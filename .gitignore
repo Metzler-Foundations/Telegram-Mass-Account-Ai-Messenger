@@ -1,11 +1,111 @@
-# Temporarily modified .gitignore to include more files
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
 venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
 *.log
 logs/
+telegram_bot.log
+telegram_bot_errors.log
+
+# Databases
 *.db
 accounts.db
 campaigns.db
 anti_detection.db
+competitor_intel.db
+conversation_analytics.db
+discovered_groups.db
+engagement.db
+intelligence.db
+media_intelligence.db
+members.db
+network.db
+proxy_pool.db
+quarantine.db
+recovery_plans.db
+scheduler.db
+shadowban_monitor.db
+status_intelligence.db
+
+# Config files with sensitive data
+config.json
+api_keys.json
+warmup_jobs.json
+encryption_key.bin.secure
+
+# Backups
+backups/
+*.backup
+config.json.backup
+
+# Cloned profiles (sensitive data)
+cloned_profiles/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Pyrogram session files
 *.session
-.gitignore.temp
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution
+*.tar.gz
+*.zip
+
+# Node modules (if any)
+node_modules/
+
+# Third-party reference code
+pyrogram_ref/
+
+# Secrets and keys
+.env
+.env.local
+.env.*.local
+secrets.json

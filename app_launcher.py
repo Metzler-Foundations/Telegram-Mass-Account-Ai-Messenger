@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 from PyQt6.QtCore import QTimer
 
 # Import and configure centralized logging with rotation
-from setup_logging import setup_logging
+from core.setup_logging import setup_logging
 
 # Set up logging with rotation (10MB per file, 5 backups)
 setup_logging(log_level=logging.INFO)
@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 def check_first_run() -> bool:
     """Check if this is the first time running the app."""
-    from welcome_wizard import should_show_wizard
+    from ui.welcome_wizard import should_show_wizard
     return should_show_wizard()
 
 
 def show_welcome_wizard(app):
     """Show the welcome wizard for first-time users."""
     try:
-        from welcome_wizard import WelcomeWizard
+        from ui.welcome_wizard import WelcomeWizard
         
         wizard = WelcomeWizard()
         
@@ -58,7 +58,7 @@ def show_welcome_wizard(app):
 def show_quick_start_tip(main_window):
     """Show quick start tip after wizard."""
     try:
-        from ui_enhancements import show_quick_start
+        from ui.ui_enhancements import show_quick_start
         
         # Show quick start guide
         show_again = show_quick_start(main_window)
@@ -117,7 +117,7 @@ def launch_application():
         
         # Apply theme
         try:
-            from ui_redesign import DISCORD_THEME
+            from ui.ui_redesign import DISCORD_THEME
             app.setStyleSheet(DISCORD_THEME)
             logger.info("Applied Discord theme")
         except ImportError:

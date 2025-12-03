@@ -47,18 +47,18 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject, QSize, QThreadPool, QRunnable, QMetaObject, Q_ARG
 from PyQt6.QtGui import QTextCursor, QIcon, QFont, QAction, QColor, QPalette, QShortcut, QKeySequence
 
-from telegram_client import TelegramClient
-from gemini_service import GeminiService
-from member_scraper import (MemberScraper, MemberDatabase, EliteAntiDetectionSystem,
+from telegram.telegram_client import TelegramClient
+from ai.gemini_service import GeminiService
+from scraping.member_scraper import (MemberScraper, MemberDatabase, EliteAntiDetectionSystem,
                             ComprehensiveDataExtractor, EliteMemberScraper)
-from account_creator import AccountCreator
-from account_manager import AccountManager
-from anti_detection_system import AntiDetectionSystem
-from api_key_manager import APIKeyManager
-from account_warmup_service import AccountWarmupService
-from dm_campaign_manager import DMCampaignManager, MessageTemplateEngine, CampaignStatus
-from settings_window import SettingsWindow
-from ui_components import CampaignManagerWidget, MessageHistoryWidget
+from accounts.account_creator import AccountCreator
+from accounts.account_manager import AccountManager
+from anti_detection.anti_detection_system import AntiDetectionSystem
+from integrations.api_key_manager import APIKeyManager
+from accounts.account_warmup_service import AccountWarmupService
+from campaigns.dm_campaign_manager import DMCampaignManager, MessageTemplateEngine, CampaignStatus
+from ui.settings_window import SettingsWindow
+from ui.ui_components import CampaignManagerWidget, MessageHistoryWidget
 import sqlite3
 from datetime import datetime, timedelta
 
@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 # Import Advanced Features Manager
 try:
-    from advanced_features_manager import get_features_manager
+    from monitoring.advanced_features_manager import get_features_manager
     ADVANCED_FEATURES_AVAILABLE = True
     logger.info("✅ Advanced features loaded successfully")
 except ImportError as e:
@@ -111,22 +111,22 @@ MIN_RETRY_MULTIPLIER = 1
 MAX_RETRY_MULTIPLIER = 3
 
 # Import event types and utilities from utils module to avoid circular imports
-from utils import (
+from utils.utils import (
     EVENT_MESSAGE_RECEIVED, EVENT_MESSAGE_SENT, EVENT_ERROR_OCCURRED,
     EVENT_SERVICE_STARTED, EVENT_SERVICE_STOPPED, EVENT_STATUS_CHANGED
 )
-from config_manager import ConfigurationManager
-from service_container import ServiceContainer, ServiceFactory, IMessageService, IAIService, IDatabaseService, IAntiDetectionService, EventSystem
-from telegram_worker import TelegramWorker
+from core.config_manager import ConfigurationManager
+from core.service_container import ServiceContainer, ServiceFactory, IMessageService, IAIService, IDatabaseService, IAntiDetectionService, EventSystem
+from telegram.telegram_worker import TelegramWorker
 
 # Import performance monitor
-from performance_monitor import PerformanceMonitor, StructuredLogger, init_resource_manager, shutdown_resource_manager, get_resource_manager
+from monitoring.performance_monitor import PerformanceMonitor, StructuredLogger, init_resource_manager, shutdown_resource_manager, get_resource_manager
 
 # Import error handler for user-friendly messages
-from error_handler import ErrorHandler
+from core.error_handler import ErrorHandler
 
 # Import UI controller for clean separation
-from ui_controller import UIController
+from ui.ui_controller import UIController
 
 
 class ThreadSafeUI:
