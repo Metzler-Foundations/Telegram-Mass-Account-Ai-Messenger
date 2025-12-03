@@ -1,0 +1,56 @@
+{
+  "queued_jobs": [
+    {
+      "job_id": "warmup_+1234567890_1764631539_2810",
+      "phone_number": "+1234567890",
+      "stage": "created",
+      "priority": "normal",
+      "created_at": "2025-12-01 16:25:39.636620",
+      "started_at": null,
+      "completed_at": null,
+      "last_activity": null,
+      "progress": 0.0,
+      "status_message": "Job queued for warmup",
+      "error_message": null,
+      "retry_count": 0,
+      "max_retries": 3,
+      "metadata": {}
+    },
+    {
+      "job_id": "warmup_+1234567890_1764632493_1455",
+      "phone_number": "+1234567890",
+      "stage": "created",
+      "priority": "normal",
+      "created_at": "2025-12-01 16:41:33.498541",
+      "started_at": null,
+      "completed_at": null,
+      "last_activity": null,
+      "progress": 0.0,
+      "status_message": "Job queued for warmup",
+      "error_message": null,
+      "retry_count": 0,
+      "max_retries": 3,
+      "metadata": {}
+    },
+    {
+      "job_id": "warmup_+1234567890_1764632562_9766",
+      "phone_number": "+1234567890",
+      "stage": "created",
+      "priority": "normal",
+      "created_at": "2025-12-01 16:42:42.695776",
+      "started_at": null,
+      "completed_at": null,
+      "last_activity": null,
+      "progress": 0.0,
+      "status_message": "Job queued for warmup",
+      "error_message": null,
+      "retry_count": 0,
+      "max_retries": 3,
+      "metadata": {}
+    }
+  ],
+  "active_jobs": [],
+  "completed_jobs": [],
+  "failed_jobs": [],
+  "last_updated": "2025-12-01T16:42:42.696505"
+}

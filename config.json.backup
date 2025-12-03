@@ -1,0 +1,87 @@
+{
+  "telegram": {
+    "api_id": "38276957",
+    "api_hash": "bf6d3904316fce66946fb5c93188a972",
+    "phone_number": "+15407420394"
+  },
+  "gemini": {
+    "api_key": "AIzaSyA7gM7p4ecuIIve9_hFLF2ENyZLYNCqpjI"
+  },
+  "openai": {
+    "api_key": ""
+  },
+  "elevenlabs": {
+    "api_key": ""
+  },
+  "sms_providers": {
+    "provider": "sms-activate",
+    "api_key": ""
+  },
+  "brain": {
+    "prompt": "You are a helpful assistant. Respond naturally and helpfully to user messages.",
+    "max_reply_length": 1024,
+    "typing_delay": 2.0,
+    "ai": {
+      "temperature": 0.8,
+      "top_p": 0.9,
+      "top_k": 40,
+      "max_tokens": 1000
+    }
+  },
+  "anti_detection": {
+    "messages_per_hour": 50,
+    "burst_limit": 3,
+    "min_delay": 2.0,
+    "max_delay": 30.0,
+    "online_simulation": true,
+    "random_skip": true,
+    "time_based_delays": true,
+    "error_backoff": true,
+    "session_recovery": true
+  },
+  "account_defaults": {
+    "account_type": "reactive",
+    "use_shared_brain": true,
+    "custom_brain_prompt": ""
+  },
+  "voice": {
+    "enabled": false,
+    "voice_id": "rachel",
+    "trigger_mode": "random",
+    "random_chance": 30,
+    "nth_message": 3,
+    "keywords": [
+      "hey",
+      "hi",
+      "hello",
+      "interested",
+      "price",
+      "how much",
+      "tell me more"
+    ],
+    "time_boost_enabled": true,
+    "rapport_boost_enabled": true
+  },
+  "account": {
+    "type": "reactive"
+  },
+  "proxy_pool": {
+    "enabled": true,
+    "min_score": 30,
+    "health_check_interval": 60,
+    "auto_reassign": true,
+    "prefer_us_proxies": true
+  },
+  "scalability": {
+    "max_concurrent_accounts": 50,
+    "max_per_shard": 10,
+    "idle_timeout": 300,
+    "batch_update_interval": 5
+  },
+  "advanced": {
+    "max_reply_length": 1024,
+    "enable_logging": true,
+    "realistic_typing": true,
+    "random_delays": true
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "test": {
+    "key": "gAAAAABpLiUbJf2EL20VllXN3vgPuNOOD17qDYjEJhOAZtHLYvcFQAqM3Q9QBUzGHFExp0Jm410eo5u42DX02UyiELRsBu2RxA==",
+    "added_at": "2025-12-01T16:30:35.639048",
+    "last_validated": "2025-12-01T16:30:35.648021",
+    "is_valid": false,
+    "validation_attempts": 1,
+    "last_used": "2025-12-01T16:30:35.647285",
+    "usage_count": 2,
+    "metadata": {},
+    "last_error": "Unknown service: test"
+  },
+  "gemini": {
+    "key": "gAAAAABpL8s3SazcRqDG5ycLgFTzg-jYJiv-oaQrfPgaUuhiiu0oN7itw4RJ8fSixHLH_cphyxS0dLqFbo-chE2TNtymFDFcxsGKafGFJoy9Y0OXQWuS3PUY82tljl6tD44Tw8kDP7Vl",
+    "added_at": "2025-12-02T22:31:35.308375",
+    "last_validated": null,
+    "is_valid": false,
+    "validation_attempts": 0,
+    "last_used": "2025-12-02T22:31:35.313101",
+    "usage_count": 1,
+    "metadata": {}
+  }
+}
