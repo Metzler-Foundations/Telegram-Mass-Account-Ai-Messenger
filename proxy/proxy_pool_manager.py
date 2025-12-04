@@ -1592,36 +1592,55 @@ class ProxyPoolManager:
             return await self._assign_new_proxy(account_phone, prefer_tier)
     
     async def _assign_new_proxy(self, account_phone: str, prefer_tier: ProxyTier) -> Optional[Proxy]:
-        """Assign a new proxy to an account."""
-        # Get available proxies sorted by score
-        available = [
-            self.proxies[key] for key in self.available_proxies
-            if key in self.proxies and self.proxies[key].score >= self.config['min_score']
-        ]
+        """Assign a new proxy to an account (with race condition protection)."""
+        async with self._lock:
+            # Check if account already has assignment (prevent double assignment)
+            if account_phone in self.assigned_proxies:
+                proxy_key = self.assigned_proxies[account_phone]
+                if proxy_key in self.proxies:
+                    logger.info(f"Account {account_phone} already has proxy {proxy_key}")
+                    return self.proxies[proxy_key]
+            
+            # Get available proxies sorted by score
+            available = [
+                self.proxies[key] for key in self.available_proxies
+                if key in self.proxies and self.proxies[key].score >= self.config['min_score']
+                and self.proxies[key].assigned_account is None  # Ensure not already assigned
+            ]
+            
+            if not available:
+                logger.warning(f"No available proxies for account {account_phone}")
+                return None
+            
+            # Sort by score and tier preference
+            def sort_key(p):
+                tier_bonus = 10 if p.tier == prefer_tier else 0
+                us_bonus = 5 if p.country == 'US' and self.config['prefer_us_proxies'] else 0
+                return -(p.score + tier_bonus + us_bonus)
+            
+            available.sort(key=sort_key)
+            
+            # Assign best proxy (atomic operation)
+            proxy = available[0]
+            proxy.assigned_account = account_phone
+            proxy.last_used = datetime.now()
+            
+            self.assigned_proxies[account_phone] = proxy.proxy_key
+            self.available_proxies.discard(proxy.proxy_key)
         
-        if not available:
-            logger.warning(f"No available proxies for account {account_phone}")
+        # Save assignment outside lock (to avoid holding lock during I/O)
+        try:
+            self._save_proxy(proxy)
+            self._save_assignment(account_phone, proxy.proxy_key)
+        except Exception as e:
+            logger.error(f"Failed to save proxy assignment: {e}")
+            # Rollback on failure
+            async with self._lock:
+                proxy.assigned_account = None
+                if account_phone in self.assigned_proxies:
+                    del self.assigned_proxies[account_phone]
+                self.available_proxies.add(proxy.proxy_key)
             return None
-        
-        # Sort by score and tier preference
-        def sort_key(p):
-            tier_bonus = 10 if p.tier == prefer_tier else 0
-            us_bonus = 5 if p.country == 'US' and self.config['prefer_us_proxies'] else 0
-            return -(p.score + tier_bonus + us_bonus)
-        
-        available.sort(key=sort_key)
-        
-        # Assign best proxy
-        proxy = available[0]
-        proxy.assigned_account = account_phone
-        proxy.last_used = datetime.now()
-        
-        self.assigned_proxies[account_phone] = proxy.proxy_key
-        self.available_proxies.discard(proxy.proxy_key)
-        
-        # Save assignment
-        self._save_proxy(proxy)
-        self._save_assignment(account_phone, proxy.proxy_key)
         
         logger.info(f"✅ Assigned proxy {proxy.proxy_key} (score: {proxy.score:.1f}) to account {account_phone}")
         

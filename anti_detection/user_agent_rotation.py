@@ -55,3 +55,4 @@ def get_random_user_agent() -> str:
     """Get random user agent."""
     return UserAgentRotator.get_random_user_agent()
 
+

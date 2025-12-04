@@ -75,3 +75,4 @@ async def detect_ban_status(client, account_id: str) -> bool:
         BanDetector.record_ban(account_id, reason)
     return is_banned
 
+

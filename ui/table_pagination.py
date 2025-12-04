@@ -67,3 +67,4 @@ class TablePaginator(QWidget):
             self.update_display()
 
 
+

@@ -131,3 +131,4 @@ async def send_media(client, chat_id: str, media_path: str, media_type: str):
     else:
         raise ValueError(f"Unsupported media type: {media_type}")
 
+

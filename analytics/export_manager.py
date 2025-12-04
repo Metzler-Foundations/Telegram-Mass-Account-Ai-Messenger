@@ -62,3 +62,4 @@ def export_to_csv(data: List[Dict], output_file: str) -> bool:
     return AnalyticsExporter.export_to_csv(data, output_file)
 
 
+

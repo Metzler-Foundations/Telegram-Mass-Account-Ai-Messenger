@@ -71,3 +71,4 @@ def generate_device_fingerprint(account_id: str) -> Dict[str, str]:
     """Generate device fingerprint."""
     return DeviceFingerprintRandomizer.generate_fingerprint(account_id)
 
+

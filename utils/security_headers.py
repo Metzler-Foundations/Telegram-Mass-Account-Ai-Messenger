@@ -63,3 +63,4 @@ def apply_security_headers(response):
     """Apply security headers to HTTP response."""
     return SecurityHeaders.apply_headers(response)
 
+

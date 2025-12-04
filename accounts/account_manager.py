@@ -727,11 +727,12 @@ class AccountManager:
     
     async def _suspend_client(self, phone_number: str):
         """Suspend a client without removing the account."""
-        if phone_number not in self.active_clients:
-            return
-        
-        client = self.active_clients[phone_number]
-        shard_id = self.account_to_shard.get(phone_number, 'shard_default')
+        async with self._lock:
+            if phone_number not in self.active_clients:
+                return
+            
+            client = self.active_clients[phone_number]
+            shard_id = self.account_to_shard.get(phone_number, 'shard_default')
         
         try:
             # Unregister from monitoring
@@ -745,7 +746,9 @@ class AccountManager:
             await self.connection_pool.release(phone_number, shard_id)
             
             # Remove from active clients
-            del self.active_clients[phone_number]
+            async with self._lock:
+                if phone_number in self.active_clients:
+                    del self.active_clients[phone_number]
             
             # Update status
             await self.batch_updater.queue_update(phone_number, {
@@ -957,18 +960,40 @@ class AccountManager:
         if 'priority' not in account_data:
             account_data['priority'] = AccountPriority.NORMAL.value
         
-        self.accounts[phone_number] = account_data
-        self.account_status[phone_number] = {
-            'status': AccountStatus.CREATED.value,
-            'last_seen': datetime.now(),
-            'messages_today': 0,
-            'total_messages': 0,
-            'is_online': False,
-            'created_at': datetime.now().isoformat()
-        }
+        # Thread-safe account addition
+        loop = None
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
         
-        # Initialize metrics
-        self.account_metrics[phone_number] = AccountMetrics()
+        if loop:
+            # If in async context, use proper locking
+            async def _add_with_lock():
+                async with self._lock:
+                    self.accounts[phone_number] = account_data
+                    self.account_status[phone_number] = {
+                        'status': AccountStatus.CREATED.value,
+                        'last_seen': datetime.now(),
+                        'messages_today': 0,
+                        'total_messages': 0,
+                        'is_online': False,
+                        'created_at': datetime.now().isoformat()
+                    }
+                    self.account_metrics[phone_number] = AccountMetrics()
+            loop.create_task(_add_with_lock())
+        else:
+            # Sync context (backward compatibility)
+            self.accounts[phone_number] = account_data
+            self.account_status[phone_number] = {
+                'status': AccountStatus.CREATED.value,
+                'last_seen': datetime.now(),
+                'messages_today': 0,
+                'total_messages': 0,
+                'is_online': False,
+                'created_at': datetime.now().isoformat()
+            }
+            self.account_metrics[phone_number] = AccountMetrics()
         
         # Assign to shard
         shard_id = self._determine_shard(account_data)
@@ -978,7 +1003,7 @@ class AccountManager:
         logger.info(f"Added account: {phone_number} (shard: {shard_id})")
 
     def remove_account(self, phone_number: str):
-        """Remove an account from the manager."""
+        """Remove an account from the manager (thread-safe)."""
         # Schedule client stop if running
         if phone_number in self.active_clients:
             try:
@@ -991,20 +1016,42 @@ class AccountManager:
             except RuntimeError:
                 logger.warning(f"Cannot stop client for {phone_number}: no running event loop")
 
-        # Remove from shard
-        if phone_number in self.account_to_shard:
-            shard_id = self.account_to_shard[phone_number]
-            if shard_id in self.shards:
-                self.shards[shard_id].accounts.discard(phone_number)
-            del self.account_to_shard[phone_number]
-        
-        # Remove data
-        if phone_number in self.accounts:
-            del self.accounts[phone_number]
-        if phone_number in self.account_status:
-            del self.account_status[phone_number]
-        if phone_number in self.account_metrics:
-            del self.account_metrics[phone_number]
+        # Perform removal with proper locking if in async context
+        try:
+            loop = asyncio.get_running_loop()
+            
+            async def _remove_with_lock():
+                async with self._lock:
+                    # Remove from shard
+                    if phone_number in self.account_to_shard:
+                        shard_id = self.account_to_shard[phone_number]
+                        if shard_id in self.shards:
+                            self.shards[shard_id].accounts.discard(phone_number)
+                        del self.account_to_shard[phone_number]
+                    
+                    # Remove data
+                    if phone_number in self.accounts:
+                        del self.accounts[phone_number]
+                    if phone_number in self.account_status:
+                        del self.account_status[phone_number]
+                    if phone_number in self.account_metrics:
+                        del self.account_metrics[phone_number]
+            
+            loop.create_task(_remove_with_lock())
+        except RuntimeError:
+            # Sync context (backward compatibility)
+            if phone_number in self.account_to_shard:
+                shard_id = self.account_to_shard[phone_number]
+                if shard_id in self.shards:
+                    self.shards[shard_id].accounts.discard(phone_number)
+                del self.account_to_shard[phone_number]
+            
+            if phone_number in self.accounts:
+                del self.accounts[phone_number]
+            if phone_number in self.account_status:
+                del self.account_status[phone_number]
+            if phone_number in self.account_metrics:
+                del self.account_metrics[phone_number]
         
         # Remove from database
         try:
@@ -1020,16 +1067,18 @@ class AccountManager:
 
     async def start_client(self, phone_number: str, force_new: bool = False) -> bool:
         """Start a Telegram client for an account with connection pooling."""
-        if phone_number not in self.accounts:
-            logger.error(f"Account not found: {phone_number}")
-            return False
+        async with self._lock:
+            if phone_number not in self.accounts:
+                logger.error(f"Account not found: {phone_number}")
+                return False
 
-        if phone_number in self.active_clients and not force_new:
-            logger.info(f"Client already running for: {phone_number}")
-            return True
+            if phone_number in self.active_clients and not force_new:
+                logger.info(f"Client already running for: {phone_number}")
+                return True
 
-        account_data = self.accounts[phone_number]
-        shard_id = self.account_to_shard.get(phone_number, 'shard_default')
+            # Get account data safely
+            account_data = self.accounts[phone_number].copy()  # Copy to avoid race
+            shard_id = self.account_to_shard.get(phone_number, 'shard_default')
         
         # Acquire connection slot
         acquired = await self.connection_pool.acquire(phone_number, shard_id)
@@ -1095,15 +1144,17 @@ class AccountManager:
             # Initialize the client
             success = await client.initialize()
             if success:
-                self.active_clients[phone_number] = client
-                
-                # Update shard
-                if shard_id in self.shards:
-                    self.shards[shard_id].active_connections += 1
-                
-                # Update metrics
-                if phone_number in self.account_metrics:
-                    self.account_metrics[phone_number].last_activity = datetime.now()
+                # Thread-safe updates
+                async with self._lock:
+                    self.active_clients[phone_number] = client
+                    
+                    # Update shard
+                    if shard_id in self.shards:
+                        self.shards[shard_id].active_connections += 1
+                    
+                    # Update metrics
+                    if phone_number in self.account_metrics:
+                        self.account_metrics[phone_number].last_activity = datetime.now()
                 
                 # Queue status update
                 await self.batch_updater.queue_update(phone_number, {
@@ -1282,20 +1333,26 @@ class AccountManager:
             logger.warning(f"⚠️ {phone_number} uses one-time phone. Use force=True to stop.")
             return False
         
-        if phone_number in self.active_clients:
-            shard_id = self.account_to_shard.get(phone_number, 'shard_default')
+        async with self._lock:
+            if phone_number not in self.active_clients:
+                return False
             
+            shard_id = self.account_to_shard.get(phone_number, 'shard_default')
+            client = self.active_clients[phone_number]
+        
+        try:
             # Unregister from monitoring
             await self.connection_manager.unregister_client(phone_number)
             
             # Stop client
-            client = self.active_clients[phone_number]
             try:
                 await client.stop()
             except Exception as e:
                 logger.error(f"Error stopping client {phone_number}: {e}")
             
-            del self.active_clients[phone_number]
+            async with self._lock:
+                if phone_number in self.active_clients:
+                    del self.active_clients[phone_number]
             
             # Release connection slot
             await self.connection_pool.release(phone_number, shard_id)

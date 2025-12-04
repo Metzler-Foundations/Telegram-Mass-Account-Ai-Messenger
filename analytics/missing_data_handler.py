@@ -87,3 +87,4 @@ def handle_missing_data(data: Any, default: Any = None) -> Any:
     """General purpose missing data handler."""
     return data if data is not None else default
 
+

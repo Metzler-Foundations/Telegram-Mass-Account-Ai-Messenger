@@ -54,3 +54,4 @@ def get_group_join_manager():
         _manager = GroupJoinManager()
     return _manager
 
+
