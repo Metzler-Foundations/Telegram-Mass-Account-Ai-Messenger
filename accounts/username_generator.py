@@ -229,34 +229,73 @@ class UsernameGenerator:
         return None
     
     def _is_valid_telegram_username(self, username: str) -> bool:
-        """Check if username is valid for Telegram."""
+        """Check if username is valid for Telegram with comprehensive validation."""
         if not username:
+            logger.debug("Empty username")
+            return False
+        
+        if not isinstance(username, str):
+            logger.warning(f"Username must be string, got {type(username)}")
             return False
         
         # Telegram username rules:
         # - 5-32 characters
         # - Only letters, numbers, underscores
         # - Cannot start with number
+        # - Cannot end with underscore
+        # - No consecutive underscores
         # - Case insensitive (but we'll preserve case for visual similarity)
         
-        if len(username) < 5 or len(username) > 32:
+        if len(username) < 5:
+            logger.debug(f"Username too short: {len(username)} < 5")
+            return False
+        
+        if len(username) > 32:
+            logger.debug(f"Username too long: {len(username)} > 32")
             return False
         
         # Check if starts with number (not allowed)
         if username[0].isdigit():
+            logger.debug(f"Username starts with digit: {username[0]}")
             return False
         
-        # Check characters (allow Unicode for lookalikes)
-        # Telegram actually allows Unicode in usernames, but we'll be conservative
-        pattern = re.compile(r'^[a-zA-Z0-9_а-яА-ЯёЁіІєЄїЇґҐ]+$', re.UNICODE)
-        if not pattern.match(username):
+        # Check if ends with underscore (not allowed)
+        if username.endswith('_'):
+            logger.debug("Username ends with underscore")
+            return False
+        
+        # Check for consecutive underscores (not allowed)
+        if '__' in username:
+            logger.debug("Username contains consecutive underscores")
+            return False
+        
+        # Validate characters
+        from accounts.username_validator import UsernameValidator
+        try:
+            UsernameValidator.validate_username(username)
+        except Exception as e:
+            logger.debug(f"Username validation failed: {e}")
+            return False
+        
+        # Check characters (allow Unicode for lookalikes but validate)
+        try:
+            # Ensure valid UTF-8
+            username.encode('utf-8')
+            
+            # Allow Latin, Cyrillic, numbers, and underscores
+            pattern = re.compile(r'^[a-zA-Z0-9_а-яА-ЯёЁіІєЄїЇґҐ]+$', re.UNICODE)
+            if not pattern.match(username):
+                logger.debug(f"Username contains invalid characters: {username}")
+                return False
+        except UnicodeEncodeError as e:
+            logger.debug(f"Username encoding error: {e}")
             return False
         
         return True
     
     async def check_username_availability(self, client, username: str) -> Tuple[bool, Optional[str]]:
         """
-        Check if a username is available on Telegram.
+        Check if a username is available on Telegram with validation.
         
         Args:
             client: Pyrogram Client instance
@@ -265,24 +304,37 @@ class UsernameGenerator:
         Returns:
             Tuple of (is_available, error_message)
         """
+        # Validate format first
+        if not self._is_valid_telegram_username(username):
+            return False, "Invalid username format"
+        
         try:
+            # Normalize username (remove @, trim, lowercase for check)
+            check_username = username.lstrip('@').strip()
+            
             # Try to get user by username
             try:
-                user = await client.get_users(username)
+                user = await client.get_users(check_username)
                 # If we get here, username is taken
+                logger.debug(f"Username {check_username} is taken by user {user.id if user else 'unknown'}")
                 return False, "Username is already taken"
             except Exception as e:
                 error_str = str(e).lower()
-                if "username not occupied" in error_str or "user not found" in error_str:
+                if "username not occupied" in error_str or "user not found" in error_str or "not found" in error_str:
+                    logger.debug(f"Username {check_username} is available")
                     return True, None
-                elif "username invalid" in error_str:
+                elif "username invalid" in error_str or "invalid" in error_str:
+                    logger.debug(f"Username {check_username} has invalid format")
                     return False, "Invalid username format"
+                elif "flood" in error_str:
+                    logger.warning(f"Rate limited checking username: {e}")
+                    return False, "Rate limited - try again later"
                 else:
-                    # Unknown error, assume available but log it
-                    logger.warning(f"Unknown error checking username {username}: {e}")
-                    return True, None
+                    # Unknown error, log and treat as unavailable for safety
+                    logger.warning(f"Unknown error checking username {check_username}: {e}")
+                    return False, f"Error checking: {e}"
         except Exception as e:
-            logger.error(f"Error checking username availability: {e}")
+            logger.error(f"Error checking username availability for {username}: {e}", exc_info=True)
             return False, str(e)
     
     async def find_available_similar_username(self, client, source_username: str, 
