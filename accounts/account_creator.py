@@ -1358,11 +1358,15 @@ class AccountCreator:
         The proxy is permanently assigned to this account.
         
         Args:
-            phone_number: Phone number for the account
+            phone_number: Phone number for the account (will be normalized)
             
         Returns:
             Proxy configuration dict or None
         """
+        # Normalize phone number for consistent proxy assignment
+        from accounts.phone_normalizer import PhoneNormalizer
+        phone_number = PhoneNormalizer.normalize(phone_number)
+        
         # Try proxy pool first
         pool = await self._get_proxy_pool_manager()
         if pool:
