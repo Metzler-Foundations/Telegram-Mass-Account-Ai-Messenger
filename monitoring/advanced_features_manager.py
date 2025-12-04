@@ -7,8 +7,10 @@ making it easy to add them to your existing bot.
 
 import logging
 import asyncio
+import json
 from typing import List, Dict, Optional, Any
 from datetime import datetime
+from pathlib import Path
 
 # Import all advanced features
 from ai.intelligence_engine import IntelligenceEngine, UserIntelligence
@@ -38,10 +40,21 @@ class AdvancedFeaturesManager:
                 Options: 'intelligence', 'engagement', 'discovery', 'status',
                         'shadowban', 'network', 'competitor', 'media', 'scheduler'
         """
-        self.enabled_features = enabled_features or [
+        self.state_file = Path("advanced_features_state.json")
+        state = self._load_state()
+
+        self.enabled_features = enabled_features or state.get('enabled_features') or [
             'intelligence', 'engagement', 'discovery', 'status',
             'shadowban', 'network', 'competitor', 'media', 'scheduler'
         ]
+
+        self.timezone_preference = state.get('timezone') or self._load_timezone_preference()
+        if not self.timezone_preference:
+            try:
+                timezone = datetime.now().astimezone().tzinfo
+                self.timezone_preference = getattr(timezone, "key", None) or getattr(timezone, "zone", None) or "UTC"
+            except Exception:
+                self.timezone_preference = "UTC"
         
         logger.info(f"Initializing Advanced Features Manager with: {self.enabled_features}")
         
@@ -157,6 +170,53 @@ class AdvancedFeaturesManager:
             target_groups=target_groups or [],
             keywords=keywords or []
         )
+
+    def _load_state(self) -> Dict[str, Any]:
+        try:
+            if self.state_file.exists():
+                data = self.state_file.read_text(encoding='utf-8')
+                if data:
+                    return json.loads(data)
+        except Exception as exc:
+            logger.debug(f"Failed to load advanced feature state: {exc}")
+        return {}
+
+    def _persist_state(self, payload: Dict[str, Any]):
+        try:
+            self.state_file.write_text(json.dumps(payload), encoding='utf-8')
+        except Exception as exc:
+            logger.debug(f"Failed to persist advanced feature state: {exc}")
+
+    def persist_enabled_features(self, features: List[str]):
+        """Persist enabled features selection for future launches."""
+        self.enabled_features = features
+        next_state = self._load_state()
+        next_state['enabled_features'] = features
+        if self.timezone_preference:
+            next_state.setdefault('timezone', self.timezone_preference)
+        self._persist_state(next_state)
+
+    def _load_timezone_preference(self) -> Optional[str]:
+        try:
+            if self.state_file.exists():
+                data = self.state_file.read_text(encoding='utf-8')
+                if data:
+                    payload = json.loads(data)
+                    return payload.get('timezone')
+        except Exception as exc:
+            logger.debug(f"Failed to load timezone preference: {exc}")
+        return None
+
+    def _persist_timezone_preference(self, timezone_name: str):
+        try:
+            current_state = self._load_state()
+            current_state['timezone'] = timezone_name
+            if self.enabled_features:
+                current_state.setdefault('enabled_features', self.enabled_features)
+            self._persist_state(current_state)
+            self.timezone_preference = timezone_name
+        except Exception as exc:
+            logger.debug(f"Failed to persist timezone preference: {exc}")
     
     # === Status & Timing Features ===
     
@@ -183,8 +243,11 @@ class AdvancedFeaturesManager:
         """
         if not self.scheduler:
             return None
-        
-        return self.scheduler.schedule_optimal(user_id, "placeholder", "UTC")
+
+        tz_name = self.timezone_preference or "UTC"
+        return_time = self.scheduler.schedule_optimal(user_id, "placeholder", tz_name)
+        self._persist_timezone_preference(tz_name)
+        return return_time
     
     def predict_online(self, user_id: int, hour: int, day: int) -> float:
         """Predict probability user is online at given time.

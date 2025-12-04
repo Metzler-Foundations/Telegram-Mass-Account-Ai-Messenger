@@ -7,6 +7,8 @@ import logging
 import os
 import json
 import datetime
+import threading
+import time
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import requests
@@ -40,11 +42,15 @@ class SetupWizardManager:
     def __init__(self, settings_data: Dict[str, Any]):
         self.settings_data = settings_data
         self.wizard_complete_file = Path(".wizard_complete")
-        
+        self.wizard_progress_file = Path(".wizard_progress.json")
+
     def is_wizard_needed(self) -> bool:
         """Check if wizard should be shown (first-time or missing required settings)."""
         # Check if wizard was previously completed
         if self.wizard_complete_file.exists():
+            marker = self._load_completion_marker()
+            if marker is None:
+                return True
             # Still check if critical settings are missing
             if not self._has_critical_settings():
                 return True
@@ -153,36 +159,37 @@ class SetupWizardManager:
     def save_step_progress(self, step: int, settings: Dict[str, Any]):
         """Save progress after each successful step."""
         try:
-            progress_file = Path(".wizard_progress.json")
             progress_data = {
                 "current_step": step,
                 "completed_steps": list(range(step)),
                 "timestamp": datetime.datetime.now().isoformat(),
                 "partial_settings": settings
             }
-            with open(progress_file, 'w') as f:
+            with open(self.wizard_progress_file, 'w') as f:
                 json.dump(progress_data, f, indent=2)
             logger.info(f"Saved wizard progress at step {step}")
         except Exception as e:
             logger.error(f"Failed to save wizard progress: {e}")
-    
+
     def load_step_progress(self) -> Optional[Dict[str, Any]]:
         """Load saved progress if exists."""
         try:
-            progress_file = Path(".wizard_progress.json")
-            if progress_file.exists():
-                with open(progress_file, 'r') as f:
-                    return json.load(f)
+            if self.wizard_progress_file.exists():
+                with open(self.wizard_progress_file, 'r') as f:
+                    progress = json.load(f)
+                if self._is_progress_metadata_valid(progress):
+                    return progress
+                logger.warning("Wizard progress file is invalid or corrupted; clearing it")
+                self.clear_step_progress()
         except Exception as e:
             logger.error(f"Failed to load wizard progress: {e}")
         return None
-    
+
     def clear_step_progress(self):
         """Clear saved progress after completion."""
         try:
-            progress_file = Path(".wizard_progress.json")
-            if progress_file.exists():
-                progress_file.unlink()
+            if self.wizard_progress_file.exists():
+                self.wizard_progress_file.unlink()
             logger.info("Cleared wizard progress")
         except Exception as e:
             logger.error(f"Failed to clear wizard progress: {e}")
@@ -196,6 +203,53 @@ class SetupWizardManager:
             self.STEP_OPTIONAL: "Optional Settings"
         }
         return names.get(step, "Unknown")
+
+    def _load_completion_marker(self) -> Optional[Dict[str, Any]]:
+        """Load and validate the wizard completion marker."""
+        try:
+            with open(self.wizard_complete_file, 'r') as f:
+                marker = json.load(f)
+            if not self._is_completion_metadata_valid(marker):
+                logger.warning("Wizard completion marker is invalid; removing and re-running wizard")
+                self.wizard_complete_file.unlink(missing_ok=True)
+                return None
+            return marker
+        except FileNotFoundError:
+            return None
+        except Exception as e:
+            logger.warning(f"Failed to load wizard completion marker: {e}")
+            try:
+                self.wizard_complete_file.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return None
+
+    @staticmethod
+    def _is_completion_metadata_valid(marker: Dict[str, Any]) -> bool:
+        """Ensure the completion file has expected shape to avoid false positives."""
+        if not isinstance(marker, dict):
+            return False
+        required_keys = {"completed", "timestamp", "version", "completed_steps"}
+        if not required_keys.issubset(set(marker.keys())):
+            return False
+        if marker.get("completed") is not True:
+            return False
+        if not isinstance(marker.get("completed_steps"), list) or len(marker["completed_steps"]) < 3:
+            return False
+        return True
+
+    @staticmethod
+    def _is_progress_metadata_valid(progress: Dict[str, Any]) -> bool:
+        """Validate partial wizard progress to guard against corrupted files."""
+        if not isinstance(progress, dict):
+            return False
+        if not isinstance(progress.get("current_step"), int):
+            return False
+        if not isinstance(progress.get("completed_steps"), list):
+            return False
+        if "partial_settings" not in progress:
+            return False
+        return True
 
 
 class QCollapsibleGroupBox(QGroupBox):
@@ -1101,6 +1155,7 @@ class SettingsWindow(QDialog):
         self.setAccessibleDescription("Dialog for configuring Telegram bot settings and preferences")
         self.resize(900, 700)
         self.settings_data = {}
+        self.balance_cache: Dict[tuple[str, str], Dict[str, Any]] = {}
         
         # CRITICAL: Prevent dialog from closing parent window when dismissed
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
@@ -2506,11 +2561,58 @@ class SettingsWindow(QDialog):
 
         self.balance_label.setText("Checking balance...")
         self.check_balance_button.setEnabled(False)
+        cached = self._get_cached_balance(provider, api_key)
+        if cached:
+            self._apply_balance_result(cached.get('balance'), cached.get('error'))
+            return
 
-        # Use synchronous requests for balance checking
+        def run_balance_lookup():
+            balance, error = self._fetch_provider_balance(provider, api_key)
+            QTimer.singleShot(0, lambda: self._apply_balance_result(balance, error))
+
+        threading.Thread(target=run_balance_lookup, daemon=True).start()
+
+    def _apply_balance_result(self, balance: Optional[str], error: Optional[str]):
+        """Apply balance result back on the UI thread and update cache."""
+        provider = self.phone_provider_combo.currentText()
+        api_key = self.provider_api_edit.text().strip()
+
+        if balance is not None:
+            self.balance_label.setText(f"Balance: {balance}")
+            self.balance_label.setStyleSheet("color: #23a559; font-weight: bold;")
+            self._cache_balance(provider, api_key, balance)
+        else:
+            self.balance_label.setText("Check failed")
+            self.balance_label.setStyleSheet("color: #f23f42; font-weight: bold;")
+            if error:
+                logger.error(f"Balance check error: {error}")
+
+        self.check_balance_button.setEnabled(True)
+
+    def _get_cached_balance(self, provider: str, api_key: str, ttl_seconds: int = 300) -> Optional[Dict[str, Any]]:
+        """Return cached balance if it is still fresh."""
+        key = (provider, api_key)
+        cached = self.balance_cache.get(key)
+        if not cached:
+            return None
+
+        if time.time() - cached.get('timestamp', 0) > ttl_seconds:
+            return None
+
+        return cached
+
+    def _cache_balance(self, provider: str, api_key: str, balance: str):
+        """Persist balance in memory for quick reuse."""
+        key = (provider, api_key)
+        self.balance_cache[key] = {
+            'balance': balance,
+            'timestamp': time.time(),
+        }
+
+    def _fetch_provider_balance(self, provider: str, api_key: str) -> tuple[Optional[str], Optional[str]]:
+        """Fetch provider balance with timeouts and error reporting."""
         balance = None
         error = None
-
         try:
             if provider == 'sms-activate':
                 params = {'api_key': api_key, 'action': 'getBalance'}
@@ -2543,20 +2645,11 @@ class SettingsWindow(QDialog):
                 resp = requests.get('https://www.textverified.com/api/me', headers=headers, timeout=10)
                 if resp.status_code == 200:
                     balance = str(resp.json().get('balance', 0))
-        except Exception as e:
-            error = str(e)
-            logger.error(f"Balance check error: {e}")
+        except Exception as exc:
+            error = str(exc)
+            logger.error(f"Balance check error: {exc}")
 
-        if balance is not None:
-            self.balance_label.setText(f"Balance: {balance}")
-            self.balance_label.setStyleSheet("color: #23a559; font-weight: bold;")
-        else:
-            self.balance_label.setText("Check failed")
-            self.balance_label.setStyleSheet("color: #f23f42; font-weight: bold;")
-            if error:
-                logger.error(f"Balance check error: {error}")
-
-        self.check_balance_button.setEnabled(True)
+        return balance, error
 
     def _toggle_custom_brain(self, state):
         """Toggle custom brain prompt visibility."""
@@ -2785,6 +2878,9 @@ class SettingsWindow(QDialog):
                 "Telegram API Hash should be 32 hexadecimal characters.")
             return
 
+        if not self._validate_country_support(provider, country, main_window.account_creator):
+            return
+
         # Check proxy requirements
         require_proxies = count >= 10
         if require_proxies:
@@ -2842,20 +2938,21 @@ class SettingsWindow(QDialog):
         ):
             return
 
-        # Prepare creation configuration
-        # Load settings from config.json instead of UI widgets
-        settings_config = self.load_settings()
+        # Prepare creation configuration using the latest UI state
+        settings_config = self.collect_ui_settings()
+        factory_settings = settings_config.get('account_factory', {})
+        use_proxy = factory_settings.get('use_proxy', True)
+        realistic_timing = factory_settings.get('realistic_timing', True)
 
         config = {
             'phone_provider': provider,
-            'provider_api_key': api_key,
-            'country': country,
-            'use_proxy': True,
-            'require_proxy': count >= 10,  # Require proxies for 10+ accounts
-            # Use saved settings instead of UI widgets to ensure consistency
+            'provider_api_key': factory_settings.get('provider_api_key', api_key) or api_key,
+            'country': factory_settings.get('country', country),
+            'use_proxy': use_proxy,
+            'require_proxy': use_proxy and count >= 10,  # Require proxies for 10+ accounts when proxying is enabled
             'api_id': settings_config.get('telegram', {}).get('api_id', ''),
             'api_hash': settings_config.get('telegram', {}).get('api_hash', ''),
-            'realistic_timing': True,
+            'realistic_timing': realistic_timing,
             'account_type': self.account_type_combo.currentText(),
             'enable_voice': self.enable_voice_checkbox.isChecked(),
             'voice_config': {
@@ -2865,14 +2962,13 @@ class SettingsWindow(QDialog):
                 'nth_message': self.voice_nth_spin.value(),
                 'keywords': self.voice_keywords_edit.text().strip()
             } if self.enable_voice_checkbox.isChecked() else None,
-            # Include anti-detection settings
             'anti_detection': settings_config.get('anti_detection', {}),
-            # Include proxy settings
             'proxy_pool': settings_config.get('proxy_pool', {}),
-            # Include brain settings for account cloning
             'brain': settings_config.get('brain', {}),
-            # Include account defaults
-            'account_defaults': settings_config.get('account_defaults', {})
+            'account_defaults': settings_config.get('account_defaults', {}),
+            'randomize_fingerprint': factory_settings.get('randomize_fingerprint', True),
+            'vary_platform': factory_settings.get('vary_platform', True),
+            'manual_proxies': factory_settings.get('proxies', []),
         }
 
         # Disable button during creation
@@ -2940,44 +3036,16 @@ class SettingsWindow(QDialog):
         """Validate that the provider has sufficient balance for the requested accounts."""
         try:
             # Try to get balance
-            balance = None
-            error = None
+            cached = self._get_cached_balance(provider, api_key)
+            balance = float(cached['balance']) if cached and cached.get('balance') is not None else None
+            error = cached.get('error') if cached else None
 
-            try:
-                if provider == 'sms-activate':
-                    params = {'api_key': api_key, 'action': 'getBalance'}
-                    resp = requests.get('https://api.sms-activate.org/stubs/handler_api.php', params=params, timeout=10)
-                    if resp.status_code == 200 and 'ACCESS_BALANCE' in resp.text:
-                        balance = float(resp.text.split(':')[1])
-                elif provider == 'sms-hub':
-                    params = {'api_key': api_key, 'action': 'getBalance'}
-                    resp = requests.get('https://smshub.org/api.php', params=params, timeout=10)
-                    if resp.status_code == 200 and 'ACCESS_BALANCE' in resp.text:
-                        balance = float(resp.text.split(':')[1])
-                elif provider == '5sim':
-                    headers = {'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'}
-                    resp = requests.get('https://5sim.net/v1/user/profile', headers=headers, timeout=10)
-                    if resp.status_code == 200:
-                        balance = float(resp.json().get('balance', 0))
-                elif provider == 'daisysms':
-                    headers = {'Authorization': f'Bearer {api_key}'}
-                    resp = requests.get('https://daisysms.com/api/balance', headers=headers, timeout=10)
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        balance = float(data.get('balance', 0))
-                elif provider == 'smspool':
-                    headers = {'Authorization': f'Bearer {api_key}'}
-                    resp = requests.get('https://api.smspool.net/me', headers=headers, timeout=10)
-                    if resp.status_code == 200:
-                        balance = float(resp.json().get('balance', 0))
-                elif provider == 'textverified':
-                    headers = {'Authorization': f'Bearer {api_key}'}
-                    resp = requests.get('https://www.textverified.com/api/me', headers=headers, timeout=10)
-                    if resp.status_code == 200:
-                        balance = float(resp.json().get('balance', 0))
-            except Exception as e:
-                error = str(e)
-                logger.warning(f"Balance validation failed: {e}")
+            if balance is None:
+                fetched_balance, fetch_error = self._fetch_provider_balance(provider, api_key)
+                balance = float(fetched_balance) if fetched_balance is not None else None
+                error = fetch_error
+                if fetched_balance is not None:
+                    self._cache_balance(provider, api_key, fetched_balance)
 
             if balance is not None:
                 # Check if balance is sufficient (with some buffer)
@@ -3007,6 +3075,23 @@ class SettingsWindow(QDialog):
             logger.error(f"Balance validation error: {e}")
             # Allow to continue on validation errors
             return True
+
+    def _validate_country_support(self, provider: str, country: str, account_creator) -> bool:
+        """Ensure selected country is supported by the provider and current catalog."""
+        try:
+            provider_map = getattr(getattr(account_creator, 'phone_provider', None), 'providers', {}) or {}
+            provider_config = provider_map.get(provider, {})
+            supported = provider_config.get('countries', [])
+            if supported and country not in supported:
+                ErrorHandler.safe_warning(
+                    self,
+                    "Unsupported Country",
+                    f"{provider} does not support {country}. Supported countries: {', '.join(supported)}"
+                )
+                return False
+        except Exception as exc:
+            logger.warning(f"Country support validation skipped due to error: {exc}")
+        return True
 
     def _update_creation_progress(self, current: int, total: int, message: str):
         """Update creation progress in UI."""
@@ -3339,7 +3424,18 @@ class SettingsWindow(QDialog):
             },
             "sms_providers": {
                 "provider": "sms-activate",
-                "api_key": ""
+                "api_key": "",
+            },
+            "account_factory": {
+                "account_count": 10,
+                "country": "US",
+                "phone_provider": "sms-activate",
+                "provider_api_key": "",
+                "use_proxy": True,
+                "randomize_fingerprint": True,
+                "realistic_timing": True,
+                "vary_platform": True,
+                "proxies": [],
             },
             "brain": {
                 "prompt": "",
@@ -3462,6 +3558,37 @@ class SettingsWindow(QDialog):
         if hasattr(self, 'random_delays_checkbox'):
             self.random_delays_checkbox.setChecked(advanced.get("random_delays", True))
 
+        # Account factory settings
+        factory_settings = self.settings_data.get("account_factory", {})
+        if hasattr(self, 'account_count_spin'):
+            self.account_count_spin.setValue(factory_settings.get("account_count", 10))
+        if hasattr(self, 'country_combo'):
+            stored_country = factory_settings.get("country", "US")
+            for i in range(self.country_combo.count()):
+                if self.country_combo.itemText(i).startswith(f"{stored_country} "):
+                    self.country_combo.setCurrentIndex(i)
+                    break
+        if hasattr(self, 'phone_provider_combo'):
+            provider = factory_settings.get("phone_provider", "sms-activate")
+            index = self.phone_provider_combo.findText(provider)
+            if index != -1:
+                self.phone_provider_combo.setCurrentIndex(index)
+        if hasattr(self, 'provider_api_edit'):
+            self.provider_api_edit.setText(factory_settings.get("provider_api_key", ""))
+        if hasattr(self, 'use_proxy_checkbox'):
+            self.use_proxy_checkbox.setChecked(factory_settings.get("use_proxy", True))
+        if hasattr(self, 'randomize_fingerprint_checkbox'):
+            self.randomize_fingerprint_checkbox.setChecked(factory_settings.get("randomize_fingerprint", True))
+        if hasattr(self, 'realistic_timing_checkbox'):
+            self.realistic_timing_checkbox.setChecked(factory_settings.get("realistic_timing", True))
+        if hasattr(self, 'vary_platform_checkbox'):
+            self.vary_platform_checkbox.setChecked(factory_settings.get("vary_platform", True))
+        if hasattr(self, 'proxy_list_edit'):
+            proxies = factory_settings.get("proxies", [])
+            proxy_text = "\n".join(proxies) if isinstance(proxies, list) else str(proxies)
+            self.proxy_list_edit.setPlainText(proxy_text)
+            self.update_proxy_count()
+
     def collect_ui_settings(self) -> Dict[str, Any]:
         """Collect settings from UI elements."""
         voice_trigger_map = {
@@ -3519,21 +3646,21 @@ class SettingsWindow(QDialog):
         settings.setdefault("account_defaults", {})
         settings["account_defaults"].update({
             "account_type": account_type,
-            "use_shared_brain": getattr(self, 'use_shared_brain_checkbox', None) and self.use_shared_brain_checkbox.isChecked() or True,
+            "use_shared_brain": self.use_shared_brain_checkbox.isChecked() if hasattr(self, 'use_shared_brain_checkbox') else True,
             "custom_brain_prompt": getattr(self, 'custom_brain_edit', None) and self.custom_brain_edit.toPlainText() or ""
         })
 
         # Voice configuration
         voice_settings = settings.setdefault("voice", {})
         voice_settings.update({
-            "enabled": getattr(self, 'enable_voice_checkbox', None) and self.enable_voice_checkbox.isChecked() or False,
+            "enabled": self.enable_voice_checkbox.isChecked() if hasattr(self, 'enable_voice_checkbox') else False,
             "voice_id": voice_id,
             "trigger_mode": voice_trigger,
-            "random_chance": getattr(self, 'voice_random_spin', None) and self.voice_random_spin.value() or 30,
-            "nth_message": getattr(self, 'voice_nth_spin', None) and self.voice_nth_spin.value() or 3,
+            "random_chance": self.voice_random_spin.value() if hasattr(self, 'voice_random_spin') else 30,
+            "nth_message": self.voice_nth_spin.value() if hasattr(self, 'voice_nth_spin') else 3,
             "keywords": keywords if keywords else ["hey", "hi", "hello", "interested", "price"],
-            "time_boost_enabled": getattr(self, 'voice_time_boost_checkbox', None) and self.voice_time_boost_checkbox.isChecked() or True,
-            "rapport_boost_enabled": getattr(self, 'voice_rapport_boost_checkbox', None) and self.voice_rapport_boost_checkbox.isChecked() or True
+            "time_boost_enabled": self.voice_time_boost_checkbox.isChecked() if hasattr(self, 'voice_time_boost_checkbox') else True,
+            "rapport_boost_enabled": self.voice_rapport_boost_checkbox.isChecked() if hasattr(self, 'voice_rapport_boost_checkbox') else True
         })
 
         # Campaign/account level metadata
@@ -3543,28 +3670,42 @@ class SettingsWindow(QDialog):
         # Optional proxy/scalability controls (if present)
         settings.setdefault("proxy_pool", {})
         settings["proxy_pool"].update({
-            "enabled": getattr(self, 'proxy_pool_enabled_checkbox', None) and self.proxy_pool_enabled_checkbox.isChecked() or True,
-            "min_score": getattr(self, 'proxy_min_score_spin', None) and self.proxy_min_score_spin.value() or 30,
-            "health_check_interval": getattr(self, 'proxy_health_interval_spin', None) and self.proxy_health_interval_spin.value() or 60,
-            "auto_reassign": getattr(self, 'proxy_auto_reassign_checkbox', None) and self.proxy_auto_reassign_checkbox.isChecked() or True,
-            "prefer_us_proxies": getattr(self, 'prefer_us_proxies_checkbox', None) and self.prefer_us_proxies_checkbox.isChecked() or True
+            "enabled": self.proxy_pool_enabled_checkbox.isChecked() if hasattr(self, 'proxy_pool_enabled_checkbox') else True,
+            "min_score": self.proxy_min_score_spin.value() if hasattr(self, 'proxy_min_score_spin') else 30,
+            "health_check_interval": self.proxy_health_interval_spin.value() if hasattr(self, 'proxy_health_interval_spin') else 60,
+            "auto_reassign": self.proxy_auto_reassign_checkbox.isChecked() if hasattr(self, 'proxy_auto_reassign_checkbox') else True,
+            "prefer_us_proxies": self.prefer_us_proxies_checkbox.isChecked() if hasattr(self, 'prefer_us_proxies_checkbox') else True
         })
 
         settings.setdefault("scalability", {})
         settings["scalability"].update({
-            "max_concurrent_accounts": getattr(self, 'max_concurrent_accounts_spin', None) and self.max_concurrent_accounts_spin.value() or 50,
-            "max_per_shard": getattr(self, 'max_per_shard_spin', None) and self.max_per_shard_spin.value() or 10,
-            "idle_timeout": getattr(self, 'idle_timeout_spin', None) and self.idle_timeout_spin.value() or 300,
-            "batch_update_interval": getattr(self, 'batch_update_interval_spin', None) and self.batch_update_interval_spin.value() or 5
+            "max_concurrent_accounts": self.max_concurrent_accounts_spin.value() if hasattr(self, 'max_concurrent_accounts_spin') else 50,
+            "max_per_shard": self.max_per_shard_spin.value() if hasattr(self, 'max_per_shard_spin') else 10,
+            "idle_timeout": self.idle_timeout_spin.value() if hasattr(self, 'idle_timeout_spin') else 300,
+            "batch_update_interval": self.batch_update_interval_spin.value() if hasattr(self, 'batch_update_interval_spin') else 5
         })
 
         settings.setdefault("advanced", {})
         settings["advanced"].update({
-            "max_reply_length": getattr(self, 'max_reply_length_spin', None) and self.max_reply_length_spin.value() or 1024,
-            "enable_logging": getattr(self, 'enable_logging_checkbox', None) and self.enable_logging_checkbox.isChecked() or True,
-            "realistic_typing": getattr(self, 'realistic_typing_checkbox', None) and self.realistic_typing_checkbox.isChecked() or True,
-            "random_delays": getattr(self, 'random_delays_checkbox', None) and self.random_delays_checkbox.isChecked() or True
+            "max_reply_length": self.max_reply_length_spin.value() if hasattr(self, 'max_reply_length_spin') else 1024,
+            "enable_logging": self.enable_logging_checkbox.isChecked() if hasattr(self, 'enable_logging_checkbox') else True,
+            "realistic_typing": self.realistic_typing_checkbox.isChecked() if hasattr(self, 'realistic_typing_checkbox') else True,
+            "random_delays": self.random_delays_checkbox.isChecked() if hasattr(self, 'random_delays_checkbox') else True
         })
+
+        # Account factory settings
+        settings["account_factory"] = {
+            "account_count": self.account_count_spin.value() if hasattr(self, 'account_count_spin') else 10,
+            "country": self.country_combo.currentText().split(" - ")[0] if hasattr(self, 'country_combo') else "US",
+            "phone_provider": self.phone_provider_combo.currentText() if hasattr(self, 'phone_provider_combo') else "sms-activate",
+            "provider_api_key": self.provider_api_edit.text().strip() if hasattr(self, 'provider_api_edit') else "",
+            "use_proxy": self.use_proxy_checkbox.isChecked() if hasattr(self, 'use_proxy_checkbox') else False,
+            "randomize_fingerprint": self.randomize_fingerprint_checkbox.isChecked() if hasattr(self, 'randomize_fingerprint_checkbox') else False,
+            "realistic_timing": self.realistic_timing_checkbox.isChecked() if hasattr(self, 'realistic_timing_checkbox') else False,
+            "vary_platform": self.vary_platform_checkbox.isChecked() if hasattr(self, 'vary_platform_checkbox') else False,
+            "proxies": [line.strip() for line in getattr(self, 'proxy_list_edit', QTextEdit())
+                         .toPlainText().split('\n') if line.strip()] if hasattr(self, 'proxy_list_edit') else [],
+        }
 
         return settings
 

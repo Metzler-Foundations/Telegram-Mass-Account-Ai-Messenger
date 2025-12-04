@@ -15,6 +15,7 @@ import random
 import json
 import os
 import time
+import hashlib
 import requests
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
@@ -24,7 +25,7 @@ from enum import Enum
 from pyrogram import Client
 from pyrogram.errors import (
     FloodWait, PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
-    SessionPasswordNeeded, UserDeactivated
+    SessionPasswordNeeded, UserDeactivated, UsernameOccupied, UsernameInvalid
 )
 
 from anti_detection.anti_detection_system import AccountCreationAntiDetection
@@ -385,22 +386,31 @@ class PhoneNumberProvider:
             if response.status_code == 200:
                 products = response.json()
                 if products:
-                    # Buy the number
-                    # Check if products is a dict (category structure) or list
+                    # Buy the number with an available product/operator
                     product_name = None
                     if isinstance(products, dict):
                         # Find a product with available quantity
                         for name, details in products.items():
-                            if details.get("Qty", 0) > 0:
-                                product_name = name
+                            quantity = details.get("Qty") or details.get("qty") or details.get("count", 0)
+                            if quantity and quantity > 0:
+                                product_name = details.get("Product") or name
                                 break
-                    else:
-                        # Assume it's a list or direct structure
-                        pass # 5sim API structure varies, assuming standard buying endpoint works without specific product selection if configured differently
+                    elif isinstance(products, list):
+                        for entry in products:
+                            quantity = entry.get("Qty") or entry.get("qty") or entry.get("count", 0)
+                            if quantity and quantity > 0:
+                                product_name = entry.get("Product") or entry.get("operator") or entry.get("slug")
+                                break
 
-                    buy_url = f"{config['api_url']}/user/buy/activation/{country.lower()}/{config['service_code']}"
-                    
-                    buy_response = requests.get(buy_url, headers=headers, timeout=30) # 5sim uses GET for buy usually
+                    if not product_name:
+                        logger.warning(f"5SIM returned no purchasable products for {country} and service {config['service_code']}")
+                        return None
+
+                    buy_url = (
+                        f"{config['api_url']}/user/buy/activation/{country.lower()}/{product_name}/{config['service_code']}"
+                    )
+
+                    buy_response = requests.get(buy_url, headers=headers, timeout=30)  # 5sim uses GET for buy usually
 
                     if buy_response.status_code == 200:
                         result = buy_response.json()
@@ -431,6 +441,68 @@ class PhoneNumberProvider:
                 return {"id": parts[1], "number": parts[2]}
 
         return None
+
+    def cancel_number(self, provider: str, number_id: str, api_key: str) -> bool:
+        """Attempt to cancel or release a purchased number to avoid leaks on failure."""
+        if not provider or not number_id or not api_key:
+            logger.warning("Cancel number called with missing data; skipping")
+            return False
+
+        try:
+            if provider == "sms-activate":
+                cancel_url = (
+                    "https://api.sms-activate.org/stubs/handler_api.php"
+                    f"?api_key={api_key}&action=setStatus&status=8&id={number_id}"
+                )
+                response = requests.get(cancel_url, timeout=15)
+                return response.status_code == 200 and response.text.startswith("ACCESS_")
+
+            if provider == "5sim":
+                headers = {"Authorization": f"Bearer {api_key}"}
+                cancel_url = f"https://5sim.net/v1/user/cancel/{number_id}"
+                response = requests.get(cancel_url, headers=headers, timeout=15)
+                return response.status_code in (200, 204)
+
+            if provider == "sms-hub":
+                params = {
+                    "api_key": api_key,
+                    "action": "setStatus",
+                    "status": "8",
+                    "id": number_id
+                }
+                response = requests.get("https://smshub.org/stubs/handler_api.php", params=params, timeout=15)
+                return response.status_code == 200 and response.text.startswith("ACCESS_")
+
+            if provider == "smspool":
+                payload = {"order_id": number_id, "cancel": True}
+                response = requests.post("https://api.smspool.net/status", json=payload, timeout=15)
+                return response.status_code == 200
+
+            if provider == "textverified":
+                headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+                response = requests.post(
+                    "https://textverified.com/api/authorization/transactions/cancel",
+                    json={"id": number_id},
+                    headers=headers,
+                    timeout=15
+                )
+                return response.status_code in (200, 204)
+
+            if provider == "daisysms":
+                headers = {"Authorization": f"Bearer {api_key}"}
+                response = requests.post(
+                    "https://api.daisysms.com/v1/orders/cancel",
+                    json={"order_id": number_id},
+                    headers=headers,
+                    timeout=15
+                )
+                return response.status_code in (200, 204)
+
+            logger.warning(f"Cancel not implemented for provider {provider}")
+            return False
+        except Exception as e:
+            logger.warning(f"Failed to cancel number for provider {provider}: {e}")
+            return False
 
     def get_sms_code(self, provider: str, number_id: str, api_key: str) -> Optional[str]:
         """Get SMS code for a phone number with retry logic."""
@@ -752,6 +824,9 @@ class AccountCreator:
             'current_batch': 0
         }
         self.progress_callback = None  # Callback for progress updates
+
+        self._photo_hash_file = Path("profile_photo_hashes.json")
+        self._applied_photo_hashes = self._load_photo_hashes()
         
         # Proxy assignment tracking
         self.account_proxies: Dict[str, Dict] = {}  # phone_number -> proxy info
@@ -866,6 +941,41 @@ class AccountCreator:
         """Get the permanently assigned proxy for an account."""
         return self.account_proxies.get(phone_number)
 
+    async def _release_proxy_assignment(self, assigned_proxy: Dict, phone_number: Optional[str], temp_phone_id: str):
+        """Release proxy assignments for failed account creation attempts."""
+        identifier = phone_number or temp_phone_id
+        pool = await self._get_proxy_pool_manager()
+
+        if pool and assigned_proxy.get('source') == 'proxy_pool':
+            try:
+                await pool.release_proxy(identifier)
+                logger.info(f"Released proxy assignment for {identifier}")
+            except Exception as e:
+                logger.warning(f"Failed to release proxy for {identifier}: {e}")
+
+        # Clean local cache for both temp and phone identifiers
+        if identifier in self.account_proxies:
+            self.account_proxies.pop(identifier, None)
+        if temp_phone_id in self.account_proxies:
+            self.account_proxies.pop(temp_phone_id, None)
+
+    async def _record_proxy_failure(self, assigned_proxy: Optional[Dict], phone_number: Optional[str]):
+        """Mark proxy as failed/cooldown to avoid immediate reuse after Telegram errors."""
+        if not assigned_proxy:
+            return
+
+        proxy_key = f"{assigned_proxy.get('ip')}:{assigned_proxy.get('port')}"
+        logger.warning(f"Marking proxy {proxy_key} as failed for {phone_number}")
+
+        pool = await self._get_proxy_pool_manager()
+        if pool and assigned_proxy.get('source') == 'proxy_pool':
+            try:
+                await pool.release_proxy(phone_number)
+            except Exception as e:
+                logger.warning(f"Failed to release proxy after failure: {e}")
+        else:
+            self.proxy_manager.mark_proxy_failed(assigned_proxy)
+
     def update_proxy_list(self, proxy_list: List[str], settings: Dict = None):
         """Update the proxy manager with configured proxies."""
         if not proxy_list:
@@ -914,6 +1024,56 @@ class AccountCreator:
             except Exception as e:
                 logger.error(f"Error in progress callback: {e}")
 
+    def _validate_provider_config(self, provider: str, country: str, api_key: Optional[str]) -> Optional[Dict[str, str]]:
+        """Validate provider selection, country availability, and API key presence."""
+        if provider not in self.phone_provider.providers:
+            supported = ", ".join(sorted(self.phone_provider.providers.keys()))
+            return {
+                'success': False,
+                'error': f"Unsupported phone provider '{provider}'. Choose one of: {supported}"
+            }
+
+        provider_config = self.phone_provider.providers.get(provider, {})
+        supported_countries = provider_config.get('countries', [])
+        if supported_countries and country not in supported_countries:
+            return {
+                'success': False,
+                'error': f"Country '{country}' not supported by {provider}. Try one of: {', '.join(supported_countries)}"
+            }
+
+        if not api_key:
+            return {
+                'success': False,
+                'error': f"Phone provider API key is required. Get it from your {provider} account dashboard."
+            }
+
+        return None
+
+    def _get_delay_range(self, config: Dict, realistic_timing: bool) -> Tuple[float, float]:
+        """Return (min_delay, max_delay) for inter-account waits."""
+        delay_config = config.get('inter_account_delay') or {}
+        if realistic_timing:
+            default_min, default_max = 30.0, 60.0
+        else:
+            default_min, default_max = 5.0, 5.0
+
+        min_delay = float(delay_config.get('min', default_min))
+        max_delay = float(delay_config.get('max', default_max))
+
+        # Ensure sane ordering
+        if max_delay < min_delay:
+            max_delay = min_delay
+
+        return min_delay, max_delay
+
+    async def _sleep_with_cancellation(self, delay: float):
+        """Sleep in short intervals so bulk creation can stop promptly."""
+        slept = 0.0
+        step = min(1.0, delay)
+        while slept < delay and self.creation_active:
+            await asyncio.sleep(step)
+            slept += step
+
     async def start_bulk_creation(self, count: int, config: Dict) -> List[Dict]:
         """Start bulk account creation."""
         self.creation_active = True
@@ -946,12 +1106,13 @@ class AccountCreator:
                 logger.error(f"Error creating account {i+1}: {e}")
                 self.creation_stats['total_failed'] += 1
                 results.append({'success': False, 'error': str(e)})
-            
+
             # Delay between creations
             if i < count - 1 and self.creation_active:
-                delay = random.uniform(30, 60) if config.get('realistic_timing') else 5
+                min_delay, max_delay = self._get_delay_range(config, config.get('realistic_timing', False))
+                delay = random.uniform(min_delay, max_delay)
                 self._notify_progress(i+1, count, f"Waiting {delay:.0f}s before next account...")
-                await asyncio.sleep(delay)
+                await self._sleep_with_cancellation(delay)
 
         self.creation_active = False
         return results
@@ -964,6 +1125,12 @@ class AccountCreator:
         """Create a single new Telegram account with proxy pool integration."""
         temp_phone_id = f"temp_{int(time.time() * 1000)}"
         assigned_proxy = None
+        phone_data: Optional[Dict[str, Any]] = None
+        phone_number: Optional[str] = None
+        client: Optional[Client] = None
+        creation_success = False
+        previous_creation_active = self.creation_active
+        self.creation_active = True
 
         try:
             # Validate configuration first
@@ -985,7 +1152,15 @@ class AccountCreator:
             self.account_defaults = config.get('account_defaults', {})
             self.voice_config = config.get('voice_config', {})
             self.proxy_pool_config = config.get('proxy_pool', {})
-            
+
+            country = config.get('country', 'US')
+            provider = config.get('phone_provider', 'sms-activate')
+            api_key = config.get('provider_api_key')
+
+            provider_validation = self._validate_provider_config(provider, country, api_key)
+            if provider_validation:
+                return provider_validation
+
             # 1. Get Proxy from Pool
             self._notify_progress(0, 100, get_progress_message("getting_proxy"))
             proxy = None
@@ -1015,17 +1190,8 @@ class AccountCreator:
 
             # 2. Get Phone Number
             self._notify_progress(10, 100, get_progress_message("getting_phone"))
-            country = config.get('country', 'US')
-            provider = config.get('phone_provider', 'sms-activate')
-            api_key = config.get('provider_api_key')
-            
-            if not api_key:
-                return {
-                    'success': False,
-                    'error': f'Phone provider API key is required. Get it from your {provider} account dashboard.'
-                }
 
-            phone_data = self.phone_provider.get_number(provider, country, api_key)
+            phone_data = await asyncio.to_thread(self.phone_provider.get_number, provider, country, api_key)
             if not phone_data:
                 return {
                     'success': False,
@@ -1082,16 +1248,19 @@ class AccountCreator:
             try:
                 sent_code = await client.send_code(phone_number)
             except FloodWait as e:
+                await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     'success': False,
                     'error': f"⏱️ Rate limit reached. Telegram requires waiting {e.value} seconds. Try again later."
                 }
             except PhoneNumberInvalid as e:
+                await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     'success': False,
                     'error': translate_error(e, "sending verification code")
                 }
             except Exception as e:
+                await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     'success': False,
                     'error': translate_error(e, "requesting SMS code")
@@ -1111,21 +1280,25 @@ class AccountCreator:
             try:
                 await client.sign_in(phone_number, sent_code.phone_code_hash, sms_code)
             except SessionPasswordNeeded as e:
+                await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     'success': False,
                     'error': translate_error(e, "signing in")
                 }
             except PhoneCodeInvalid as e:
+                await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     'success': False,
                     'error': translate_error(e, "verifying code")
                 }
             except PhoneCodeExpired as e:
+                await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     'success': False,
                     'error': translate_error(e, "verifying code")
                 }
             except Exception as e:
+                await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     'success': False,
                     'error': translate_error(e, "signing in")
@@ -1144,10 +1317,12 @@ class AccountCreator:
                 'proxy': proxy,
                 'device_fingerprint': fingerprint,
                 'status': 'active',
-                'is_warmed_up': False,
+                'is_warmed_up': bool(config.get('is_warmed_up', False)),
                 'warmup_stage': 'pending',
                 'messages_sent': 0,
-                'last_active': datetime.now().isoformat()
+                'last_active': datetime.now().isoformat(),
+                'api_id': config.get('api_id'),
+                'api_hash': config.get('api_hash')
             }
             
             # ACTUALLY save account to database
@@ -1168,6 +1343,7 @@ class AccountCreator:
                     logger.warning(f"Failed to notify account manager: {e}")
 
             logger.info(f"✅ Account {phone_number} created successfully!")
+            creation_success = True
             return {'success': True, 'account': account_info, 'message': '✅ Account created successfully!'}
 
         except Exception as e:
@@ -1176,6 +1352,33 @@ class AccountCreator:
                 'success': False,
                 'error': translate_error(e, "account creation")
             }
+        finally:
+            # Restore prior creation flag so manual single runs don't leave it stuck
+            self.creation_active = previous_creation_active
+
+            # Disconnect client regardless of outcome
+            if client:
+                try:
+                    await client.disconnect()
+                except Exception as e:
+                    logger.warning(f"Failed to disconnect client: {e}")
+
+            # Release or mark proxy failures when creation did not complete
+            if not creation_success and assigned_proxy:
+                await self._record_proxy_failure(assigned_proxy, phone_number or temp_phone_id)
+                await self._release_proxy_assignment(assigned_proxy, phone_number, temp_phone_id)
+
+            # Cancel phone number order when creation fails mid-flow
+            if not creation_success and phone_data:
+                try:
+                    await asyncio.to_thread(
+                        self.phone_provider.cancel_number,
+                        phone_data.get('provider'),
+                        phone_data.get('id'),
+                        config.get('provider_api_key')
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to cancel phone order: {e}")
 
     def _generate_device_fingerprint(self, config: Dict) -> Dict:
         """Generate a realistic device fingerprint."""
@@ -1265,7 +1468,11 @@ class AccountCreator:
         max_sms_attempts = 5  # Wait up to 5 minutes for SMS
 
         for attempt in range(max_sms_attempts):
-            sms_code = self.phone_provider.get_sms_code(
+            if not self.creation_active:
+                return None
+
+            sms_code = await asyncio.to_thread(
+                self.phone_provider.get_sms_code,
                 phone_data["provider"],
                 phone_data["id"],
                 config["provider_api_key"]
@@ -1286,7 +1493,7 @@ class AccountCreator:
 
             # Wait before checking again
             check_delay = random.uniform(8, 15)  # 8-15 seconds between checks
-            await asyncio.sleep(check_delay)
+            await self._sleep_with_cancellation(check_delay)
 
         logger.error("Failed to receive SMS code within timeout")
         return None
@@ -1311,48 +1518,156 @@ class AccountCreator:
                 # Generate and set username with availability checking
                 await self._generate_and_set_username(client)
 
-            # STEP 2: Profile photo (if specified) - with stealth update
+            # STEP 2: Profile photo (if specified) - with stealth update/skip when already applied
             if config.get("profile_photo"):
                 photo_delay = self.anti_detection.simulate_profile_setup(session_id, "photo")
                 await asyncio.sleep(photo_delay)
 
                 try:
-                    # Use stealth photo update to avoid "updated 1 day ago" message
-                    await self._set_profile_photo_stealth(client, config["profile_photo"])
-                    logger.info("📸 Profile photo set (stealth mode)")
+                    # Use duplicate-aware photo update to avoid unnecessary profile churn
+                    await self._set_profile_photo_stealth(client, config["profile_photo"],
+                                                         allow_skip=True)
+                    logger.info("📸 Profile photo set (stealth-aware mode)")
                 except Exception as e:
                     logger.warning(f"Failed to set profile photo: {e}")
 
             # STEP 3: Bio setup
             bio_delay = self.anti_detection.simulate_profile_setup(session_id, "bio")
             await asyncio.sleep(bio_delay)
-            # Add bio setup logic if needed (not implemented in snippet)
+            await self._set_profile_bio(client, config)
 
         except Exception as e:
             logger.error(f"Profile setup failed: {e}")
 
     def _generate_realistic_name(self, country: str) -> Tuple[str, str]:
-        """Generate a realistic name for the given country."""
-        # This is a placeholder. In a real implementation, you'd use a name generation library
-        # or a list of common names for the country.
-        first_names = ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas", "Charles"]
-        last_names = ["Smith", "Johnson", "Williams", "Jones", "Brown", "Davis", "Miller", "Wilson", "Moore", "Taylor"]
-        return random.choice(first_names), random.choice(last_names)
+        """Generate a realistic name for the given country with regional variety."""
+        regional_names = {
+            "US": {
+                "first": ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas", "Charles",
+                          "Emily", "Sophia", "Ava", "Olivia", "Isabella", "Mia", "Charlotte", "Amelia", "Harper", "Evelyn"],
+                "last": ["Smith", "Johnson", "Williams", "Jones", "Brown", "Davis", "Miller", "Wilson", "Moore", "Taylor",
+                         "Anderson", "Martin", "Thompson", "Garcia", "Martinez", "Robinson", "Clark", "Rodriguez", "Lewis", "Lee"],
+            },
+            "RU": {
+                "first": ["Alexander", "Dmitry", "Sergey", "Andrey", "Alexey", "Anna", "Maria", "Elena", "Olga", "Natalia"],
+                "last": ["Ivanov", "Petrov", "Sidorov", "Smirnov", "Kuznetsov", "Volkov", "Fedorov", "Morozov", "Sokolov", "Popov"],
+            },
+            "BR": {
+                "first": ["João", "Gabriel", "Miguel", "Arthur", "Maria", "Ana", "Julia", "Mariana", "Beatriz", "Laura"],
+                "last": ["Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Almeida", "Costa", "Gomes", "Martins", "Carvalho"],
+            },
+            "IN": {
+                "first": ["Aarav", "Vihaan", "Vivaan", "Aditya", "Ananya", "Aadhya", "Pari", "Diya", "Myra", "Isha"],
+                "last": ["Sharma", "Verma", "Singh", "Patel", "Gupta", "Khan", "Reddy", "Nair", "Kapoor", "Joshi"],
+            },
+            "ES": {
+                "first": ["Alejandro", "Daniel", "Pablo", "Adrián", "Lucas", "Lucía", "Sofía", "Martina", "Emma", "Julia"],
+                "last": ["García", "Martínez", "López", "Sánchez", "Pérez", "Gómez", "Fernández", "Díaz", "Moreno", "Muñoz"],
+            },
+            "JP": {
+                "first": ["Haruto", "Yuto", "Sota", "Yuki", "Hina", "Yui", "Sakura", "Mio", "Rin", "Mei"],
+                "last": ["Sato", "Suzuki", "Takahashi", "Tanaka", "Watanabe", "Ito", "Yamamoto", "Nakamura", "Kobayashi", "Kato"],
+            },
+            "AU": {
+                "first": ["Jack", "Noah", "William", "Olivia", "Isla", "Charlotte", "Amelia", "Evie", "Lucas", "Liam"],
+                "last": ["Smith", "Jones", "Williams", "Brown", "Wilson", "Taylor", "Johnson", "Martin", "Anderson", "Thompson"],
+            },
+        }
+
+        pool = regional_names.get(country.upper()) or regional_names.get("US")
+        return random.choice(pool["first"]), random.choice(pool["last"])
 
     async def _generate_and_set_username(self, client: Client):
         """Generate and set a username."""
         try:
-            # Placeholder for username generation
             me = await client.get_me()
-            username = f"{me.first_name.lower()}_{random.randint(1000, 9999)}"
-            await client.set_username(username)
+            base = (me.first_name or "user").lower().replace(" ", "_")
+            last_error: Optional[Exception] = None
+            for _ in range(10):
+                candidate = f"{base}_{random.randint(1000, 99999)}"
+                try:
+                    await client.set_username(candidate)
+                    logger.info(f"Username set to {candidate}")
+                    return
+                except (UsernameOccupied, UsernameInvalid) as exc:
+                    last_error = exc
+                    logger.info(f"Username {candidate} unavailable, retrying")
+                    continue
+            if last_error:
+                logger.warning(f"Failed to set a unique username after retries: {last_error}")
+            else:
+                logger.warning("Failed to set a unique username after several attempts")
         except Exception as e:
             logger.warning(f"Failed to set username: {e}")
 
-    async def _set_profile_photo_stealth(self, client: Client, photo_path: str):
-        """Set profile photo with stealth update."""
-        # Placeholder for stealth photo update
+    def _load_photo_hashes(self) -> set:
+        """Load persisted profile photo hashes to prevent duplicate uploads."""
+        try:
+            if self._photo_hash_file.exists():
+                with open(self._photo_hash_file, 'r') as f:
+                    data = json.load(f)
+                    return set(data.get('hashes', []))
+        except Exception as exc:
+            logger.warning(f"Failed to load photo hash cache: {exc}")
+        return set()
+
+    def _save_photo_hashes(self):
+        """Persist profile photo hashes for reuse across sessions."""
+        try:
+            with open(self._photo_hash_file, 'w') as f:
+                json.dump({'hashes': list(self._applied_photo_hashes)}, f, indent=2)
+        except Exception as exc:
+            logger.warning(f"Failed to persist photo hash cache: {exc}")
+
+    async def _set_profile_photo_stealth(self, client: Client, photo_path: str, allow_skip: bool = False):
+        """Set profile photo while avoiding duplicate updates and respecting stop signals."""
+        if not hasattr(self, "_applied_photo_hashes"):
+            self._applied_photo_hashes = set()
+
+        photo_file = Path(photo_path)
+        if not photo_file.exists():
+            raise FileNotFoundError(f"Profile photo {photo_path} does not exist")
+
+        photo_hash = hashlib.sha256(photo_file.read_bytes()).hexdigest()
+        if allow_skip and photo_hash in self._applied_photo_hashes:
+            logger.info("Profile photo already applied for this session; skipping to avoid churn")
+            return
+
         await client.set_profile_photo(photo=photo_path)
+        self._applied_photo_hashes.add(photo_hash)
+        self._save_photo_hashes()
+
+    async def _set_profile_bio(self, client: Client, config: Dict):
+        """Populate the account bio with regionalized defaults when provided."""
+        bio_text = config.get("bio")
+        persona_template = config.get("persona_template")
+        persona_templates = config.get("persona_templates") or {}
+        persona = config.get("persona")
+        if not bio_text:
+            region = config.get("country", "US").upper()
+            templates = {
+                "US": "Explorer. Building connections.",
+                "RU": "Исследую новое. Открыт к общению.",
+                "IN": "Here to collaborate and learn.",
+                "BR": "Conectando pessoas e ideias.",
+                "ES": "Compartiendo y descubriendo novedades.",
+            }
+            if persona_templates:
+                candidate = persona_templates.get(region) or persona_templates.get("default")
+                if candidate:
+                    bio_text = candidate.format(region=region, persona=persona or "")
+
+            if not bio_text and persona_template:
+                bio_text = persona_template.format(region=region, persona=persona or "")
+
+            if not bio_text:
+                bio_text = templates.get(region, "Open to new conversations.")
+
+        try:
+            await client.update_profile(bio=bio_text)
+            logger.info("✏️ Bio configured")
+        except Exception as exc:
+            logger.warning(f"Failed to set bio: {exc}")
     
     def _save_account_to_database(self, account_info: Dict):
         """ACTUALLY save account to database (not a placeholder)."""
@@ -1386,8 +1701,8 @@ class AccountCreator:
                 INSERT OR REPLACE INTO accounts (
                     phone_number, session_name, status, created_at,
                     last_active, messages_sent, is_warmed_up, warmup_stage,
-                    proxy_used, device_fingerprint
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    proxy_used, device_fingerprint, api_id, api_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 account_info['phone_number'],
                 account_info['session_name'],
@@ -1395,10 +1710,12 @@ class AccountCreator:
                 account_info['created_at'],
                 account_info.get('last_active', datetime.now().isoformat()),
                 account_info.get('messages_sent', 0),
-                0,  # is_warmed_up
+                int(account_info.get('is_warmed_up', False)),
                 account_info.get('warmup_stage', 'pending'),
                 str(account_info.get('proxy', '')),
-                str(account_info.get('device_fingerprint', ''))
+                str(account_info.get('device_fingerprint', '')),
+                account_info.get('api_id'),
+                account_info.get('api_hash')
             ))
             
             conn.commit()

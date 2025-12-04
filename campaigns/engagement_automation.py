@@ -110,7 +110,10 @@ class EngagementAutomation:
         self.db_path = db_path
         self.intelligence_db = intelligence_db
         self._init_database()
-        
+
+        # Retention controls
+        self.stats_retention_days = 90
+
         # Rate limiting tracking
         self._reaction_counts = defaultdict(lambda: defaultdict(int))  # {hour: {group_id: count}}
         self._last_reactions = {}  # {group_id: timestamp}
@@ -177,6 +180,7 @@ class EngagementAutomation:
         
         # Indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_timestamp ON engagement_log(timestamp)")
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_log_rule_message ON engagement_log(rule_id, message_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_group ON engagement_log(group_id, timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stats_user ON engagement_stats(user_id)")
         
@@ -373,6 +377,10 @@ class EngagementAutomation:
             True if successful
         """
         try:
+            if self._already_engaged(rule.rule_id, message.id):
+                logger.debug(f"Skipping duplicate engagement for message {message.id} and rule {rule.rule_id}")
+                return False
+
             # Select reaction
             if rule.reaction_emojis:
                 reaction = random.choice(rule.reaction_emojis)
@@ -459,6 +467,38 @@ class EngagementAutomation:
               datetime.now(), int(success), error))
         conn.commit()
         conn.close()
+
+    def _prune_engagement_stats(self, conn):
+        """Delete stale engagement stats to prevent unbounded growth."""
+        try:
+            cutoff = datetime.now() - timedelta(days=self.stats_retention_days)
+            conn.execute(
+                "DELETE FROM engagement_stats WHERE last_engagement IS NOT NULL AND last_engagement < ?",
+                (cutoff,)
+            )
+            conn.execute(
+                "DELETE FROM engagement_log WHERE timestamp < ?",
+                (cutoff,)
+            )
+            conn.commit()
+        except Exception as exc:
+            logger.debug(f"Engagement stats pruning failed: {exc}")
+
+    def _already_engaged(self, rule_id: str, message_id: int) -> bool:
+        """Check if we've already reacted to this message for the given rule."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT 1 FROM engagement_log WHERE rule_id = ? AND message_id = ? LIMIT 1",
+                (rule_id, message_id)
+            )
+            exists = cursor.fetchone() is not None
+            conn.close()
+            return exists
+        except Exception as exc:
+            logger.debug(f"Duplicate engagement check failed: {exc}")
+            return False
     
     def _update_engagement_stats(self, user_id: int, group_id: int,
                                  gave_reaction: bool = False, received_reaction: bool = False):
@@ -483,8 +523,9 @@ class EngagementAutomation:
                     reactions_received = reactions_received + 1,
                     last_engagement = excluded.last_engagement
             """, (user_id, group_id, datetime.now()))
-        
+
         conn.commit()
+        self._prune_engagement_stats(conn)
         conn.close()
     
     def get_engagement_stats(self, period_hours: int = 24) -> Dict:

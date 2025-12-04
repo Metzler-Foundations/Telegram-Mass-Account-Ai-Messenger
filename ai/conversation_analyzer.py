@@ -54,6 +54,8 @@ class ConversationAnalyzer:
         """Initialize conversation analyzer."""
         self.db_path = db_path
         self._init_database()
+        self.flow_retention_days = 90
+        self._prune_old_flows()
     
     def _init_database(self):
         """Initialize analytics database."""
@@ -122,10 +124,31 @@ class ConversationAnalyzer:
         conn.commit()
         conn.close()
         logger.info("Conversation analytics database initialized")
+
+    def _prune_old_flows(self):
+        """Remove stale conversation flows and associated data."""
+        try:
+            cutoff = datetime.now() - timedelta(days=self.flow_retention_days)
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT flow_id FROM conversation_flows WHERE ended_at IS NOT NULL AND ended_at < ?", (cutoff,))
+            stale_ids = [row[0] for row in cursor.fetchall()]
+
+            if stale_ids:
+                cursor.executemany("DELETE FROM conversation_stages WHERE flow_id = ?", [(fid,) for fid in stale_ids])
+                cursor.executemany("DELETE FROM conversions WHERE flow_id = ?", [(fid,) for fid in stale_ids])
+                cursor.executemany("DELETE FROM conversation_flows WHERE flow_id = ?", [(fid,) for fid in stale_ids])
+                conn.commit()
+
+            conn.close()
+        except Exception as exc:
+            logger.debug(f"Failed to prune old conversation flows: {exc}")
     
-    def analyze_conversation(self, flow_id: str, user_id: int, 
+    def analyze_conversation(self, flow_id: str, user_id: int,
                            messages: List[str], responses: List[str],
-                           outcome: str, value: float = 0.0) -> Dict:
+                           outcome: str, value: float = 0.0,
+                           timestamps: Optional[List[Tuple[datetime, datetime]]] = None) -> Dict:
         """Analyze a complete conversation.
         
         Args:
@@ -143,11 +166,11 @@ class ConversationAnalyzer:
         patterns = self._extract_patterns(messages, responses, outcome)
         
         # Calculate metrics
-        response_times = self._calculate_response_times(messages, responses)
+        response_times = self._calculate_response_times(messages, responses, timestamps)
         
         # Save flow
-        self._save_conversation_flow(flow_id, user_id, messages, responses, 
-                                    outcome, value, response_times)
+        self._save_conversation_flow(flow_id, user_id, messages, responses,
+                                    outcome, value, response_times, timestamps)
         
         # Update patterns
         for pattern in patterns:
@@ -205,36 +228,76 @@ class ConversationAnalyzer:
         template = re.sub(r'\$\{number\}', '{price}', template)
         return template
     
-    def _calculate_response_times(self, messages: List[str], responses: List[str]) -> List[float]:
-        """Calculate response times (placeholder - needs timestamps)."""
-        # This would need actual timestamps in real implementation
-        return [random.uniform(1, 60) for _ in range(min(len(messages), len(responses)))]
+    def _calculate_response_times(self, messages: List[str], responses: List[str],
+                                  timestamps: Optional[List[Tuple[datetime, datetime]]] = None) -> List[float]:
+        """Calculate response times using provided timestamps; fallback to zero."""
+        pair_count = min(len(messages), len(responses))
+        if not timestamps:
+            return [0.0 for _ in range(pair_count)]
+
+        cleaned = []
+        for idx in range(pair_count):
+            try:
+                sent_at, responded_at = timestamps[idx]
+                if sent_at and responded_at:
+                    cleaned.append(max((responded_at - sent_at).total_seconds(), 0.0))
+                else:
+                    cleaned.append(0.0)
+            except Exception:
+                cleaned.append(0.0)
+        return cleaned
+
+    def _score_sentiment(self, text: str) -> float:
+        """Very lightweight sentiment heuristic in range [-1, 1]."""
+        if not text:
+            return 0.0
+
+        positive_words = {"great", "thanks", "thank", "awesome", "good", "love", "amazing", "perfect", "yes"}
+        negative_words = {"bad", "no", "hate", "angry", "upset", "terrible", "refund", "cancel", "problem"}
+
+        words = re.findall(r"\w+", text.lower())
+        score = 0
+        for word in words:
+            if word in positive_words:
+                score += 1
+            if word in negative_words:
+                score -= 1
+
+        if not words:
+            return 0.0
+
+        normalized = max(-1.0, min(1.0, score / len(words)))
+        return normalized
     
     def _save_conversation_flow(self, flow_id: str, user_id: int,
                                 messages: List[str], responses: List[str],
-                                outcome: str, value: float, response_times: List[float]):
+                                outcome: str, value: float, response_times: List[float],
+                                timestamps: Optional[List[Tuple[datetime, datetime]]] = None):
         """Save conversation flow to database."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
         duration = sum(response_times) if response_times else 0.0
+        started_at = timestamps[0][0] if timestamps and timestamps[0][0] else datetime.now()
+        ended_at = timestamps[-1][1] if timestamps and timestamps[-1][1] else datetime.now()
         
         cursor.execute("""
-            INSERT OR REPLACE INTO conversation_flows 
-            (flow_id, user_id, messages, user_responses, outcome, conversion_value, 
+            INSERT OR REPLACE INTO conversation_flows
+            (flow_id, user_id, messages, user_responses, outcome, conversion_value,
              duration_minutes, started_at, ended_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (flow_id, user_id, json.dumps(messages), json.dumps(responses),
-              outcome, value, duration, datetime.now(), datetime.now()))
+              outcome, value, duration, started_at, ended_at))
         
         # Save individual stages
         for i, (msg, resp) in enumerate(zip(messages, responses)):
             resp_time = response_times[i] if i < len(response_times) else 0
+            sentiment = self._score_sentiment(resp)
             cursor.execute("""
-                INSERT INTO conversation_stages 
-                (flow_id, stage_number, our_message, user_response, response_time, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (flow_id, i+1, msg, resp, resp_time, datetime.now()))
+                INSERT INTO conversation_stages
+                (flow_id, stage_number, our_message, user_response, response_time, sentiment_score, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (flow_id, i+1, msg, resp, resp_time, sentiment, datetime.now()))
         
         conn.commit()
         conn.close()

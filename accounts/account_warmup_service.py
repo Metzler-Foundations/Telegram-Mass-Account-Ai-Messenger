@@ -59,6 +59,7 @@ class WarmupJob:
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     last_activity: Optional[datetime] = None
+    next_attempt_at: Optional[datetime] = None
     progress: float = 0.0
     status_message: str = ""
     error_message: Optional[str] = None
@@ -82,11 +83,20 @@ class WarmupJob:
     def from_dict(cls, data: Dict[str, Any]) -> 'WarmupJob':
         """Create from dictionary."""
         # Convert strings back to enums
-        data['stage'] = WarmupStage(data['stage'])
-        data['priority'] = WarmupPriority(data['priority'])
+        try:
+            data['stage'] = WarmupStage(data['stage'])
+        except Exception:
+            logger.error(f"Invalid warmup stage encountered during load: {data.get('stage')}")
+            data['stage'] = WarmupStage.FAILED
+
+        try:
+            data['priority'] = WarmupPriority(data['priority'])
+        except Exception:
+            logger.error(f"Invalid warmup priority encountered during load: {data.get('priority')}")
+            data['priority'] = WarmupPriority.NORMAL
 
         # Convert datetime strings back to datetime objects
-        for field in ['created_at', 'started_at', 'completed_at', 'last_activity']:
+        for field in ['created_at', 'started_at', 'completed_at', 'last_activity', 'next_attempt_at']:
             if data.get(field) and isinstance(data[field], str):
                 try:
                     data[field] = datetime.fromisoformat(data[field])
@@ -152,6 +162,7 @@ class AccountWarmupService:
         # Status tracking
         self.status_callbacks: List[Callable] = []
         self.is_running = False
+        self._shutdown_event: asyncio.Event = asyncio.Event()
 
         # Configuration
         self.config = WarmupConfig()
@@ -160,8 +171,10 @@ class AccountWarmupService:
         self.jobs_file = Path("warmup_jobs.json")
         self.load_jobs()
 
-        # Activity tracking
+        # Activity tracking persistence
+        self.activity_file = Path("warmup_activity.json")
         self.daily_activity_log: Dict[str, List[datetime]] = {}
+        self._load_activity_log()
 
         # Initialize warmup intelligence
         self.warmup_intelligence = WarmupIntelligence(gemini_service)
@@ -233,6 +246,7 @@ class AccountWarmupService:
             return
 
         self.is_running = True
+        self._shutdown_event.clear()
         logger.info("🚀 Starting Account Warmup Service")
 
         # Track tasks for proper cleanup
@@ -245,11 +259,13 @@ class AccountWarmupService:
 
         # Start the status monitoring loop
         task2 = asyncio.create_task(self._monitor_job_status())
+        self._monitor_task = task2
         self._background_tasks.append(task2)
 
     async def stop_warmup_service(self):
         """Stop the warmup service."""
         self.is_running = False
+        self._shutdown_event.set()
         logger.info("🛑 Stopping Account Warmup Service")
         
         # Cancel all background tasks
@@ -262,6 +278,8 @@ class AccountWarmupService:
                     except asyncio.CancelledError:
                         pass
             self._background_tasks.clear()
+        if hasattr(self, '_monitor_task'):
+            self._monitor_task = None
 
     def add_warmup_job(self, phone_number: str, priority: WarmupPriority = WarmupPriority.NORMAL) -> str:
         """Add a new warmup job to the queue."""
@@ -298,6 +316,31 @@ class AccountWarmupService:
 
         self.job_queue.sort(key=lambda j: (priority_order[j.priority], j.created_at))
 
+    async def _sleep_with_cancellation(self, total_seconds: float) -> bool:
+        """Sleep in small intervals while honoring shutdown requests.
+
+        Returns False if the service was stopped before the delay elapsed.
+        """
+        if total_seconds <= 0:
+            return self.is_running and not self._shutdown_event.is_set()
+
+        loop = asyncio.get_event_loop()
+        end_time = loop.time() + total_seconds
+
+        while self.is_running and not self._shutdown_event.is_set():
+            remaining = end_time - loop.time()
+            if remaining <= 0:
+                return True
+
+            wait_time = min(remaining, 60)
+            try:
+                await asyncio.wait_for(self._shutdown_event.wait(), timeout=wait_time)
+                return False
+            except asyncio.TimeoutError:
+                continue
+
+        return False
+
     async def _process_job_queue(self):
         """Main job processing loop."""
         while self.is_running:
@@ -305,13 +348,15 @@ class AccountWarmupService:
                 # Get next job
                 job = self._get_next_job()
                 if not job:
-                    await asyncio.sleep(30)  # Wait 30 seconds if no jobs
+                    if not await self._sleep_with_cancellation(30):
+                        break
                     continue
 
                 # Start processing job
                 job.started_at = datetime.now()
                 job.last_activity = datetime.now()
                 self.active_jobs[job.job_id] = job
+                self._record_activity(job.phone_number, f"stage_start:{job.stage.value}")
 
                 logger.info(f"🔄 Starting warmup job {job.job_id} for {job.phone_number} (Stage: {job.stage.value})")
                 self._notify_status_update(job, f"Starting {job.stage.value} stage")
@@ -326,19 +371,23 @@ class AccountWarmupService:
                         if next_stage:
                             job.stage = next_stage
                             job.progress = 0.0
+                            job.next_attempt_at = None
                             job.status_message = f"Completed {job.stage.value}, moving to {next_stage.value}"
+                            self._record_activity(job.phone_number, f"stage_complete:{next_stage.value}")
                             # Re-queue for next stage
                             self.job_queue.append(job)
                         else:
                             job.stage = WarmupStage.COMPLETED
                             job.completed_at = datetime.now()
                             job.progress = 100.0
+                            job.next_attempt_at = None
                             job.status_message = "Warmup completed successfully"
                             self.completed_jobs.append(job)
                     else:
                         job.stage = WarmupStage.COMPLETED
                         job.completed_at = datetime.now()
                         job.progress = 100.0
+                        job.next_attempt_at = None
                         job.status_message = "Warmup completed successfully"
                         self.completed_jobs.append(job)
                 else:
@@ -354,8 +403,12 @@ class AccountWarmupService:
                         # Re-queue with backoff
                         delay_hours = 2 ** job.retry_count  # Exponential backoff
                         job.status_message = f"Job failed, retrying in {delay_hours} hours"
-                        await asyncio.sleep(delay_hours * 3600)  # Convert to seconds
+                        job.next_attempt_at = datetime.now() + timedelta(hours=delay_hours)
                         self.job_queue.append(job)
+                        self.save_jobs()
+                        should_resume = await self._sleep_with_cancellation(delay_hours * 3600)
+                        if not should_resume:
+                            logger.info("Warmup service stopping during backoff; preserving queued retry state")
 
                 # Remove from active jobs
                 if job.job_id in self.active_jobs:
@@ -366,7 +419,8 @@ class AccountWarmupService:
 
             except Exception as e:
                 logger.error(f"Error processing warmup job: {e}")
-                await asyncio.sleep(60)  # Wait before retrying
+                if not await self._sleep_with_cancellation(60):
+                    break
 
     def _get_next_job(self) -> Optional[WarmupJob]:
         """Get the next job to process."""
@@ -383,6 +437,9 @@ class AccountWarmupService:
 
     def _is_job_ready(self, job: WarmupJob) -> bool:
         """Check if a job is ready to be processed."""
+        if job.next_attempt_at and datetime.now() < job.next_attempt_at:
+            return False
+
         if job.stage == WarmupStage.CREATED:
             # Check initial delay
             hours_since_creation = (datetime.now() - job.created_at).total_seconds() / 3600
@@ -415,13 +472,15 @@ class AccountWarmupService:
             if current_index + 1 < len(stage_progression):
                 return stage_progression[current_index + 1]
         except ValueError:
-            pass
+            logger.error(f"Unexpected warmup stage stored for progression: {current_stage}")
 
         return None
 
     async def _process_warmup_job(self, job: WarmupJob) -> bool:
         """Process a single warmup job."""
         try:
+            if not self._validate_job(job):
+                return False
             # Get account client
             client = await self._get_account_client(job.phone_number)
             if not client:
@@ -461,8 +520,25 @@ class AccountWarmupService:
                 try:
                     await client.stop()
                 except (AttributeError, RuntimeError, ConnectionError, Exception) as e:
-                    logger.debug(f"Error stopping client during cleanup: {e}")
-                    pass
+                    logger.warning(f"Error stopping client during cleanup: {e}")
+
+    def _validate_job(self, job: WarmupJob) -> bool:
+        """Ensure the job has a valid stage and required identifiers."""
+        if not isinstance(job.stage, WarmupStage):
+            logger.error(f"Warmup job {job.job_id} has invalid stage: {job.stage}")
+            job.error_message = "Invalid warmup stage"
+            job.stage = WarmupStage.FAILED
+            self.failed_jobs.append(job)
+            return False
+
+        if not job.phone_number:
+            logger.error(f"Warmup job {job.job_id} missing phone number")
+            job.error_message = "Missing phone number"
+            job.stage = WarmupStage.FAILED
+            self.failed_jobs.append(job)
+            return False
+
+        return True
 
     async def _get_account_client(self, phone_number: str) -> Optional[TelegramClient]:
         """Get a Telegram client for the account."""
@@ -1414,11 +1490,14 @@ class AccountWarmupService:
                         if inactive_time > 300:  # 5 minutes
                             job.status_message = f"Job inactive for {inactive_time:.0f} seconds"
 
-                await asyncio.sleep(60)  # Check every minute
+                if not await self._sleep_with_cancellation(60):
+                    break
 
             except Exception as e:
                 logger.error(f"Error monitoring job status: {e}")
                 await asyncio.sleep(60)
+
+        logger.info("Warmup status monitor stopped")
 
     def get_job_status(self, job_id: str) -> Optional[WarmupJob]:
         """Get status of a specific job."""
@@ -1467,6 +1546,39 @@ class AccountWarmupService:
 
         except Exception as e:
             logger.error(f"Failed to save warmup jobs: {e}")
+
+    def _record_activity(self, phone_number: str, action: str):
+        """Record a warmup action for daily pacing and persist it."""
+        try:
+            today = datetime.now().date().isoformat()
+            key = f"{phone_number}:{today}"
+            self.daily_activity_log.setdefault(key, [])
+            self.daily_activity_log[key].append(datetime.now())
+            self._persist_activity_log()
+        except Exception as exc:
+            logger.debug(f"Failed to record warmup activity for {phone_number}: {exc}")
+
+    def _persist_activity_log(self):
+        """Persist daily activity log with ISO timestamps."""
+        try:
+            retention_cutoff = datetime.now() - timedelta(days=120)
+            for key, entries in list(self.daily_activity_log.items()):
+                pruned = [ts for ts in entries if ts >= retention_cutoff]
+                if pruned:
+                    self.daily_activity_log[key] = pruned
+                else:
+                    self.daily_activity_log.pop(key, None)
+
+            serializable = {
+                key: [ts.isoformat() for ts in entries]
+                for key, entries in self.daily_activity_log.items()
+            }
+            temp_file = self.activity_file.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
+                json.dump(serializable, f, indent=2)
+            temp_file.replace(self.activity_file)
+        except Exception as exc:
+            logger.warning(f"Failed to persist warmup activity log: {exc}")
 
     def _save_job_progress(self, job: WarmupJob):
         """Save individual job progress immediately to prevent data loss.
@@ -1527,12 +1639,46 @@ class AccountWarmupService:
         except Exception as e:
             logger.error(f"Failed to load warmup jobs: {e}")
 
+    def _load_activity_log(self):
+        """Load persisted activity log into memory."""
+        if not self.activity_file.exists():
+            return
+
+        try:
+            with open(self.activity_file, 'r') as f:
+                data = json.load(f)
+
+            for key, entries in data.items():
+                restored = []
+                for ts in entries:
+                    try:
+                        restored.append(datetime.fromisoformat(ts))
+                    except Exception:
+                        continue
+                if restored:
+                    self.daily_activity_log[key] = restored
+        except Exception as exc:
+            logger.warning(f"Failed to load warmup activity log: {exc}")
+
 
 class WarmupIntelligence:
     """AI-powered intelligence for warmup activities."""
 
     def __init__(self, gemini_service=None):
         self.gemini_service = gemini_service if GEMINI_AVAILABLE else None
+        self._prompt_cache: Dict[str, Tuple[float, str]] = {}
+        self._prompt_ttl_seconds = 6 * 3600  # reuse prompts for six hours per stage
+
+    def _get_cached_reply(self, key: str) -> Optional[str]:
+        """Return cached Gemini reply if still valid."""
+        if key in self._prompt_cache:
+            ts, value = self._prompt_cache[key]
+            if time.time() - ts < self._prompt_ttl_seconds:
+                return value
+        return None
+
+    def _set_cached_reply(self, key: str, value: str):
+        self._prompt_cache[key] = (time.time(), value)
 
     async def analyze_account_for_profile(self, phone_number: str) -> Dict[str, Any]:
         """Analyze account characteristics to inform profile generation."""
@@ -1680,7 +1826,14 @@ class WarmupIntelligence:
         """
 
         try:
-            response = await self.gemini_service.generate_reply(prompt, chat_id=f"conv_starter_{phone_number}")
+            cache_key = f"conv_starter_{phone_number}"
+            cached = self._get_cached_reply(cache_key)
+            if cached:
+                response = cached
+            else:
+                response = await self.gemini_service.generate_reply(prompt, chat_id=cache_key)
+                if response:
+                    self._set_cached_reply(cache_key, response)
             if response:
                 return {
                     'message': response,

@@ -12,6 +12,7 @@ try:
     import psutil
 except ImportError:
     psutil = None
+    logger.warning("psutil not available - performance metrics and throttling degraded")
 
 from utils.utils import RandomizationUtils
 
@@ -67,7 +68,9 @@ class ResourceManager:
             try:
                 await self._resource_monitor_task
             except asyncio.CancelledError:
-                pass
+                logger.debug("Resource monitor task cancelled")
+            except Exception as exc:
+                logger.warning(f"Resource monitor task failed to stop cleanly: {exc}")
 
         # Cancel workers
         for worker in self._workers:
@@ -75,7 +78,9 @@ class ResourceManager:
             try:
                 await worker
             except asyncio.CancelledError:
-                pass
+                logger.debug("Worker task cancelled")
+            except Exception as exc:
+                logger.warning(f"Worker shutdown raised an error: {exc}")
 
         self._workers.clear()
 

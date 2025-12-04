@@ -1,6 +1,7 @@
 import logging
 from typing import Dict, List, Optional
 from datetime import datetime
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -11,7 +12,7 @@ from PyQt6.QtWidgets import (
     QInputDialog, QFileDialog, QGraphicsOpacityEffect
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QColor, QIcon, QMovie
+from PyQt6.QtGui import QColor, QIcon, QMovie, QPixmap
 
 from core.error_handler import ErrorHandler
 
@@ -376,15 +377,15 @@ class MemberProfileViewer(QDialog):
         # Header with basic info
         header_layout = QHBoxLayout()
 
-        # Profile photo placeholder (would show actual photo if available)
-        photo_label = QLabel("👤")
-        photo_label.setStyleSheet("""
+        # Profile photo placeholder (replaced if actual photo is available)
+        self.photo_label = QLabel("👤")
+        self.photo_label.setStyleSheet("""
             font-size: 48px;
             padding: 20px;
             background: rgba(114, 137, 218, 0.1);
             border-radius: 8px;
         """)
-        header_layout.addWidget(photo_label)
+        header_layout.addWidget(self.photo_label)
 
         # Basic info
         info_layout = QVBoxLayout()
@@ -704,8 +705,29 @@ class MemberProfileViewer(QDialog):
                 self.comprehensive_data = self.data_access_layer.get_comprehensive_profile(
                     self.member_data['user_id']
                 )
+                self._update_profile_photo()
             except Exception as e:
                 logger.error(f"Failed to load comprehensive data: {e}")
+
+        # Fallback to basic member data photo if no DAL is provided
+        if not self.comprehensive_data:
+            self._update_profile_photo()
+
+    def _update_profile_photo(self):
+        """Load a stored profile photo path into the UI when available."""
+        photo_path = None
+        if self.comprehensive_data:
+            photo_path = self.comprehensive_data.get('photo_path') or self.comprehensive_data.get('profile_photo')
+
+        if not photo_path:
+            photo_path = self.member_data.get('photo_path') or self.member_data.get('profile_photo')
+
+        if photo_path and Path(photo_path).exists():
+            pixmap = QPixmap(photo_path)
+            if not pixmap.isNull():
+                scaled = pixmap.scaled(96, 96, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.photo_label.setPixmap(scaled)
+                self.photo_label.setText("")
 
     def send_message(self):
         """Send a message to this member."""

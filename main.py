@@ -650,6 +650,12 @@ class MainWindow(QMainWindow):
             # Refresh campaign list if available
             if hasattr(self, 'campaign_manager_widget'):
                 self.campaign_manager_widget.refresh_campaigns()
+            if hasattr(self, 'analytics_widget') and self.analytics_widget:
+                # Refresh dropdown options and any active campaign data
+                self.analytics_widget.refresh_campaigns_list()
+                QTimer.singleShot(0, self.analytics_widget.refresh_data)
+            # Update summary metrics to reflect the new campaign
+            QTimer.singleShot(0, self.update_dashboard_metrics)
         except Exception as e:
             logger.error(f"Error handling campaign creation: {e}")
 
@@ -660,6 +666,11 @@ class MainWindow(QMainWindow):
             # Refresh campaign list if available
             if hasattr(self, 'campaign_manager_widget'):
                 self.campaign_manager_widget.refresh_campaigns()
+            if hasattr(self, 'analytics_widget') and self.analytics_widget:
+                # Keep analytics data in sync with backend updates
+                self.analytics_widget.refresh_campaigns_list()
+                QTimer.singleShot(0, self.analytics_widget.refresh_data)
+            QTimer.singleShot(0, self.update_dashboard_metrics)
         except Exception as e:
             logger.error(f"Error handling campaign update: {e}")
 
@@ -673,6 +684,9 @@ class MainWindow(QMainWindow):
                 self.dashboard_widget.update_metrics({
                     'system_health': f"{health_score}%"
                 })
+            if hasattr(self, 'health_dashboard_widget') and self.health_dashboard_widget:
+                # Trigger a full refresh so risk cards and charts stay accurate
+                QTimer.singleShot(0, self.health_dashboard_widget.refresh_data)
         except Exception as e:
             logger.error(f"Error handling system health update: {e}")
 
@@ -776,11 +790,13 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Error handling warmup status update: {e}")
     
-    def _on_account_status_changed(self, phone_number: str, status, metadata: Dict):
-        """Handle account status change callback."""
+    def _on_account_status_changed(self, phone_number: str, status, metadata: Optional[Dict] = None):
+        """Handle account status change callback and controller signal."""
         try:
             from account_manager import AccountStatus
-            status_msg = f"Account {phone_number} status: {status.value}"
+            # Signals may send raw strings; normalize when possible
+            status_value = status.value if isinstance(status, AccountStatus) else str(status)
+            status_msg = f"Account {phone_number} status: {status_value}"
             if metadata:
                 if 'error_message' in metadata:
                     status_msg += f" - Error: {metadata['error_message']}"
@@ -788,10 +804,21 @@ class MainWindow(QMainWindow):
                     status_msg += f" - Clone: {metadata['clone_status']}"
                 elif 'warmup_stage' in metadata:
                     status_msg += f" - Warmup: {metadata['warmup_stage']}"
-            
+
             logger.info(status_msg)
+            if hasattr(self, 'message_history_widget'):
+                self.message_history_widget.add_message({
+                    'time': datetime.now().strftime("%H:%M:%S"),
+                    'account': phone_number,
+                    'contact': phone_number,
+                    'message': status_msg,
+                    'status': 'Info'
+                })
             # Update account list immediately
             QTimer.singleShot(0, self.update_account_list)
+            if hasattr(self, 'health_dashboard_widget') and self.health_dashboard_widget:
+                QTimer.singleShot(0, self.health_dashboard_widget.refresh_data)
+            QTimer.singleShot(0, self.update_dashboard_metrics)
         except Exception as e:
             logger.error(f"Error handling account status change: {e}")
 
@@ -1497,8 +1524,31 @@ class MainWindow(QMainWindow):
 
     def setup_tray_icon(self):
         """Set up system tray icon."""
-        # Placeholder for tray icon setup
-        pass
+        if getattr(self, "tray_icon", None):
+            return
+
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            logger.warning("System tray not available on this platform; skipping tray icon setup")
+            return
+
+        tray_menu = QMenu(self)
+        show_action = QAction("Show", self)
+        show_action.triggered.connect(self.show)
+        hide_action = QAction("Hide", self)
+        hide_action.triggered.connect(self.hide)
+        quit_action = QAction("Quit", self)
+        quit_action.triggered.connect(QApplication.instance().quit)
+
+        tray_menu.addAction(show_action)
+        tray_menu.addAction(hide_action)
+        tray_menu.addSeparator()
+        tray_menu.addAction(quit_action)
+
+        self.tray_icon = QSystemTrayIcon(self.windowIcon(), self)
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.setToolTip("Telegram Mass Account Messenger")
+        self.tray_icon.activated.connect(lambda _: self.show())
+        self.tray_icon.show()
 
     def _check_first_time_setup(self):
         """Check if first-time setup is needed and show wizard if necessary."""

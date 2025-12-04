@@ -11,6 +11,8 @@ Features:
 
 import asyncio
 import logging
+import socket
+import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from PyQt6.QtWidgets import (
@@ -226,9 +228,9 @@ class ProxyTableWidget(QWidget):
         
         # Table
         self.table = QTableWidget()
-        self.table.setColumnCount(8)
+        self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels([
-            "IP:Port", "Status", "Tier", "Latency", "Score", "Uptime %", "Assigned To", "Source"
+            "IP:Port", "Status", "Tier", "Latency", "Score", "Uptime %", "Assigned To", "Source", "Last Tested"
         ])
         
         # Style table
@@ -452,6 +454,13 @@ class ProxyTableWidget(QWidget):
             # Source
             source = proxy.get('source_endpoint', 'Unknown')
             self.table.setItem(row, 7, QTableWidgetItem(source))
+
+            # Last tested
+            last_tested = proxy.get('last_tested') or proxy.get('last_check')
+            last_tested_display = last_tested if isinstance(last_tested, str) else (
+                last_tested.strftime('%Y-%m-%d %H:%M') if hasattr(last_tested, 'strftime') else '—'
+            )
+            self.table.setItem(row, 8, QTableWidgetItem(last_tested_display or '—'))
         
         # Re-enable updates
         self.table.setUpdatesEnabled(True)
@@ -615,19 +624,27 @@ class EndpointStatusWidget(QWidget):
 
 class ProxyManagementWidget(QWidget):
     """Complete proxy management widget combining all components."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.proxy_pool_manager = None
+        self.manual_mode = not PROXY_POOL_AVAILABLE
         self.setup_ui()
         self.setup_timer()
-        
+
         # Try to get proxy pool manager
         if PROXY_POOL_AVAILABLE:
             try:
                 self.proxy_pool_manager = get_proxy_pool_manager()
+                self.manual_mode = self.proxy_pool_manager is None
             except Exception as e:
                 logger.warning(f"Failed to get proxy pool manager: {e}")
+                self.manual_mode = True
+        else:
+            self.manual_mode = True
+
+        # Toggle manual controls based on availability
+        self._configure_mode()
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
@@ -639,11 +656,12 @@ class ProxyManagementWidget(QWidget):
         layout.addWidget(title)
         
         if not PROXY_POOL_AVAILABLE:
-            error_label = QLabel("⚠️ Proxy Pool Manager not available. Check proxy_pool_manager.py")
+            error_label = QLabel(
+                "⚠️ Proxy Pool Manager not available. Falling back to manual proxy entry and testing."
+            )
             error_label.setStyleSheet("color: #ed4245; font-size: 14px;")
             layout.addWidget(error_label)
-            return
-        
+
         # Stats Section
         self.stats_widget = ProxyStatsWidget()
         layout.addWidget(self.stats_widget)
@@ -736,18 +754,22 @@ class ProxyManagementWidget(QWidget):
             }
         """)
         actions_layout = QHBoxLayout(actions_group)
-        
-        fetch_btn = QPushButton("🔄 Fetch All Endpoints")
-        fetch_btn.clicked.connect(self._fetch_all_endpoints)
-        actions_layout.addWidget(fetch_btn)
-        
-        test_all_btn = QPushButton("🧪 Test All Proxies")
-        test_all_btn.clicked.connect(self._test_all_proxies)
-        actions_layout.addWidget(test_all_btn)
-        
-        cleanup_btn = QPushButton("🧹 Cleanup Failed")
-        cleanup_btn.clicked.connect(self._cleanup_failed)
-        actions_layout.addWidget(cleanup_btn)
+
+        self.fetch_btn = QPushButton("🔄 Fetch All Endpoints")
+        self.fetch_btn.clicked.connect(self._fetch_all_endpoints)
+        actions_layout.addWidget(self.fetch_btn)
+
+        self.test_all_btn = QPushButton("🧪 Test All Proxies")
+        self.test_all_btn.clicked.connect(self._test_all_proxies)
+        actions_layout.addWidget(self.test_all_btn)
+
+        self.cleanup_btn = QPushButton("🧹 Cleanup Failed")
+        self.cleanup_btn.clicked.connect(self._cleanup_failed)
+        actions_layout.addWidget(self.cleanup_btn)
+
+        self.export_btn = QPushButton("📤 Export Health")
+        self.export_btn.clicked.connect(self._export_health_results)
+        actions_layout.addWidget(self.export_btn)
         
         layout.addWidget(actions_group)
         
@@ -787,7 +809,52 @@ class ProxyManagementWidget(QWidget):
         config_layout.addWidget(apply_config_btn, 2, 0, 1, 4)
         
         layout.addWidget(config_group)
-        
+
+        # Manual fallback controls (visible when proxy pool manager is unavailable)
+        self.manual_controls_group = QGroupBox("Manual Proxy Entry (Fallback Mode)")
+        self.manual_controls_group.setStyleSheet(actions_group.styleSheet())
+        manual_layout = QVBoxLayout(self.manual_controls_group)
+
+        manual_layout.addWidget(QLabel(
+            "Paste proxies as one per line (protocol://user:pass@ip:port or ip:port)."
+        ))
+
+        self.manual_proxy_input = QTextEdit()
+        self.manual_proxy_input.setPlaceholderText("socks5://1.2.3.4:1080")
+        self.manual_proxy_input.setFixedHeight(120)
+        self.manual_proxy_input.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1f22;
+                color: #b5bac1;
+                border: 1px solid #3f4147;
+                border-radius: 6px;
+            }
+        """)
+        manual_layout.addWidget(self.manual_proxy_input)
+
+        timeout_row = QHBoxLayout()
+        timeout_row.addWidget(QLabel("Manual test timeout (sec):"))
+        self.manual_timeout_spin = QSpinBox()
+        self.manual_timeout_spin.setRange(1, 30)
+        self.manual_timeout_spin.setValue(3)
+        timeout_row.addWidget(self.manual_timeout_spin)
+        timeout_row.addStretch()
+        manual_layout.addLayout(timeout_row)
+
+        manual_buttons = QHBoxLayout()
+        self.manual_add_btn = QPushButton("➕ Add/Replace Table")
+        self.manual_add_btn.clicked.connect(self._add_manual_proxies)
+        manual_buttons.addWidget(self.manual_add_btn)
+
+        self.manual_test_btn = QPushButton("🧪 Test Manually")
+        self.manual_test_btn.clicked.connect(self._test_manual_proxies)
+        manual_buttons.addWidget(self.manual_test_btn)
+
+        manual_buttons.addStretch()
+        manual_layout.addLayout(manual_buttons)
+
+        layout.addWidget(self.manual_controls_group)
+
         # Log output
         log_group = QGroupBox("Activity Log")
         log_group.setStyleSheet(actions_group.styleSheet())
@@ -816,16 +883,40 @@ class ProxyManagementWidget(QWidget):
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_data)
         self.refresh_timer.start(30000)  # 30 seconds default
-    
+
     def _update_timer_interval(self, value: int):
         """Update timer interval."""
         self.refresh_timer.setInterval(value * 1000)
-    
+
+    def _configure_mode(self):
+        """Enable or disable controls based on proxy pool availability."""
+        manual = self.manual_mode or not self.proxy_pool_manager
+        self.fetch_btn.setEnabled(not manual)
+        self.test_all_btn.setEnabled(not manual)
+        self.cleanup_btn.setEnabled(not manual)
+        self.min_score_spin.setEnabled(not manual)
+        self.health_interval_spin.setEnabled(not manual)
+        self.max_failures_spin.setEnabled(not manual)
+        self.cooldown_spin.setEnabled(not manual)
+        self.manual_controls_group.setVisible(manual)
+        if manual:
+            self.status_label.setText("Manual mode: proxy pool manager unavailable")
+            self._update_manual_stats([])
+        else:
+            self.status_label.setText("Ready")
+
     def refresh_data(self):
         """Refresh all data using pagination."""
         if not self.auto_refresh_check.isChecked():
             return
-        
+
+        if self.manual_mode:
+            self._update_manual_stats(list(self.proxy_table.proxies.values()))
+            self.status_label.setText(
+                f"Manual mode: {len(self.proxy_table.proxies)} proxies loaded"
+            )
+            return
+
         if not self.proxy_pool_manager:
             return
         
@@ -860,6 +951,122 @@ class ProxyManagementWidget(QWidget):
         except Exception as e:
             logger.error(f"Failed to refresh proxy data: {e}")
             self.status_label.setText(f"Error: {str(e)[:50]}")
+
+    def _parse_manual_proxy_lines(self) -> List[Dict[str, Any]]:
+        """Parse manual proxy input into proxy dictionaries."""
+        proxies: List[Dict[str, Any]] = []
+        lines = self.manual_proxy_input.toPlainText().splitlines()
+        for line in lines:
+            raw = line.strip()
+            if not raw or raw.startswith('#'):
+                continue
+
+            protocol = 'socks5'
+            auth_part = ''
+            host_part = raw
+
+            if '://' in raw:
+                protocol, remainder = raw.split('://', 1)
+                host_part = remainder
+
+            if '@' in host_part:
+                auth_part, host_part = host_part.split('@', 1)
+
+            if ':' not in host_part:
+                logger.warning(f"Invalid proxy line (missing port): {raw}")
+                continue
+
+            host, port_str = host_part.split(':', 1)
+            try:
+                port = int(port_str)
+            except ValueError:
+                logger.warning(f"Invalid proxy line (bad port): {raw}")
+                continue
+
+            username = None
+            password = None
+            if auth_part:
+                if ':' in auth_part:
+                    username, password = auth_part.split(':', 1)
+                else:
+                    username = auth_part
+
+            proxies.append({
+                'ip': host,
+                'port': port,
+                'protocol': protocol or 'socks5',
+                'username': username,
+                'password': password,
+                'status': 'untested'
+            })
+
+        return proxies
+
+    def _add_manual_proxies(self):
+        """Load manual proxies into the table without external dependencies."""
+        proxies = self._parse_manual_proxy_lines()
+        if not proxies:
+            ErrorHandler.safe_warning(self, "No Proxies", "Add at least one proxy to proceed.")
+            return
+
+        self.proxy_table.update_proxies(proxies)
+        self.proxy_table.apply_filter()
+        self._update_manual_stats(proxies)
+        self.status_label.setText(f"Loaded {len(proxies)} proxies (manual mode)")
+
+    def _test_manual_proxies(self):
+        """Perform a lightweight connectivity probe for manual proxies."""
+        proxies = self._parse_manual_proxy_lines()
+        if not proxies:
+            ErrorHandler.safe_warning(self, "No Proxies", "Add proxies before testing.")
+            return
+
+        tested = []
+        for proxy in proxies:
+            start = time.perf_counter()
+            status = 'failed'
+            latency_ms = 0.0
+            try:
+                with socket.create_connection((proxy['ip'], proxy['port']), timeout=self.manual_timeout_spin.value()):
+                    latency_ms = (time.perf_counter() - start) * 1000
+                    status = 'active'
+            except Exception as e:
+                logger.debug(f"Manual proxy test failed for {proxy['ip']}:{proxy['port']} - {e}")
+
+            proxy['status'] = status
+            proxy['latency_ms'] = latency_ms
+            proxy['score'] = max(0, 100 - (latency_ms / 10)) if latency_ms else 0
+            proxy['last_tested'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+            tested.append(proxy)
+
+        self.proxy_table.update_proxies(tested)
+        self.proxy_table.apply_filter()
+        self._update_manual_stats(tested)
+        self.status_label.setText(f"Tested {len(tested)} proxies (manual mode)")
+
+    def _update_manual_stats(self, proxies: List[Dict[str, Any]]):
+        """Update stat cards based on manual entries."""
+        total = len(proxies)
+        active = sum(1 for p in proxies if p.get('status') == 'active')
+        failed = sum(1 for p in proxies if p.get('status') == 'failed')
+        avg_latency = (
+            sum(p.get('latency_ms', 0) for p in proxies if p.get('latency_ms')) / max(1, active)
+            if active else 0
+        )
+        stats = {
+            'total': total,
+            'active': active,
+            'available': max(0, total - failed),
+            'assigned': 0,
+            'avg_latency_ms': avg_latency,
+            'avg_score': (
+                sum(p.get('score', 0) for p in proxies) / max(total, 1)
+                if total else 0
+            ),
+            'endpoints': 0,
+            'last_full_poll': 'Manual'
+        }
+        self.stats_widget.update_stats(stats)
     
     def _fetch_all_endpoints(self):
         """Trigger fetch from all endpoints."""
@@ -882,12 +1089,113 @@ class ProxyManagementWidget(QWidget):
     
     def _test_all_proxies(self):
         """Test all proxies."""
-        self._log("Testing all proxies...")
-        # This would trigger health checks
+        # In manual mode, reuse the lightweight tester
+        if self.manual_mode or not self.proxy_pool_manager:
+            self._log("Testing manual proxies...")
+            self._test_manual_proxies()
+            return
+
+        self._log("Testing all proxies via health checks...")
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(self.proxy_pool_manager._run_health_checks())
+            else:
+                loop.run_until_complete(self.proxy_pool_manager._run_health_checks())
+            self.status_label.setText("Health checks running...")
+        except Exception as e:
+            logger.error(f"Failed to trigger proxy health checks: {e}")
+            self.status_label.setText(f"Error: {str(e)[:50]}")
+        else:
+            self.refresh_data()
+            self._log("Health checks completed")
     
     def _cleanup_failed(self):
         """Cleanup failed proxies."""
-        self._log("Cleaning up failed proxies...")
+        if self.manual_mode or not self.proxy_pool_manager:
+            # Remove failed entries from the table in manual mode
+            cleaned = [p for p in self.proxy_table.proxies.values() if p.get('status') != 'failed']
+            self.proxy_table.update_proxies(cleaned)
+            self.proxy_table.apply_filter()
+            self._update_manual_stats(cleaned)
+            if cleaned:
+                self.status_label.setText(f"Manual mode: {len(cleaned)} proxies active")
+            else:
+                self.status_label.setText("Manual mode: no proxies loaded")
+            self._log("Removed failed manual proxies from view")
+            return
+
+        self._log("Cleaning up failed/low-quality proxies...")
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(self.proxy_pool_manager._cleanup_low_quality_proxies())
+                asyncio.create_task(self.proxy_pool_manager._cleanup_cooldowns())
+            else:
+                loop.run_until_complete(self.proxy_pool_manager._cleanup_low_quality_proxies())
+                loop.run_until_complete(self.proxy_pool_manager._cleanup_cooldowns())
+            self.status_label.setText("Cleanup triggered")
+        except Exception as e:
+            logger.error(f"Cleanup failed: {e}")
+            self.status_label.setText(f"Error: {str(e)[:50]}")
+        else:
+            self.refresh_data()
+            self._log("Cleanup complete")
+
+    def _export_health_results(self):
+        """Export current proxy health data for audits."""
+        import csv
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filepath = f"proxy_health_{timestamp}.csv"
+
+        try:
+            proxies: List[Dict[str, Any]] = []
+            if self.manual_mode or not self.proxy_pool_manager:
+                proxies = list(self.proxy_table.proxies.values())
+            else:
+                page = 1
+                page_size = 500
+                while True:
+                    batch, total = self.proxy_pool_manager.get_proxies_paginated(
+                        page=page,
+                        page_size=page_size,
+                        status_filter=None,
+                        tier_filter=None,
+                        assigned_only=False,
+                        active_only=False
+                    )
+                    proxies.extend(batch)
+                    if len(proxies) >= total or not batch:
+                        break
+                    page += 1
+
+            if not proxies:
+                ErrorHandler.safe_information(self, "No Data", "No proxy data available to export.")
+                return
+
+            with open(filepath, 'w', newline='') as csvfile:
+                fieldnames = ['proxy_key', 'ip', 'port', 'protocol', 'username', 'password', 'status', 'score', 'latency_ms', 'last_tested']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                for proxy in proxies:
+                    writer.writerow({
+                        'proxy_key': proxy.get('proxy_key') or f"{proxy.get('ip')}:{proxy.get('port')}",
+                        'ip': proxy.get('ip'),
+                        'port': proxy.get('port'),
+                        'protocol': proxy.get('protocol'),
+                        'username': proxy.get('username') or '',
+                        'password': proxy.get('password') or '',
+                        'status': proxy.get('status'),
+                        'score': proxy.get('score'),
+                        'latency_ms': proxy.get('latency_ms'),
+                        'last_tested': proxy.get('last_tested') or proxy.get('last_check')
+                    })
+
+            self._log(f"Exported {len(proxies)} proxies to {filepath}")
+            self.status_label.setText(f"Exported proxy health to {filepath}")
+        except Exception as exc:
+            logger.error(f"Failed to export proxy health: {exc}")
+            self.status_label.setText(f"Export failed: {str(exc)[:50]}")
     
     def _apply_configuration(self):
         """Apply configuration changes."""

@@ -945,6 +945,14 @@ class DMCampaignManager:
         Returns:
             True if sent successfully
         """
+        max_length = campaign.config.get('max_message_length', 4096) if campaign and campaign.config else 4096
+        if len(message_text) > max_length:
+            logger.warning(f"Message length {len(message_text)} exceeds platform max; trimming to {max_length}")
+            message_text = message_text[:max_length]
+            self._record_message(campaign_id, user_id, account_phone, message_text,
+                               MessageStatus.FAILED, f"Message exceeded max length {max_length}")
+            return False
+
         # Check with anti-detection system first
         if self._anti_detection_system:
             can_send, delay, reason = self._anti_detection_system.can_send_message(account_phone)

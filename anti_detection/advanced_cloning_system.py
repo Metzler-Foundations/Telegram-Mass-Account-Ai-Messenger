@@ -208,7 +208,7 @@ class AdvancedCloningSystem:
         """Gather data from source account with anti-detection measures."""
         try:
             # Create a temporary client for data gathering
-            temp_client = await self._create_temp_client_for_scraping()
+            temp_client, created_temp_session = await self._create_temp_client_for_scraping()
 
             if not temp_client:
                 logger.error("Could not create temporary client for data gathering")
@@ -255,13 +255,12 @@ class AdvancedCloningSystem:
                 return source_data
 
             finally:
-                # Only stop if it's a new session, if reused, keep it
-                # For now, we assume _create_temp_client_for_scraping handles reuse logic or we manage it here
-                # If we reused a client from AccountManager, we shouldn't stop it here.
-                # But _create_temp_client_for_scraping currently might create new ones or reuse.
-                # If it's a "scraper" session, we might want to keep it alive.
-                # I'll check what _create_temp_client_for_scraping returns.
-                pass 
+                if created_temp_session and temp_client:
+                    try:
+                        await temp_client.disconnect()
+                        logger.info("Temporary scraping client disconnected")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to disconnect temporary scraping client: {cleanup_error}")
 
         except Exception as e:
             logger.error(f"Failed to gather source data for {username}: {e}")
@@ -294,7 +293,7 @@ class AdvancedCloningSystem:
         """Clone prepared components to target account."""
         try:
             # Get target account client
-            target_client = await self._get_target_client(target_phone_number)
+            target_client, created_temp_session = await self._get_target_client(target_phone_number)
             if not target_client:
                 logger.error(f"Could not get client for target account: {target_phone_number}")
                 return False
@@ -328,13 +327,12 @@ class AdvancedCloningSystem:
                 return True
 
             finally:
-                # Don't stop client if it belongs to account manager and should stay online
-                # But here we got it specifically for cloning.
-                # If we used AccountManager to get it, it might be the main session.
-                # We should probably not stop it if it's managed elsewhere.
-                # For safety, if we created a new instance, we should stop it.
-                # The _get_target_client implementation will clarify.
-                pass
+                if created_temp_session and target_client:
+                    try:
+                        await target_client.disconnect()
+                        logger.info(f"Disconnected temporary target client for {target_phone_number}")
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to disconnect target client {target_phone_number}: {cleanup_error}")
 
         except Exception as e:
             logger.error(f"Failed to clone to target account {target_phone_number}: {e}")
@@ -510,14 +508,13 @@ class AdvancedCloningSystem:
                         return True
                 except (ValueError, RuntimeError, Exception) as e:
                     logger.debug(f"Error setting username {source_username}: {e}")
-                    pass
-                
+
                 return False  # Failed to set any username
         except Exception as e:
             logger.error(f"Failed to clone username: {e}")
             return False
 
-    async def _create_temp_client_for_scraping(self) -> Optional[Client]:
+    async def _create_temp_client_for_scraping(self) -> Tuple[Optional[Client], bool]:
         """Create a temporary client for scraping source data."""
         try:
             # Prefer using an existing connected account from AccountManager to avoid new session flags
@@ -533,7 +530,7 @@ class AdvancedCloningSystem:
                             if not client.client.is_connected:
                                 await client.client.connect()
                             logger.info(f"Using existing account {phone} for scraping")
-                            return client.client
+                            return client.client, False
                     except Exception as e:
                         logger.warning(f"Failed to reuse account {phone} for scraping: {e}")
 
@@ -543,24 +540,24 @@ class AdvancedCloningSystem:
             session_name = f"scraper_{int(time.time())}_{random.randint(1000, 9999)}"
             api_id = os.getenv("TELEGRAM_API_ID", "")
             api_hash = os.getenv("TELEGRAM_API_HASH", "")
-            
+
             if not api_id or not api_hash:
                 logger.error("Missing Telegram API credentials.")
-                return None
-            
+                return None, False
+
             client = Client(
                 session_name,
                 api_id=api_id,
                 api_hash=api_hash
             )
             await client.connect()
-            return client
+            return client, True
 
         except Exception as e:
             logger.error(f"Failed to create scraping client: {e}")
-            return None
+            return None, False
 
-    async def _get_target_client(self, phone_number: str) -> Optional[Client]:
+    async def _get_target_client(self, phone_number: str) -> Tuple[Optional[Client], bool]:
         """Get client for target account."""
         try:
             # Try to get client from AccountManager if available
@@ -569,23 +566,22 @@ class AdvancedCloningSystem:
                 if phone_number in self.account_manager.active_clients:
                     client_wrapper = self.account_manager.active_clients[phone_number]
                     if hasattr(client_wrapper, 'client'):
-                        return client_wrapper.client
-            
+                        return client_wrapper.client, False
+
             # Fallback: Try to load from session file directly if not active
             session_name = f"account_{phone_number.replace('+', '')}"
             try:
                 client = Client(session_name)
                 await client.connect()
-                return client
+                return client, True
             except (ConnectionError, RuntimeError, Exception) as e:
                 logger.debug(f"Error loading client from session {session_name}: {e}")
-                pass
-            
+
             logger.warning(f"Could not get client for target account: {phone_number}")
-            return None
+            return None, False
         except Exception as e:
             logger.error(f"Failed to get target client for {phone_number}: {e}")
-            return None
+            return None, False
 
     async def _download_profile_photo_safe(self, client: Client, photo_object) -> Optional[str]:
         """Download profile photo with safety measures."""

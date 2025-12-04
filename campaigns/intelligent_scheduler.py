@@ -26,12 +26,14 @@ logger = logging.getLogger(__name__)
 class IntelligentScheduler:
     """Smart message scheduling system."""
     
-    def __init__(self, db_path: str = "scheduler.db", 
+    def __init__(self, db_path: str = "scheduler.db",
                  status_db: str = "status_intelligence.db"):
         """Initialize intelligent scheduler."""
         self.db_path = db_path
         self.status_db = status_db
         self._init_database()
+        self.cleanup_stale_records()
+        self.blackout_windows: List[Tuple[int, int]] = [(0, 6)]
     
     def _init_database(self):
         """Initialize scheduler database."""
@@ -55,7 +57,7 @@ class IntelligentScheduler:
         conn.commit()
         conn.close()
     
-    def schedule_optimal(self, user_id: int, message: str, 
+    def schedule_optimal(self, user_id: int, message: str,
                         timezone: str = "UTC") -> datetime:
         """Schedule message at optimal time for user.
         
@@ -73,9 +75,13 @@ class IntelligentScheduler:
         if not online_hours:
             # Default to afternoon if no data
             online_hours = [14, 15, 16, 17, 18]
-        
+
+        allowed_hours = [h for h in online_hours if not self._is_blackout_hour(h)]
+        if not allowed_hours:
+            allowed_hours = [h for h in range(0, 24) if not self._is_blackout_hour(h)] or online_hours
+
         # Pick best hour
-        best_hour = random.choice(online_hours)
+        best_hour = random.choice(allowed_hours)
         
         # Calculate next occurrence
         now = datetime.now()
@@ -84,12 +90,27 @@ class IntelligentScheduler:
         
         if scheduled <= now:
             scheduled += timedelta(days=1)
-        
+
+        if self._is_blackout_hour(scheduled.hour):
+            scheduled = self._next_available_time(scheduled)
+
         # Save to database
         self._save_scheduled_message(user_id, message, scheduled, timezone)
         
         logger.info(f"Scheduled message for user {user_id} at {scheduled}")
         return scheduled
+
+    def _is_blackout_hour(self, hour: int) -> bool:
+        return any(start <= hour < end for start, end in self.blackout_windows)
+
+    def _next_available_time(self, start_time: datetime) -> datetime:
+        """Find the next time slot outside blackout windows."""
+        current = start_time
+        for _ in range(48):  # scan up to two days
+            current += timedelta(hours=1)
+            if not self._is_blackout_hour(current.hour):
+                return current.replace(minute=random.randint(0, 59), second=0, microsecond=0)
+        return start_time
     
     def _get_user_online_hours(self, user_id: int) -> List[int]:
         """Get user's typical online hours from status intelligence."""
@@ -147,10 +168,30 @@ class IntelligentScheduler:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("""
-            UPDATE scheduled_messages 
+            UPDATE scheduled_messages
             SET status = 'sent', sent_at = ?
             WHERE id = ?
         """, (datetime.now(), message_id))
         conn.commit()
         conn.close()
+
+    def cleanup_stale_records(self, sent_retention_days: int = 30, pending_retention_days: int = 14):
+        """Remove stale scheduled message records to prevent unbounded growth."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cutoff_sent = datetime.now() - timedelta(days=sent_retention_days)
+            cutoff_pending = datetime.now() - timedelta(days=pending_retention_days)
+            cursor.execute(
+                "DELETE FROM scheduled_messages WHERE status = 'sent' AND sent_at < ?",
+                (cutoff_sent,)
+            )
+            cursor.execute(
+                "DELETE FROM scheduled_messages WHERE status IN ('pending','failed') AND scheduled_time < ?",
+                (cutoff_pending,)
+            )
+            conn.commit()
+            conn.close()
+        except Exception as exc:
+            logger.debug(f"Failed to cleanup stale scheduled messages: {exc}")
 

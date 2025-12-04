@@ -113,7 +113,7 @@ class MemberQueries:
     def get_all_members(self, limit: int = None) -> List[Dict]:
         """Get ALL real members from database."""
         query = """
-            SELECT 
+            SELECT
                 user_id, username, first_name, last_name, phone,
                 bio, is_bot, is_verified, is_premium, has_photo,
                 language_code, scraped_at, last_seen, message_count,
@@ -124,10 +124,45 @@ class MemberQueries:
         
         if limit:
             query += f" LIMIT {limit}"
-        
+
         members = self.db.execute_query(query)
         logger.info(f"Retrieved {len(members)} REAL members from database")
         return members
+
+    def get_member_statistics(self) -> Dict[str, float]:
+        """Return aggregated member statistics without loading full datasets."""
+        conn = sqlite3.connect(self.db.db_path)
+        cursor = conn.cursor()
+
+        today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        active_cutoff = (datetime.now() - timedelta(days=30)).isoformat()
+
+        stats = {}
+        try:
+            cursor.execute("SELECT COUNT(*) FROM members")
+            stats['total'] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM members WHERE scraped_at >= ?", (today_start,))
+            stats['new_today'] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM members WHERE username IS NOT NULL AND username != ''")
+            stats['with_username'] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM members WHERE is_verified = 1")
+            stats['verified'] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM members WHERE is_premium = 1")
+            stats['premium'] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM members WHERE last_seen >= ?", (active_cutoff,))
+            stats['active_30d'] = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM channels")
+            stats['total_channels'] = cursor.fetchone()[0]
+        finally:
+            conn.close()
+
+        return stats
     
     def get_filtered_members(self, filter_criteria: Dict) -> List[Dict]:
         """Get filtered members with REAL database query."""
