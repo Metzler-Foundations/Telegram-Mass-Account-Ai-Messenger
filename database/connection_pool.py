@@ -46,24 +46,46 @@ class PooledConnection:
             raise
     
     def executemany(self, *args, **kwargs):
-        """Execute many SQL statements."""
-        try:
-            self.last_used = datetime.now()
-            self.use_count += 1
-            return self.connection.executemany(*args, **kwargs)
-        except sqlite3.Error as e:
-            logger.error(f"SQL executemany error: {e}")
-            self.is_healthy = False
-            raise
+        """Execute many SQL statements with lock retry."""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                self.last_used = datetime.now()
+                self.use_count += 1
+                return self.connection.executemany(*args, **kwargs)
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                    wait_time = 0.5 * (2 ** attempt)
+                    logger.warning(f"Database locked, retry {attempt + 1}/{max_retries} after {wait_time}s")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"SQL executemany error after {attempt + 1} attempts: {e}")
+                    self.is_healthy = False
+                    raise
+            except sqlite3.Error as e:
+                logger.error(f"SQL executemany error: {e}")
+                self.is_healthy = False
+                raise
     
     def commit(self):
-        """Commit transaction."""
-        try:
-            return self.connection.commit()
-        except sqlite3.Error as e:
-            logger.error(f"Commit error: {e}")
-            self.is_healthy = False
-            raise
+        """Commit transaction with lock retry."""
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                return self.connection.commit()
+            except sqlite3.OperationalError as e:
+                if 'locked' in str(e).lower() and attempt < max_retries - 1:
+                    wait_time = 0.5 * (2 ** attempt)
+                    logger.warning(f"Database locked on commit, retry {attempt + 1}/{max_retries} after {wait_time}s")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Commit error after {attempt + 1} attempts: {e}")
+                    self.is_healthy = False
+                    raise
+            except sqlite3.Error as e:
+                logger.error(f"Commit error: {e}")
+                self.is_healthy = False
+                raise
     
     def rollback(self):
         """Rollback transaction."""
@@ -152,18 +174,20 @@ class ConnectionPool:
             PooledConnection instance
         """
         try:
-            # Enable WAL mode for better concurrency
+            # Enable WAL mode for better concurrency with extended timeout
             conn = sqlite3.connect(
                 self.database,
                 check_same_thread=False,
-                timeout=30.0
+                timeout=60.0  # Increased from 30 to 60 seconds
             )
             
-            # Configure connection
+            # Configure connection for better lock handling
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA foreign_keys=ON")
-            conn.execute("PRAGMA busy_timeout=30000")  # 30 seconds
+            conn.execute("PRAGMA busy_timeout=60000")  # 60 seconds for better lock tolerance
+            conn.execute("PRAGMA wal_autocheckpoint=1000")  # Checkpoint every 1000 pages
+            conn.execute("PRAGMA cache_size=-64000")  # 64MB cache
             
             # Row factory for dict-like access
             conn.row_factory = sqlite3.Row
