@@ -2245,13 +2245,41 @@ class AccountCreator:
             logger.warning(f"Failed to persist photo hash cache: {exc}")
 
     async def _set_profile_photo_stealth(self, client: Client, photo_path: str, allow_skip: bool = False):
-        """Set profile photo while avoiding duplicate updates and respecting stop signals."""
+        """Set profile photo with validation and stealth mode."""
         if not hasattr(self, "_applied_photo_hashes"):
             self._applied_photo_hashes = set()
 
         photo_file = Path(photo_path)
+        
+        # Validate photo exists
         if not photo_file.exists():
             raise FileNotFoundError(f"Profile photo {photo_path} does not exist")
+        
+        # Validate photo format
+        valid_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
+        if photo_file.suffix.lower() not in valid_extensions:
+            raise ValueError(f"Invalid photo format: {photo_file.suffix}. Must be one of {valid_extensions}")
+        
+        # Validate photo size (max 10MB for Telegram)
+        max_size_mb = 10
+        file_size_mb = photo_file.stat().st_size / (1024 * 1024)
+        if file_size_mb > max_size_mb:
+            raise ValueError(f"Photo too large: {file_size_mb:.1f}MB (max {max_size_mb}MB)")
+        
+        # Validate image is readable
+        try:
+            from PIL import Image
+            with Image.open(photo_file) as img:
+                # Validate dimensions (min 160x160, max 2560x2560 recommended)
+                width, height = img.size
+                if width < 160 or height < 160:
+                    logger.warning(f"Photo dimensions too small: {width}x{height} (min 160x160 recommended)")
+                if width > 5000 or height > 5000:
+                    raise ValueError(f"Photo dimensions too large: {width}x{height} (max 5000x5000)")
+        except ImportError:
+            logger.warning("PIL not available, skipping image validation")
+        except Exception as e:
+            raise ValueError(f"Invalid image file: {e}")
 
         photo_hash = hashlib.sha256(photo_file.read_bytes()).hexdigest()
         if allow_skip and photo_hash in self._applied_photo_hashes:
