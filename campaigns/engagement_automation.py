@@ -125,7 +125,7 @@ class EngagementAutomation:
         
     def _init_database(self):
         """Initialize engagement database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Engagement rules
@@ -198,7 +198,7 @@ class EngagementAutomation:
     
     def _load_rules(self):
         """Load engagement rules from database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM engagement_rules WHERE enabled = 1")
 
@@ -231,7 +231,7 @@ class EngagementAutomation:
     
     def add_rule(self, rule: EngagementRule):
         """Add or update an engagement rule."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         rule.updated_at = datetime.now()
@@ -500,7 +500,7 @@ class EngagementAutomation:
     def _log_engagement(self, rule_id: str, group_id: int, message_id: int,
                        user_id: int, reaction: str, success: bool, error: str = None):
         """Log an engagement action."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO engagement_log (
@@ -539,7 +539,7 @@ class EngagementAutomation:
     def _already_engaged(self, rule_id: str, message_id: int) -> bool:
         """Check if we've already reacted to this message for the given rule."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT 1 FROM engagement_log WHERE rule_id = ? AND message_id = ? LIMIT 1",
@@ -555,7 +555,7 @@ class EngagementAutomation:
     def _update_engagement_stats(self, user_id: int, group_id: int,
                                  gave_reaction: bool = False, received_reaction: bool = False):
         """Update engagement statistics."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         if gave_reaction:
@@ -589,7 +589,7 @@ class EngagementAutomation:
         Returns:
             Dictionary with statistics
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         since = datetime.now() - timedelta(hours=period_hours)
@@ -721,7 +721,7 @@ class EngagementAutomation:
         """
         cutoff = datetime.now() - timedelta(days=days)
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("DELETE FROM engagement_log WHERE timestamp < ?", (cutoff,))
         deleted = cursor.rowcount

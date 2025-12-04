@@ -1851,14 +1851,18 @@ class MainWindow(QMainWindow):
             # Update services that depend on configuration
             if hasattr(self, 'gemini_service') and self.gemini_service:
                 # Reinitialize Gemini service with new API key if changed
-                gemini_config = settings.get('gemini', {})
-                if gemini_config.get('api_key'):
-                    try:
-                        from gemini_service import GeminiService
-                        self.gemini_service = GeminiService(api_key=gemini_config['api_key'])
+                try:
+                    from gemini_service import GeminiService
+                    from core.secrets_manager import get_secrets_manager
+                    secrets = get_secrets_manager()
+                    api_key = secrets.get_secret('gemini_api_key', required=False)
+                    if api_key:
+                        self.gemini_service = GeminiService(api_key=api_key)
                         logger.info("Gemini service reinitialized with new settings")
-                    except Exception as e:
-                        logger.error(f"Failed to reinitialize Gemini service: {e}")
+                    else:
+                        logger.warning("Gemini API key not found in secrets manager")
+                except Exception as e:
+                    logger.error(f"Failed to reinitialize Gemini service: {e}")
 
             # Update anti-detection settings if they changed
             anti_detection_config = settings.get('anti_detection', {})
@@ -2007,21 +2011,24 @@ class MainWindow(QMainWindow):
     def _initialize_fallback_services(self):
         """Fallback service initialization if service container fails."""
         try:
-            # Load config to get credentials
+            # Get credentials from secrets manager
+            from core.secrets_manager import get_secrets_manager
+            secrets = get_secrets_manager()
+            
+            # Get Telegram credentials
+            api_id = secrets.get_secret("telegram_api_id", required=False)
+            api_hash = secrets.get_secret("telegram_api_hash", required=False)
+            
+            # Get phone number from config (not a secret)
             config_path = Path("config.json")
-            config = {}
+            phone = ""
             if config_path.exists():
                 with open(config_path, 'r') as f:
                     config = json.load(f)
-            
-            # Get Telegram credentials
-            telegram_cfg = config.get("telegram", {})
-            api_id = telegram_cfg.get("api_id") or os.getenv("TELEGRAM_API_ID", "")
-            api_hash = telegram_cfg.get("api_hash") or os.getenv("TELEGRAM_API_HASH", "")
-            phone = telegram_cfg.get("phone_number", "")
+                    phone = config.get("telegram", {}).get("phone_number", "")
             
             # Get Gemini API key
-            gemini_key = config.get("gemini", {}).get("api_key", "")
+            gemini_key = secrets.get_secret("gemini_api_key", required=False)
             
             # Create services with proper credentials
             if api_id and api_hash and phone:

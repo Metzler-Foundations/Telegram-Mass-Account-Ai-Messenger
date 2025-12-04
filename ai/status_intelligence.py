@@ -93,13 +93,19 @@ class StatusIntelligence:
     """Status and read receipt intelligence system."""
     
     def __init__(self, db_path: str = "status_intelligence.db"):
-        """Initialize status intelligence.
-        
-        Args:
-            db_path: Path to status database
-        """
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
 
         # In-memory tracking
         self._status_cache: Dict[int, UserStatusProfile] = {}
@@ -112,7 +118,7 @@ class StatusIntelligence:
         
     def _init_database(self):
         """Initialize status tracking database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # User status profiles
@@ -197,7 +203,7 @@ class StatusIntelligence:
     def _load_seen_receipts(self):
         """Load previously stored read receipts to avoid reprocessing after restarts."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT message_id FROM read_receipts")
             self._seen_receipts = {row[0] for row in cursor.fetchall()}
@@ -381,7 +387,7 @@ class StatusIntelligence:
             receipt.time_to_read = (receipt.read_at - receipt.sent_at).total_seconds()
             
             # Save to database
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR REPLACE INTO read_receipts
@@ -408,7 +414,7 @@ class StatusIntelligence:
         """
         delay = (their_response_time - our_message_time).total_seconds() / 60.0  # Minutes
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO response_times 
@@ -428,7 +434,7 @@ class StatusIntelligence:
     
     def _recalculate_response_metrics(self, user_id: int, profile: UserStatusProfile):
         """Recalculate response time metrics for a user."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -451,7 +457,7 @@ class StatusIntelligence:
     
     def _analyze_patterns(self, user_id: int):
         """Analyze activity patterns for a user."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Get online times from last 30 days
@@ -503,7 +509,7 @@ class StatusIntelligence:
             return None
         
         # Calculate scores for each hour/day combination
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Get response times by hour and day
@@ -540,7 +546,7 @@ class StatusIntelligence:
         Returns:
             Probability (0-1)
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         since = datetime.now() - timedelta(days=30)
@@ -614,7 +620,7 @@ class StatusIntelligence:
     
     def _get_profile(self, user_id: int) -> Optional[UserStatusProfile]:
         """Get profile from database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM status_profiles WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
@@ -645,7 +651,7 @@ class StatusIntelligence:
     
     def _save_profile(self, profile: UserStatusProfile):
         """Save profile to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -676,7 +682,7 @@ class StatusIntelligence:
     
     def _save_status_snapshot(self, snapshot: StatusSnapshot):
         """Save status snapshot to history."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO status_history (user_id, status, timestamp, was_online_at)
@@ -691,7 +697,7 @@ class StatusIntelligence:
     
     def get_statistics(self) -> Dict:
         """Get status intelligence statistics."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Total tracked users

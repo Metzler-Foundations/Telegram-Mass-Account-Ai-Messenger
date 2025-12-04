@@ -78,9 +78,19 @@ class AccountRiskMonitor:
     """
     
     def __init__(self, db_path: str = "account_risk.db"):
-        """Initialize risk monitor."""
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
         
         # Risk scoring weights
         self.weights = {
@@ -93,7 +103,7 @@ class AccountRiskMonitor:
     
     def _init_database(self):
         """Initialize risk monitoring database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             # Account risk scores table
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS account_risk_scores (
@@ -268,7 +278,7 @@ class AccountRiskMonitor:
     def save_risk_score(self, score: AccountRiskScore) -> bool:
         """Save risk score to database."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 import json
                 conn.execute('''
                     INSERT INTO account_risk_scores
@@ -322,7 +332,7 @@ class AccountRiskMonitor:
     ) -> bool:
         """Log a risk event."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     INSERT INTO risk_events
                     (phone_number, risk_factor, severity, description)
@@ -339,7 +349,7 @@ class AccountRiskMonitor:
     def get_account_risk(self, phone_number: str) -> Optional[AccountRiskScore]:
         """Get current risk score for an account."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM account_risk_scores
@@ -385,7 +395,7 @@ class AccountRiskMonitor:
         accounts = []
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM account_risk_scores
@@ -421,7 +431,7 @@ class AccountRiskMonitor:
         try:
             accounts = []
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM account_risk_scores
@@ -449,7 +459,7 @@ class AccountRiskMonitor:
     def get_risk_summary(self) -> Dict[str, Any]:
         """Get summary of risk across all accounts."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 
                 # Count by risk level

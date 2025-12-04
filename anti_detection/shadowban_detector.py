@@ -46,14 +46,24 @@ class ShadowBanDetector:
     """Detect shadow bans and delivery issues."""
     
     def __init__(self, db_path: str = "shadowban_monitor.db"):
-        """Initialize shadow ban detector."""
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
         self.canary_accounts: List[int] = []
     
     def _init_database(self):
         """Initialize monitoring database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Delivery tests
@@ -105,7 +115,7 @@ class ShadowBanDetector:
             user_id: Telegram user ID
             phone: Phone number
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO canary_accounts 
@@ -172,7 +182,7 @@ class ShadowBanDetector:
     
     def _save_test_result(self, test: DeliveryTest):
         """Save test result to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO delivery_tests 
@@ -187,7 +197,7 @@ class ShadowBanDetector:
     
     def _update_account_status(self, account_id: str, test: DeliveryTest):
         """Update account status based on test result."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Get current stats
@@ -234,7 +244,7 @@ class ShadowBanDetector:
     
     def get_account_status(self, account_id: str) -> Dict:
         """Get shadow ban status for account."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM account_status WHERE account_id = ?
@@ -262,7 +272,7 @@ class ShadowBanDetector:
     
     def get_suspected_accounts(self) -> List[str]:
         """Get list of accounts with suspected shadow bans."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT account_id FROM account_status

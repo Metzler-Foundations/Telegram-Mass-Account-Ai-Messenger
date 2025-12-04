@@ -397,8 +397,10 @@ class ServiceFactory:
 
     @staticmethod
     def create_ai_service(config_manager: ConfigurationManager) -> GeminiAIService:
-        gemini_cfg = config_manager.get("gemini", {})
-        api_key = gemini_cfg.get("api_key", "")
+        # Get API key from secrets manager
+        api_key = config_manager.get_gemini_api_key()
+        if not api_key:
+            api_key = ""  # Fallback to empty string for initialization
         gemini_service = GeminiService(api_key)
         ai_adapter = GeminiAIService(gemini_service, APIKeyManager())
         if api_key:

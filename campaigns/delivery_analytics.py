@@ -69,11 +69,21 @@ class DeliveryAnalytics:
     def __init__(self, db_path: str = "campaigns.db"):
         """Initialize delivery analytics."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return sqlite3.connect(self.db_path)
     
     def _init_database(self):
         """Initialize delivery analytics tables."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             # Delivery events table
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS delivery_events (
@@ -162,7 +172,7 @@ class DeliveryAnalytics:
             sent_at = datetime.now()
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     INSERT INTO delivery_events 
                     (message_id, campaign_id, user_id, account_phone, sent_at, status)
@@ -191,7 +201,7 @@ class DeliveryAnalytics:
             delivered_at = datetime.now()
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Calculate delivery time
                 cursor = conn.execute('''
                     SELECT sent_at FROM delivery_events
@@ -235,7 +245,7 @@ class DeliveryAnalytics:
             read_at = datetime.now()
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Calculate read time
                 cursor = conn.execute('''
                     SELECT sent_at FROM delivery_events
@@ -278,7 +288,7 @@ class DeliveryAnalytics:
             replied_at = datetime.now()
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Calculate response time
                 cursor = conn.execute('''
                     SELECT sent_at FROM delivery_events
@@ -313,7 +323,7 @@ class DeliveryAnalytics:
     def _update_campaign_stats(self, campaign_id: int):
         """Update aggregated statistics for a campaign."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Calculate statistics
                 cursor = conn.execute('''
                     SELECT 
@@ -390,7 +400,7 @@ class DeliveryAnalytics:
     def get_campaign_delivery_stats(self, campaign_id: int) -> Dict[str, Any]:
         """Get delivery statistics for a campaign."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM campaign_response_stats
@@ -416,7 +426,7 @@ class DeliveryAnalytics:
         try:
             cutoff = datetime.now() - timedelta(days=days)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT 
@@ -464,7 +474,7 @@ class DeliveryAnalytics:
         try:
             cutoff = datetime.now() - timedelta(days=days)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT 
@@ -509,7 +519,7 @@ class DeliveryAnalytics:
             List of bins with count and time range
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 if campaign_id:
                     cursor = conn.execute('''
                         SELECT response_time_seconds 
@@ -583,6 +593,8 @@ def get_delivery_analytics() -> DeliveryAnalytics:
     if _delivery_analytics is None:
         _delivery_analytics = DeliveryAnalytics()
     return _delivery_analytics
+
+
 
 
 

@@ -35,3 +35,5 @@ def add_search_to_table(table: QTableWidget, search_box: QLineEdit):
 
 
 
+
+

@@ -36,7 +36,7 @@ class ResponseOptimizer:
             Optimized response template
         """
         # Get top patterns
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT message_template FROM message_patterns

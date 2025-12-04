@@ -131,3 +131,5 @@ def protect_button(button: QPushButton, callback: Callable, debounce_ms: int = 1
     protected_callback = debouncer.create_debounced_handler(button, callback)
     button.clicked.connect(protected_callback)
 
+
+

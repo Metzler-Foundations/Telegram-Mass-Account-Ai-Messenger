@@ -550,11 +550,29 @@ class ProxyPoolManager:
         # Load config from file if available
         self._load_config_from_file()
         
-        # Thread pool for blocking operations
-        self.executor = ThreadPoolExecutor(max_workers=30)
+        # Thread pool for blocking operations (use centralized config)
+        try:
+            from utils.threadpool_config import get_thread_pool
+            self.executor = get_thread_pool().executor
+            logger.info("Using shared thread pool for proxy operations")
+        except ImportError:
+            # Fallback to local thread pool if config not available
+            self.executor = ThreadPoolExecutor(max_workers=30)
+            logger.warning("Using local thread pool (shared pool not available)")
         
         # Lock for thread-safe operations
         self._lock = asyncio.Lock()
+        
+        # Initialize connection pool if available
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+            logger.info("Using connection pool for proxy database")
+        except ImportError:
+            logger.warning("Connection pool not available, using direct sqlite3 connections")
+        except Exception as e:
+            logger.warning(f"Failed to initialize connection pool: {e}")
         
         # Statistics
         self.stats = {
@@ -573,6 +591,18 @@ class ProxyPoolManager:
             logger.warning("Proxy database integrity check failed; writes may be unsafe until repaired")
         else:
             self._create_integrity_checked_backup()
+    
+    def _get_connection(self):
+        """Get a database connection (using pool if available).
+        
+        Returns:
+            Context manager for database connection
+        """
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        else:
+            # Fallback to direct connection
+            return self._get_connection()
 
         # Restore persisted statistics so historical health is not lost between restarts
         self._load_stats()
@@ -702,7 +732,7 @@ class ProxyPoolManager:
 
     def _init_database(self):
         """Initialize the proxy database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS proxies (
                     proxy_key TEXT PRIMARY KEY,
@@ -786,7 +816,7 @@ class ProxyPoolManager:
     def _load_stats(self):
         """Load persisted pool statistics so historical health is retained."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("SELECT * FROM proxy_pool_stats WHERE id = 1")
                 row = cursor.fetchone()
@@ -811,7 +841,7 @@ class ProxyPoolManager:
     def _persist_stats(self):
         """Persist pool statistics to disk for restart continuity."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute(
                     '''
                         INSERT INTO proxy_pool_stats (id, total_fetched, total_validated, total_failed, endpoints_polled, last_full_poll)
@@ -838,7 +868,7 @@ class ProxyPoolManager:
     def _load_proxies(self):
         """Load proxies from database with optimized query."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 # Only load proxies that meet minimum criteria
                 # Load top proxies by score, limit to prevent memory issues
@@ -904,7 +934,7 @@ class ProxyPoolManager:
     def _save_proxy(self, proxy: Proxy):
         """Save a single proxy to database."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Encrypt credentials before storing
                 encrypted_username = self.credential_manager.encrypt_credential(proxy.username) if proxy.username else None
                 encrypted_password = self.credential_manager.encrypt_credential(proxy.password) if proxy.password else None
@@ -929,7 +959,7 @@ class ProxyPoolManager:
     def _migrate_proxy_credentials(self):
         """Migrate existing proxy credentials to encrypted storage."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('SELECT proxy_key, username, password FROM proxies WHERE username IS NOT NULL OR password IS NOT NULL')
 
@@ -1426,7 +1456,7 @@ class ProxyPoolManager:
         """Log health check result to database."""
         safe_error = self._sanitize_error_message(error_msg, proxy)
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     INSERT INTO proxy_health_log (proxy_key, latency_ms, success, error_message)
                     VALUES (?, ?, ?, ?)
@@ -1485,7 +1515,7 @@ class ProxyPoolManager:
     async def _cleanup_old_logs(self):
         """Clean up old health check logs."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     DELETE FROM proxy_health_log 
                     WHERE timestamp < datetime('now', '-7 days')
@@ -1554,7 +1584,7 @@ class ProxyPoolManager:
                             self.available_proxies.discard(proxy.proxy_key)
                     
                     # Remove from database
-                    with sqlite3.connect(self.db_path) as conn:
+                    with self._get_connection() as conn:
                         conn.executemany(
                             'DELETE FROM proxies WHERE proxy_key = ?',
                             [(key,) for key in removed_keys]
@@ -1620,27 +1650,69 @@ class ProxyPoolManager:
             
             available.sort(key=sort_key)
             
-            # Assign best proxy (atomic operation)
+            # Assign best proxy atomically with database save
             proxy = available[0]
-            proxy.assigned_account = account_phone
-            proxy.last_used = datetime.now()
             
-            self.assigned_proxies[account_phone] = proxy.proxy_key
-            self.available_proxies.discard(proxy.proxy_key)
-        
-        # Save assignment outside lock (to avoid holding lock during I/O)
-        try:
-            self._save_proxy(proxy)
-            self._save_assignment(account_phone, proxy.proxy_key)
-        except Exception as e:
-            logger.error(f"Failed to save proxy assignment: {e}")
-            # Rollback on failure
-            async with self._lock:
-                proxy.assigned_account = None
-                if account_phone in self.assigned_proxies:
-                    del self.assigned_proxies[account_phone]
-                self.available_proxies.add(proxy.proxy_key)
-            return None
+            # Save to database FIRST (inside lock) to prevent race conditions
+            # This ensures the assignment is persisted before releasing the lock
+            try:
+                # Use database transaction for atomicity
+                with self._get_connection() as conn:
+                    conn.execute('BEGIN EXCLUSIVE')  # Exclusive lock on database
+                    try:
+                        # Check one more time if proxy is already assigned (race condition check at DB level)
+                        cursor = conn.execute(
+                            'SELECT account_phone FROM proxy_assignments WHERE proxy_key = ?',
+                            (proxy.proxy_key,)
+                        )
+                        existing = cursor.fetchone()
+                        if existing and existing[0] != account_phone:
+                            # Proxy was assigned to someone else between our check and now
+                            logger.warning(f"Proxy {proxy.proxy_key} was assigned to {existing[0]} during assignment")
+                            conn.rollback()
+                            return None
+                        
+                        # Update proxy assigned_account and last_used
+                        proxy.assigned_account = account_phone
+                        proxy.last_used = datetime.now()
+                        
+                        # Save proxy state
+                        encrypted_username = self.credential_manager.encrypt_credential(proxy.username) if proxy.username else None
+                        encrypted_password = self.credential_manager.encrypt_credential(proxy.password) if proxy.password else None
+                        
+                        conn.execute('''
+                            INSERT OR REPLACE INTO proxies
+                            (proxy_key, ip, port, protocol, username, password, country, city, isp,
+                             latency_ms, uptime_percent, success_count, failure_count, last_check, last_used,
+                             score, tier, fraud_score, status, assigned_account, cooldown_until, source_endpoint, updated_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        ''', (
+                            proxy.proxy_key, proxy.ip, proxy.port, proxy.protocol.value,
+                            encrypted_username, encrypted_password, proxy.country, proxy.city, proxy.isp,
+                            proxy.latency_ms, proxy.uptime_percent, proxy.success_count, proxy.failure_count,
+                            proxy.last_check, proxy.last_used, proxy.score, proxy.tier.value, proxy.fraud_score,
+                            proxy.status.value, proxy.assigned_account, proxy.cooldown_until, proxy.source_endpoint
+                        ))
+                        
+                        # Save assignment
+                        conn.execute('''
+                            INSERT OR REPLACE INTO proxy_assignments (account_phone, proxy_key, is_permanent, is_locked)
+                            VALUES (?, ?, 1, 0)
+                        ''', (account_phone, proxy.proxy_key))
+                        
+                        conn.commit()
+                        
+                        # Update in-memory state AFTER successful database commit
+                        self.assigned_proxies[account_phone] = proxy.proxy_key
+                        self.available_proxies.discard(proxy.proxy_key)
+                        
+                    except Exception as e:
+                        conn.rollback()
+                        raise e
+                        
+            except Exception as e:
+                logger.error(f"Failed to save proxy assignment: {e}")
+                return None
         
         logger.info(f"✅ Assigned proxy {proxy.proxy_key} (score: {proxy.score:.1f}) to account {account_phone}")
         
@@ -1677,7 +1749,7 @@ class ProxyPoolManager:
     def _save_assignment(self, account_phone: str, proxy_key: str, is_locked: bool = False):
         """Save proxy assignment to database with optional locking."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Add is_locked column if it doesn't exist
                 try:
                     conn.execute('ALTER TABLE proxy_assignments ADD COLUMN is_locked INTEGER DEFAULT 0')
@@ -1715,7 +1787,7 @@ class ProxyPoolManager:
             proxy_key = self.assigned_proxies[account_phone]
             
             try:
-                with sqlite3.connect(self.db_path) as conn:
+                with self._get_connection() as conn:
                     # Add is_locked column if needed
                     try:
                         conn.execute('ALTER TABLE proxy_assignments ADD COLUMN is_locked INTEGER DEFAULT 0')
@@ -1747,7 +1819,7 @@ class ProxyPoolManager:
             True if unlock was successful
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     UPDATE proxy_assignments
                     SET is_locked = 0
@@ -1765,7 +1837,7 @@ class ProxyPoolManager:
     def is_proxy_locked(self, account_phone: str) -> bool:
         """Check if an account's proxy assignment is locked."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT is_locked FROM proxy_assignments
@@ -1796,7 +1868,7 @@ class ProxyPoolManager:
             
             # Remove from database
             try:
-                with sqlite3.connect(self.db_path) as conn:
+                with self._get_connection() as conn:
                     conn.execute('DELETE FROM proxy_assignments WHERE account_phone = ?', (account_phone,))
                     conn.commit()
             except Exception as e:
@@ -1853,7 +1925,7 @@ class ProxyPoolManager:
             Tuple of (proxy_list, total_count)
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 
                 # Build query with filters

@@ -23,7 +23,7 @@ class DatabaseQueryHelper:
         """Execute a query and return results as list of dicts."""
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -57,7 +57,7 @@ class DatabaseQueryHelper:
         """Execute count query."""
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             cursor.execute(query, params)
@@ -81,7 +81,7 @@ class DatabaseQueryHelper:
         """Execute update/insert/delete query."""
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             cursor.execute(query, params)

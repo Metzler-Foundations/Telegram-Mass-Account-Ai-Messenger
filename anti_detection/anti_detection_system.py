@@ -1217,7 +1217,7 @@ class AccountQuarantineManager:
     
     def _init_database(self):
         """Initialize quarantine database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS quarantine_history (
                     id INTEGER PRIMARY KEY,
@@ -1251,7 +1251,7 @@ class AccountQuarantineManager:
         metrics_json = json.dumps(metrics) if metrics else None
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Add to active quarantine
                 conn.execute('''
                     INSERT OR REPLACE INTO active_quarantine 
@@ -1285,7 +1285,7 @@ class AccountQuarantineManager:
     def release_account(self, account_id: str) -> bool:
         """Release an account from quarantine."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Update history
                 conn.execute('''
                     UPDATE quarantine_history 
@@ -1307,7 +1307,7 @@ class AccountQuarantineManager:
     def is_quarantined(self, account_id: str) -> Tuple[bool, Optional[datetime]]:
         """Check if account is quarantined."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 cursor = conn.execute('''
                     SELECT release_at FROM active_quarantine 
                     WHERE account_id = ? AND release_at > CURRENT_TIMESTAMP
@@ -1327,7 +1327,7 @@ class AccountQuarantineManager:
         released = []
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 cursor = conn.execute('''
                     SELECT account_id FROM active_quarantine 
                     WHERE release_at <= CURRENT_TIMESTAMP
@@ -1346,7 +1346,7 @@ class AccountQuarantineManager:
     def get_quarantine_stats(self, account_id: str) -> Dict[str, Any]:
         """Get quarantine statistics for an account."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 cursor = conn.execute('''
                     SELECT COUNT(*) as total_quarantines,
                            SUM(duration_minutes) as total_minutes,

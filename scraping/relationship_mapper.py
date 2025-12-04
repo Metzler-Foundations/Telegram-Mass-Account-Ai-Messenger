@@ -72,7 +72,7 @@ class RelationshipMapper:
     
     def _init_database(self):
         """Initialize relationship tables."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Relationships table
@@ -135,7 +135,7 @@ class RelationshipMapper:
         if user_id_1 > user_id_2:
             user_id_1, user_id_2 = user_id_2, user_id_1
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Check if relationship exists
@@ -182,7 +182,7 @@ class RelationshipMapper:
         if user_id_1 > user_id_2:
             user_id_1, user_id_2 = user_id_2, user_id_1
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM relationships WHERE user_id_1 = ? AND user_id_2 = ?
@@ -320,7 +320,7 @@ class RelationshipMapper:
     
     def _save_cluster(self, cluster: CommunityCluster):
         """Save cluster to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         now = datetime.now()
@@ -393,7 +393,7 @@ class RelationshipMapper:
         
         self.graph = nx.Graph()
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT user_id_1, user_id_2, strength FROM relationships")
         
@@ -468,7 +468,7 @@ class RelationshipMapper:
     
     def get_relationship_stats(self) -> Dict[str, Any]:
         """Get overall relationship statistics."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Total relationships

@@ -43,13 +43,23 @@ class RecoveryProtocol:
     """Automated account recovery system."""
     
     def __init__(self, db_path: str = "recovery_plans.db"):
-        """Initialize recovery protocol."""
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
     
     def _init_database(self):
         """Initialize recovery database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -122,7 +132,7 @@ class RecoveryProtocol:
     
     def _save_plan(self, plan: RecoveryPlan):
         """Save recovery plan to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO recovery_plans
@@ -137,7 +147,7 @@ class RecoveryProtocol:
     
     def _log_action(self, account_id: str, action: str, stage: RecoveryStage, notes: str = ""):
         """Log recovery action."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO recovery_log (account_id, action, stage, timestamp, notes)
@@ -198,7 +208,7 @@ class RecoveryProtocol:
     
     def get_plan(self, account_id: str) -> Optional[RecoveryPlan]:
         """Get recovery plan for account."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM recovery_plans WHERE account_id = ?
@@ -242,7 +252,7 @@ class RecoveryProtocol:
     
     def get_accounts_in_recovery(self) -> Dict[str, RecoveryPlan]:
         """Get all accounts currently in recovery."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM recovery_plans WHERE stage != 'recovered'

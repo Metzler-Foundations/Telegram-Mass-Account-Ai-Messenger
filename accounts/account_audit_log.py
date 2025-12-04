@@ -100,13 +100,23 @@ class AccountAuditLog:
     """
     
     def __init__(self, db_path: str = "accounts_audit.db"):
-        """Initialize audit log."""
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
     
     def _init_database(self):
         """Initialize audit log database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             # Main audit events table
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS audit_events (
@@ -190,7 +200,7 @@ class AccountAuditLog:
             Event ID
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 cursor = conn.execute('''
                     INSERT INTO audit_events (
                         phone_number, event_type, timestamp,
@@ -308,7 +318,7 @@ class AccountAuditLog:
             List of audit events
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM audit_events 
@@ -337,7 +347,7 @@ class AccountAuditLog:
     def get_account_cost(self, phone_number: str) -> float:
         """Get total cost for an account."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 cursor = conn.execute(
                     'SELECT total_cost_usd FROM account_summary WHERE phone_number = ?',
                     (phone_number,)
@@ -366,7 +376,7 @@ class AccountAuditLog:
             Dictionary of costs
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 if group_by_provider:
                     query = '''
                         SELECT sms_provider, SUM(sms_cost) as total_cost
@@ -408,7 +418,7 @@ class AccountAuditLog:
     def get_proxy_usage_stats(self, proxy_key: Optional[str] = None) -> Dict[str, Any]:
         """Get usage statistics for proxies."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 
                 if proxy_key:
@@ -457,6 +467,8 @@ def get_audit_log() -> AccountAuditLog:
     if _audit_log is None:
         _audit_log = AccountAuditLog()
     return _audit_log
+
+
 
 
 

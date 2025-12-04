@@ -9,6 +9,14 @@ from copy import deepcopy
 
 logger = logging.getLogger(__name__)
 
+# Import secrets manager for secure credential handling
+try:
+    from core.secrets_manager import get_secrets_manager
+    SECRETS_AVAILABLE = True
+except ImportError:
+    SECRETS_AVAILABLE = False
+    logger.warning("Secrets manager not available")
+
 
 class ConfigurationManager:
     """Load and persist application configuration."""
@@ -98,6 +106,50 @@ class ConfigurationManager:
                 ConfigurationManager._deep_merge(base[key], value)
             else:
                 base[key] = value
+    
+    def get_secret(self, secret_name: str, required: bool = False) -> Optional[str]:
+        """Get a secret value from secrets manager.
+        
+        Args:
+            secret_name: Name of the secret (e.g., 'telegram_api_id', 'gemini_api_key')
+            required: If True, raises ValueError if secret not found
+            
+        Returns:
+            Secret value or None if not found (and not required)
+            
+        Raises:
+            ValueError: If secret is required but not found
+        """
+        if not SECRETS_AVAILABLE:
+            logger.warning(f"Secrets manager not available, secret '{secret_name}' not retrieved")
+            if required:
+                raise ValueError(f"Secret '{secret_name}' is required but secrets manager not available")
+            return None
+            
+        try:
+            secrets_manager = get_secrets_manager()
+            return secrets_manager.get_secret(secret_name, required=required)
+        except Exception as exc:
+            logger.error(f"Failed to retrieve secret '{secret_name}': {exc}")
+            if required:
+                raise
+            return None
+    
+    def get_telegram_api_id(self) -> Optional[str]:
+        """Get Telegram API ID from secrets manager."""
+        return self.get_secret('telegram_api_id', required=True)
+    
+    def get_telegram_api_hash(self) -> Optional[str]:
+        """Get Telegram API hash from secrets manager."""
+        return self.get_secret('telegram_api_hash', required=True)
+    
+    def get_gemini_api_key(self) -> Optional[str]:
+        """Get Gemini API key from secrets manager."""
+        return self.get_secret('gemini_api_key', required=True)
+    
+    def get_sms_provider_api_key(self) -> Optional[str]:
+        """Get SMS provider API key from secrets manager."""
+        return self.get_secret('sms_provider_api_key', required=False)
 
 
 

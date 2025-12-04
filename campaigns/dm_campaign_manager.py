@@ -24,6 +24,14 @@ from enum import Enum
 from dataclasses import dataclass, asdict
 import json
 
+# Import connection pool for database operations
+try:
+    from database.connection_pool import get_pool
+    CONNECTION_POOL_AVAILABLE = True
+except ImportError:
+    CONNECTION_POOL_AVAILABLE = False
+    logger.warning("Connection pool not available, using direct sqlite3 connections")
+
 # Timezone handling
 try:
     from zoneinfo import ZoneInfo
@@ -476,11 +484,32 @@ class DMCampaignManager:
         # Campaign scheduler
         self.scheduler = CampaignScheduler(self)
         
+        # Initialize connection pool if available
+        self._connection_pool = None
+        if CONNECTION_POOL_AVAILABLE:
+            try:
+                self._connection_pool = get_pool(self.db_path)
+                logger.info("Using connection pool for campaign database")
+            except Exception as e:
+                logger.warning(f"Failed to initialize connection pool: {e}")
+        
         self.init_database()
+    
+    def _get_connection(self):
+        """Get a database connection (using pool if available).
+        
+        Returns:
+            Context manager for database connection
+        """
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        else:
+            # Fallback to direct connection
+            return self._get_connection()
     
     def init_database(self):
         """Initialize campaign database schema."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             # Campaigns table
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS campaigns (
@@ -757,7 +786,7 @@ class DMCampaignManager:
         )
         
         # Save to database
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             cursor = conn.execute('''
                 INSERT INTO campaigns 
                 (name, template, status, target_channel_id, target_member_ids, account_ids,
@@ -857,7 +886,7 @@ class DMCampaignManager:
         campaign.started_at = datetime.now()
         
         # Update database
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute('''
                 UPDATE campaigns 
                 SET status = ?, started_at = ?
@@ -1026,7 +1055,7 @@ class DMCampaignManager:
             
             # Store account-user mapping for reply handling
             campaign.config['account_user_mapping'] = account_user_mapping
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('UPDATE campaigns SET config = ? WHERE id = ?', 
                            (json.dumps(campaign.config), campaign_id))
                 conn.commit()
@@ -1408,7 +1437,7 @@ class DMCampaignManager:
     def _is_message_already_sent(self, campaign_id: int, user_id: int) -> bool:
         """Check if message already sent to prevent duplicates."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 cursor = conn.execute(
                     'SELECT 1 FROM campaign_messages WHERE campaign_id = ? AND user_id = ? AND status = ? LIMIT 1',
                     (campaign_id, user_id, MessageStatus.SENT.value)
@@ -1431,7 +1460,7 @@ class DMCampaignManager:
     ):
         """Record a message in the database with idempotency support."""
         template_variant = template_variant or "default"
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             if self._messages_have_variant:
                 conn.execute(
                     '''
@@ -1522,7 +1551,7 @@ class DMCampaignManager:
                     campaign.config['account_user_mapping'] = {}
                 campaign.config['account_user_mapping'][user_id] = account_phone
                 # Update in database
-                with sqlite3.connect(self.db_path) as conn:
+                with self._get_connection() as conn:
                     conn.execute('''
                         UPDATE campaigns SET config = ? WHERE id = ?
                     ''', (json.dumps(campaign.config), campaign_id))
@@ -1556,7 +1585,7 @@ class DMCampaignManager:
     
     def _update_campaign_progress(self, campaign_id: int, campaign: Campaign):
         """Update campaign progress in database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute('''
                 UPDATE campaigns
                 SET status = ?, sent_count = ?, failed_count = ?, blocked_count = ?,
@@ -1585,7 +1614,7 @@ class DMCampaignManager:
     
     def _load_campaign(self, campaign_id: int) -> Optional[Campaign]:
         """Load campaign from database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             cursor = conn.execute('SELECT * FROM campaigns WHERE id = ?', (campaign_id,))
             row = cursor.fetchone()
             if not row:
@@ -1620,7 +1649,7 @@ class DMCampaignManager:
     
     def get_all_campaigns(self) -> List[Campaign]:
         """Get all campaigns. Optimized to avoid N+1 queries."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute('''
                 SELECT * FROM campaigns
@@ -1643,7 +1672,7 @@ class DMCampaignManager:
         if not campaign:
             return {}
         
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             # Get message status counts
             cursor = conn.execute('''
                 SELECT status, COUNT(*) 
@@ -1717,7 +1746,7 @@ class DMCampaignManager:
         
         # Also check database for campaigns not in memory
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
                     'SELECT * FROM campaigns WHERE status = ?',
@@ -1842,7 +1871,7 @@ class DMCampaignManager:
             guidance: Actionable guidance message
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Ensure floodwait_events table exists
                 conn.execute('''
                     CREATE TABLE IF NOT EXISTS floodwait_events (
@@ -1898,7 +1927,7 @@ class DMCampaignManager:
         try:
             cutoff = datetime.now() - timedelta(hours=hours)
             
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 cursor = conn.execute('''
                     SELECT COUNT(*) FROM floodwait_events
                     WHERE account_phone = ? AND timestamp >= ?
@@ -1929,7 +1958,7 @@ class DMCampaignManager:
             List of FloodWait events
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 
                 # Build query with filters

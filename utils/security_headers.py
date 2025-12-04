@@ -64,3 +64,5 @@ def apply_security_headers(response):
     return SecurityHeaders.apply_headers(response)
 
 
+
+

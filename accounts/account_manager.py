@@ -460,8 +460,15 @@ class AccountManager:
         self._lock = asyncio.Lock()
         self._init_lock = asyncio.Lock()  # For lazy initialization
         
-        # Thread pool for blocking operations
-        self.executor = ThreadPoolExecutor(max_workers=10)
+        # Thread pool for blocking operations (use centralized config)
+        try:
+            from utils.threadpool_config import get_thread_pool
+            self.executor = get_thread_pool().executor
+            logger.info("Using shared thread pool for account operations")
+        except ImportError:
+            # Fallback to local thread pool if config not available
+            self.executor = ThreadPoolExecutor(max_workers=10)
+            logger.warning("Using local thread pool (shared pool not available)")
         
         # File paths
         self.accounts_file = Path("accounts.json")
@@ -480,7 +487,7 @@ class AccountManager:
     
     def _init_database(self):
         """Initialize SQLite database for account persistence."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS accounts (
                     phone_number TEXT PRIMARY KEY,
@@ -776,7 +783,7 @@ class AccountManager:
         
         # Then sync with database
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('SELECT * FROM accounts')
                 
@@ -818,7 +825,7 @@ class AccountManager:
         
         # Save to database
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 for phone, account_data in self.accounts.items():
                     status_data = self.account_status.get(phone, {})
                     shard_id = self.account_to_shard.get(phone)
@@ -850,7 +857,7 @@ class AccountManager:
         """Save account data immediately to prevent data loss."""
         # Save to database first (more reliable for immediate persistence)
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 for phone, account_data in self.accounts.items():
                     status_data = self.account_status.get(phone, {})
                     shard_id = self.account_to_shard.get(phone)
@@ -888,7 +895,7 @@ class AccountManager:
 
         # Save to database (backup persistence)
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 for phone, account_data in self.accounts.items():
                     status_data = self.account_status.get(phone, {})
                     shard_id = self.account_to_shard.get(phone)
@@ -1055,7 +1062,7 @@ class AccountManager:
         
         # Remove from database
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('DELETE FROM accounts WHERE phone_number = ?', (phone_number,))
                 conn.execute('DELETE FROM account_metrics WHERE phone_number = ?', (phone_number,))
                 conn.commit()

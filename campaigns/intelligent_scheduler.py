@@ -37,7 +37,7 @@ class IntelligentScheduler:
     
     def _init_database(self):
         """Initialize scheduler database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -133,7 +133,7 @@ class IntelligentScheduler:
     def _save_scheduled_message(self, user_id: int, message: str, 
                                 scheduled_time: datetime, timezone: str):
         """Save scheduled message to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO scheduled_messages 
@@ -145,7 +145,7 @@ class IntelligentScheduler:
     
     def get_due_messages(self) -> List[Dict]:
         """Get messages that are due to be sent."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, user_id, message_text FROM scheduled_messages
@@ -165,7 +165,7 @@ class IntelligentScheduler:
     
     def mark_as_sent(self, message_id: int):
         """Mark scheduled message as sent."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             UPDATE scheduled_messages
@@ -178,7 +178,7 @@ class IntelligentScheduler:
     def cleanup_stale_records(self, sent_retention_days: int = 30, pending_retention_days: int = 14):
         """Remove stale scheduled message records to prevent unbounded growth."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             cutoff_sent = datetime.now() - timedelta(days=sent_retention_days)
             cutoff_pending = datetime.now() - timedelta(days=pending_retention_days)

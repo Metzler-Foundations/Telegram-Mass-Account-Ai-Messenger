@@ -278,3 +278,5 @@ class CostTrendChart(QWidget):
 
 
 
+
+

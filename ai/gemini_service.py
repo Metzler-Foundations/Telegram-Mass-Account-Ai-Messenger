@@ -331,18 +331,72 @@ class GeminiService:
                 'max_output_tokens': RandomizationUtils.get_gemini_max_tokens(),
             }
 
-        # Generate response with anti-detection timeout and error handling
-        try:
-            response = await asyncio.wait_for(
-                self.model.generate_content_async(context, generation_config=generation_config),
-                timeout=RandomizationUtils.get_api_timeout()
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"Gemini API timeout for chat {chat_id}")
-            raise
-        except Exception as e:
-            logger.error(f"Gemini API error: {e}", exc_info=True)
-            raise
+        # Generate response with anti-detection timeout and comprehensive error handling
+        max_retries = 3
+        retry_delays = [1, 2, 4]  # Exponential backoff
+        
+        last_exception = None
+        for attempt in range(max_retries):
+            try:
+                response = await asyncio.wait_for(
+                    self.model.generate_content_async(context, generation_config=generation_config),
+                    timeout=RandomizationUtils.get_api_timeout()
+                )
+                break  # Success, exit retry loop
+                
+            except asyncio.TimeoutError as e:
+                last_exception = e
+                logger.warning(f"Gemini API timeout for chat {chat_id} (attempt {attempt + 1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delays[attempt])
+                    continue
+                else:
+                    logger.error(f"Gemini API timeout after {max_retries} attempts for chat {chat_id}")
+                    raise Exception("Gemini API timeout - please try again later") from e
+                    
+            except Exception as e:
+                last_exception = e
+                error_str = str(e).lower()
+                
+                # Handle specific API errors
+                if "quota" in error_str or "rate limit" in error_str:
+                    logger.error(f"Gemini API quota/rate limit exceeded for chat {chat_id}: {e}")
+                    raise Exception("AI service is currently overloaded. Please try again in a few moments.") from e
+                    
+                elif "api key" in error_str or "authentication" in error_str or "invalid" in error_str:
+                    logger.error(f"Gemini API authentication error for chat {chat_id}: {e}")
+                    raise Exception("AI service configuration error. Please contact support.") from e
+                    
+                elif "safety" in error_str or "blocked" in error_str:
+                    logger.warning(f"Gemini content safety block for chat {chat_id}: {e}")
+                    raise Exception("Message could not be processed due to content policy. Please rephrase your message.") from e
+                    
+                elif "model" in error_str and "not found" in error_str:
+                    logger.error(f"Gemini model not found for chat {chat_id}: {e}")
+                    raise Exception("AI service is temporarily unavailable. Please try again later.") from e
+                    
+                # For retryable errors, retry with backoff
+                elif "server" in error_str or "unavailable" in error_str or "503" in error_str or "500" in error_str:
+                    logger.warning(f"Gemini API server error for chat {chat_id} (attempt {attempt + 1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delays[attempt])
+                        continue
+                    else:
+                        logger.error(f"Gemini API server error after {max_retries} attempts for chat {chat_id}")
+                        raise Exception("AI service is temporarily unavailable. Please try again later.") from e
+                
+                # For unknown errors, log and raise with user-friendly message
+                else:
+                    logger.error(f"Gemini API unexpected error for chat {chat_id}: {e}", exc_info=True)
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(retry_delays[attempt])
+                        continue
+                    else:
+                        raise Exception("AI service encountered an error. Please try again later.") from e
+        else:
+            # If we exhaust retries without success
+            if last_exception:
+                raise Exception("AI service is temporarily unavailable. Please try again later.") from last_exception
 
         # Record performance metrics
         response_time = time.time() - start_time

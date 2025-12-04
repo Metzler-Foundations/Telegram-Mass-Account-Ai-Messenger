@@ -131,19 +131,25 @@ class IntelligenceEngine:
     """Core intelligence gathering and analysis engine."""
     
     def __init__(self, db_path: str = "intelligence.db"):
-        """Initialize intelligence engine.
-        
-        Args:
-            db_path: Path to intelligence database
-        """
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
         self._cache = {}
         self._cache_ttl = 3600  # 1 hour cache
         
     def _init_database(self):
         """Initialize intelligence database schema."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # User intelligence table
@@ -367,7 +373,7 @@ class IntelligenceEngine:
             group_ids = [chat.id for chat in common_chats]
             
             # Save to database
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             for group_id in group_ids:
                 cursor.execute("""
@@ -402,7 +408,7 @@ class IntelligenceEngine:
         Returns:
             List of hours (0-23) when user is typically online
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT hour_of_day, COUNT(*) as count
@@ -432,7 +438,7 @@ class IntelligenceEngine:
     
     def _calculate_activity_level(self, user_id: int) -> ActivityLevel:
         """Calculate user's activity level."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Count activities in last 30 days
@@ -526,7 +532,7 @@ class IntelligenceEngine:
     
     def _load_user_intelligence(self, user_id: int) -> Optional[UserIntelligence]:
         """Load existing intelligence from database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM user_intelligence WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
@@ -568,7 +574,7 @@ class IntelligenceEngine:
     
     def _save_user_intelligence(self, intel: UserIntelligence):
         """Save user intelligence to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -606,7 +612,7 @@ class IntelligenceEngine:
     
     def _log_profile_change(self, user_id: int, change_type: str, old_value: str, new_value: str):
         """Log a profile change."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO profile_changes (user_id, change_type, old_value, new_value, detected_at)
@@ -618,7 +624,7 @@ class IntelligenceEngine:
     def _log_activity(self, user_id: int, activity_type: str, metadata: Dict = None):
         """Log user activity."""
         now = datetime.now()
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO activity_log (user_id, activity_type, timestamp, hour_of_day, day_of_week, metadata)
@@ -643,7 +649,7 @@ class IntelligenceEngine:
             message_id: Message ID
             metadata: Additional data
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO interactions (user_id, interaction_type, target_id, message_id, timestamp, metadata)
@@ -663,7 +669,7 @@ class IntelligenceEngine:
         Returns:
             List of UserIntelligence objects
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM user_intelligence
@@ -742,7 +748,7 @@ class IntelligenceEngine:
     
     def get_user_statistics(self) -> Dict[str, Any]:
         """Get overall intelligence statistics."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Total users

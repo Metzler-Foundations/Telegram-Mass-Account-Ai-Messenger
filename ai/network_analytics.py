@@ -52,13 +52,19 @@ class NetworkAnalytics:
     """Social network analysis and graph analytics."""
     
     def __init__(self, db_path: str = "network.db"):
-        """Initialize network analytics.
-        
-        Args:
-            db_path: Path to network database
-        """
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
         
         if NETWORKX_AVAILABLE:
             self.graph = nx.Graph()
@@ -67,7 +73,7 @@ class NetworkAnalytics:
     
     def _init_database(self):
         """Initialize network database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Network nodes
@@ -133,7 +139,7 @@ class NetworkAnalytics:
         if user_id_1 > user_id_2:
             user_id_1, user_id_2 = user_id_2, user_id_1
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Check if exists
@@ -173,7 +179,7 @@ class NetworkAnalytics:
     
     def _update_node_connections(self, user_id: int):
         """Update connection count for a node."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Count connections
@@ -206,7 +212,7 @@ class NetworkAnalytics:
             pagerank = nx.pagerank(self.graph)
             
             # Save to database
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             
             for user_id, score in pagerank.items():
@@ -233,7 +239,7 @@ class NetworkAnalytics:
         Returns:
             List of NetworkNode objects
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM network_nodes
@@ -303,7 +309,7 @@ class NetworkAnalytics:
     
     def _save_cluster(self, cluster: NetworkCluster, members: List[int]):
         """Save cluster to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Save cluster
@@ -371,7 +377,7 @@ class NetworkAnalytics:
         """
         stats = {}
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Node count
@@ -409,7 +415,7 @@ class NetworkAnalytics:
         
         self.graph = nx.Graph()
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT user_id_1, user_id_2, strength FROM network_edges")
         

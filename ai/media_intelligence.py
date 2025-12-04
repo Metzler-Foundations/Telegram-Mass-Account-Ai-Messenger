@@ -48,13 +48,23 @@ class MediaIntelligence:
     """Media analysis and optimization system."""
     
     def __init__(self, db_path: str = "media_intelligence.db"):
-        """Initialize media intelligence."""
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
     
     def _init_database(self):
         """Initialize media database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -155,7 +165,7 @@ class MediaIntelligence:
     
     def _save_analysis(self, analysis: MediaAnalysis):
         """Save analysis to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO media_analysis
@@ -185,7 +195,7 @@ class MediaIntelligence:
             reactions: Number of reactions received
             got_response: Whether it got a response
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO media_performance
@@ -200,7 +210,7 @@ class MediaIntelligence:
     
     def _update_media_stats(self, media_hash: str):
         """Update aggregate media statistics."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Calculate averages
@@ -234,7 +244,7 @@ class MediaIntelligence:
         Returns:
             List of media analyses
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         query = """

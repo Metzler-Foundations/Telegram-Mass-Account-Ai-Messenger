@@ -52,9 +52,19 @@ class ConversationAnalyzer:
     """Analyze conversation patterns and success rates."""
     
     def __init__(self, db_path: str = "conversation_analytics.db"):
-        """Initialize conversation analyzer."""
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
         self.flow_retention_days = 90
         self.max_sentiment_records_per_user = 500
         self._stage_has_user_id = False
@@ -65,7 +75,7 @@ class ConversationAnalyzer:
     
     def _init_database(self):
         """Initialize analytics database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Conversation flows
@@ -135,7 +145,7 @@ class ConversationAnalyzer:
         """Add missing columns to conversation_stages for sentiment tracking."""
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             cursor.execute("PRAGMA table_info(conversation_stages)")
@@ -167,7 +177,7 @@ class ConversationAnalyzer:
         """Create indexes to keep stage lookups and pruning efficient."""
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
             if self._stage_has_user_id:
                 cursor.execute(
@@ -189,7 +199,7 @@ class ConversationAnalyzer:
         """Remove stale conversation flows and associated data."""
         try:
             cutoff = datetime.now() - timedelta(days=self.flow_retention_days)
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             cursor.execute("SELECT flow_id FROM conversation_flows WHERE ended_at IS NOT NULL AND ended_at < ?", (cutoff,))
@@ -212,7 +222,7 @@ class ConversationAnalyzer:
 
         conn = None
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = self._get_connection()
             cursor = conn.cursor()
 
             cursor.execute(
@@ -378,7 +388,7 @@ class ConversationAnalyzer:
                                 outcome: str, value: float, response_times: List[float],
                                 timestamps: Optional[List[Tuple[datetime, datetime]]] = None):
         """Save conversation flow to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         duration = sum(response_times) if response_times else 0.0
@@ -423,7 +433,7 @@ class ConversationAnalyzer:
     
     def _update_pattern(self, pattern: MessagePattern):
         """Update or create message pattern."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("SELECT times_used, success_count FROM message_patterns WHERE pattern_id = ?",
@@ -457,7 +467,7 @@ class ConversationAnalyzer:
     
     def get_top_patterns(self, limit: int = 10, min_uses: int = 3) -> List[MessagePattern]:
         """Get top performing message patterns."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -486,7 +496,7 @@ class ConversationAnalyzer:
     
     def get_conversion_insights(self) -> Dict:
         """Get insights about successful conversions."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Average messages to convert

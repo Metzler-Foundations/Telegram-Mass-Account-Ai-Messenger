@@ -98,7 +98,7 @@ class AutomatedProxyCleanupService:
     
     def _init_database(self):
         """Initialize audit database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS cleanup_events (
                     event_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -321,7 +321,7 @@ class AutomatedProxyCleanupService:
     def _log_cleanup_event(self, event: CleanupEvent):
         """Log cleanup event to audit database."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     INSERT INTO cleanup_events
                     (proxy_key, reason, score, failure_count, age_days, operator_notified)
@@ -344,7 +344,7 @@ class AutomatedProxyCleanupService:
         events = []
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM cleanup_events
@@ -380,6 +380,8 @@ def get_cleanup_service(proxy_pool_manager=None) -> AutomatedProxyCleanupService
     if _cleanup_service is None and proxy_pool_manager:
         _cleanup_service = AutomatedProxyCleanupService(proxy_pool_manager)
     return _cleanup_service
+
+
 
 
 

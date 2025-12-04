@@ -111,13 +111,19 @@ class GroupDiscoveryEngine:
     """Advanced group discovery system."""
     
     def __init__(self, db_path: str = "discovered_groups.db"):
-        """Initialize group discovery engine.
-        
-        Args:
-            db_path: Path to discovered groups database
-        """
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
         
         # Discovery tracking
         self._discovered_ids: Set[int] = set()
@@ -128,7 +134,7 @@ class GroupDiscoveryEngine:
         
     def _init_database(self):
         """Initialize discovery database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Discovered groups
@@ -214,7 +220,7 @@ class GroupDiscoveryEngine:
     
     def _load_discovered_ids(self):
         """Load discovered group IDs into memory."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT group_id FROM discovered_groups")
         self._discovered_ids = {row[0] for row in cursor.fetchall()}
@@ -592,7 +598,7 @@ class GroupDiscoveryEngine:
     
     def _save_group(self, group: DiscoveredGroup):
         """Save discovered group to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         cursor.execute("""
@@ -619,7 +625,7 @@ class GroupDiscoveryEngine:
     def _save_invite_link(self, link_hash: str, full_link: str, 
                          group_id: Optional[int], is_valid: bool):
         """Save invite link to database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO invite_links 
@@ -631,7 +637,7 @@ class GroupDiscoveryEngine:
     
     def _is_link_processed(self, link_hash: str) -> bool:
         """Check if invite link has been processed."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM invite_links WHERE link_hash = ?", (link_hash,))
         result = cursor.fetchone() is not None
@@ -641,7 +647,7 @@ class GroupDiscoveryEngine:
     def _log_discovery(self, method: DiscoveryMethod, groups_found: int, 
                       success: bool, params: Dict = None):
         """Log a discovery operation."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO discovery_log (method, groups_found, timestamp, parameters, success)
@@ -664,7 +670,7 @@ class GroupDiscoveryEngine:
         Returns:
             List of DiscoveredGroup objects
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         query = """
@@ -717,7 +723,7 @@ class GroupDiscoveryEngine:
     
     def get_discovery_stats(self) -> Dict[str, Any]:
         """Get discovery statistics."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Total discovered

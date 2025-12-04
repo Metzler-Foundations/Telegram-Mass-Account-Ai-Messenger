@@ -62,13 +62,23 @@ class CompetitorIntelligence:
     """Monitor and analyze competitor activities."""
     
     def __init__(self, db_path: str = "competitor_intel.db"):
-        """Initialize competitor intelligence."""
+        """Initialize."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return self._get_connection()
     
     def _init_database(self):
         """Initialize intelligence database."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Competitor profiles
@@ -144,7 +154,7 @@ class CompetitorIntelligence:
         """
         competitor_id = f"comp_{user_id}"
         
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO competitors
@@ -176,7 +186,7 @@ class CompetitorIntelligence:
             return False
         
         # Save message
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO competitor_messages
@@ -193,7 +203,7 @@ class CompetitorIntelligence:
     
     def _is_competitor(self, competitor_id: str) -> bool:
         """Check if ID is a tracked competitor."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM competitors WHERE competitor_id = ?", (competitor_id,))
         exists = cursor.fetchone() is not None
@@ -202,7 +212,7 @@ class CompetitorIntelligence:
     
     def _update_competitor_stats(self, competitor_id: str):
         """Update competitor statistics."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         # Count messages
@@ -257,7 +267,7 @@ class CompetitorIntelligence:
         Returns:
             List of templates
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT message_text FROM competitor_messages
@@ -288,7 +298,7 @@ class CompetitorIntelligence:
         Returns:
             List of overlapping user IDs
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         
         overlap = []
@@ -312,7 +322,7 @@ class CompetitorIntelligence:
         Returns:
             Summary dictionary
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM competitors WHERE competitor_id = ?
@@ -338,7 +348,7 @@ class CompetitorIntelligence:
     
     def get_all_competitors(self) -> List[Dict]:
         """Get all tracked competitors."""
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("SELECT competitor_id FROM competitors")
         competitor_ids = [row[0] for row in cursor.fetchall()]
@@ -352,7 +362,7 @@ class CompetitorIntelligence:
         Returns:
             List of strategy patterns
         """
-        conn = sqlite3.connect(self.db_path)
+        conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
             SELECT competitor_id, pattern_type, pattern_data, effectiveness_score, times_observed

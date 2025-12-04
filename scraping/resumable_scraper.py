@@ -99,11 +99,21 @@ class ResumableScraperManager:
     def __init__(self, db_path: str = "scraping_checkpoints.db"):
         """Initialize resumable scraper manager."""
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except: pass
         self._init_database()
+    
+    def _get_connection(self):
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        return sqlite3.connect(self.db_path)
     
     def _init_database(self):
         """Initialize checkpoint database."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             # Scraping jobs table
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS scraping_jobs (
@@ -183,7 +193,7 @@ class ResumableScraperManager:
         )
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     INSERT INTO scraping_jobs 
                     (job_id, channel_identifier, status, started_at)
@@ -228,7 +238,7 @@ class ResumableScraperManager:
             True if successful
         """
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     INSERT INTO scraping_checkpoints
                     (job_id, channel_id, channel_name, method, cursor_position, 
@@ -261,7 +271,7 @@ class ResumableScraperManager:
     def get_job(self, job_id: str) -> Optional[ScrapingJob]:
         """Get scraping job by ID."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM scraping_jobs WHERE job_id = ?
@@ -298,7 +308,7 @@ class ResumableScraperManager:
         checkpoints = {}
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT * FROM scraping_checkpoints 
@@ -337,7 +347,7 @@ class ResumableScraperManager:
     ) -> bool:
         """Update job status."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 if status == JobStatus.COMPLETED:
                     conn.execute('''
                         UPDATE scraping_jobs
@@ -371,7 +381,7 @@ class ResumableScraperManager:
     ) -> bool:
         """Save partial results (user IDs scraped so far)."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.execute('''
                     UPDATE scraping_jobs
                     SET partial_results = ?, total_members_found = ?, updated_at = ?
@@ -398,7 +408,7 @@ class ResumableScraperManager:
             if method.value not in job.methods_completed:
                 job.methods_completed.append(method.value)
                 
-                with sqlite3.connect(self.db_path) as conn:
+                with self._get_connection() as conn:
                     conn.execute('''
                         UPDATE scraping_jobs
                         SET methods_completed = ?, updated_at = ?
@@ -419,7 +429,7 @@ class ResumableScraperManager:
         jobs = []
         
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute('''
                     SELECT job_id FROM scraping_jobs 
@@ -440,7 +450,7 @@ class ResumableScraperManager:
     def cleanup_old_jobs(self, days: int = 30) -> int:
         """Clean up completed/failed jobs older than specified days."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._get_connection() as conn:
                 # Delete old checkpoints first
                 conn.execute('''
                     DELETE FROM scraping_checkpoints
@@ -479,6 +489,8 @@ def get_resumable_scraper_manager() -> ResumableScraperManager:
     if _manager is None:
         _manager = ResumableScraperManager()
     return _manager
+
+
 
 
 
