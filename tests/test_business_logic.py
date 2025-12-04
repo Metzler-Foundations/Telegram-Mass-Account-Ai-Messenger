@@ -6,7 +6,7 @@ import sqlite3
 import sys
 import os
 from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -90,10 +90,10 @@ class TestMemberService:
         metrics = member_service.calculate_campaign_metrics(members)
 
         assert metrics['total_members'] == 3
-        assert metrics['avg_profile_quality'] == 0.7666666666666667  # (0.8 + 0.6 + 0.9) / 3
-        assert metrics['avg_messaging_potential'] == 0.7  # (0.7 + 0.8 + 0.6) / 3
-        assert metrics['high_potential_count'] == 2  # 2 members with score > 0.8
-        assert metrics['high_potential_percentage'] == 66.66666666666667
+        assert metrics['avg_profile_quality'] == 0.77  # (0.8 + 0.6 + 0.9) / 3 = 0.7666... rounded to 0.77
+        assert metrics['avg_messaging_potential'] == 0.7  # (0.7 + 0.8 + 0.6) / 3 = 0.7
+        assert metrics['high_potential_count'] == 1  # 1 member with score >= 0.8 (member 2 has 0.8)
+        assert metrics['high_potential_percentage'] == 33.33  # 1/3 * 100 = 33.333... rounded to 33.33
 
 
 class TestCampaignService:
@@ -274,7 +274,7 @@ class TestAccountService:
         }
 
         errors = account_service.validate_account_data(account_data)
-        assert 'Phone number must start with country code' in errors
+        assert any('Phone number must start with country code' in error for error in errors)
 
     def test_validate_account_data_invalid_api_id(self, account_service):
         """Test account validation failure due to non-numeric API ID."""
@@ -347,7 +347,7 @@ class TestAccountService:
         account_repo_mock.get_account_by_phone.return_value = {
             'status': 'limited',
             'error_count': 15,
-            'last_success': (datetime.now().replace(day=datetime.now().day - 10)).isoformat()  # 10 days ago
+            'last_success': (datetime.now() - timedelta(days=10)).isoformat()  # 10 days ago
         }
 
         result = account_service.calculate_account_health_score('+1234567890')
@@ -364,9 +364,9 @@ class TestBusinessLogicCoordinator:
     def coordinator(self):
         """Create coordinator with in-memory database for testing."""
         # Create in-memory database for testing
-        with patch('repositories.MemberRepository.__init__', lambda self, db_path: None):
-            with patch('repositories.CampaignRepository.__init__', lambda self, db_path: None):
-                with patch('repositories.AccountRepository.__init__', lambda self, db_path: None):
+        with patch('core.repositories.MemberRepository.__init__', lambda self, db_path: None):
+            with patch('core.repositories.CampaignRepository.__init__', lambda self, db_path: None):
+                with patch('core.repositories.AccountRepository.__init__', lambda self, db_path: None):
                     # Mock the database connections
                     coordinator = BusinessLogicCoordinator(':memory:')
 

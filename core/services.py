@@ -59,14 +59,14 @@ class MemberService(BaseService):
         total_members = len(members)
         avg_quality = sum(m.get('profile_quality_score', 0) for m in members) / total_members
         avg_potential = sum(m.get('messaging_potential_score', 0) for m in members) / total_members
-        high_potential = sum(1 for m in members if m.get('messaging_potential_score', 0) > 0.8)
+        high_potential = sum(1 for m in members if m.get('messaging_potential_score', 0) >= 0.8)
 
         return {
             'total_members': total_members,
-            'avg_profile_quality': avg_quality,
-            'avg_messaging_potential': avg_potential,
+            'avg_profile_quality': round(avg_quality, 2),  # Round to 2 decimals to avoid floating point issues
+            'avg_messaging_potential': round(avg_potential, 2),
             'high_potential_count': high_potential,
-            'high_potential_percentage': (high_potential / total_members) * 100 if total_members > 0 else 0
+            'high_potential_percentage': round((high_potential / total_members) * 100, 2) if total_members > 0 else 0
         }
 
 

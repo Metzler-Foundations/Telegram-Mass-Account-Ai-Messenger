@@ -165,7 +165,7 @@ class MediaProcessor:
     @staticmethod
     def calculate_hash(file_path: str) -> str:
         """Calculate file hash."""
-        hash_md5 = hashlib.md5()
+        hash_md5 = hashlib.md5(usedforsecurity=False)  # Used for file identification, not security
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)

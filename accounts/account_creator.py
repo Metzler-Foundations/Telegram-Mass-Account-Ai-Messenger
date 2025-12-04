@@ -1321,30 +1321,53 @@ class AccountCreator:
             Account creation result
         """
         async with self._creation_semaphore:
-            if progress_callback:
-                progress_callback(
-                    f"Starting account creation "
-                    f"(slot {self._max_concurrent_creations - self._creation_semaphore._value + 1}/"
-                    f"{self._max_concurrent_creations})"
+            try:
+                if progress_callback:
+                    progress_callback(
+                        f"Starting account creation "
+                        f"(slot {self._max_concurrent_creations - self._creation_semaphore._value + 1}/"
+                        f"{self._max_concurrent_creations})"
+                    )
+                
+                logger.info(
+                    f"Account creation started with concurrency control "
+                    f"({self.get_active_creation_count()}/{self._max_concurrent_creations} slots used)"
                 )
-            
-            # Actual creation would go here - this is a wrapper
-            # In real usage, this would call the actual create_account method
-            # For now, returning placeholder
-            logger.info(
-                f"Account creation started with concurrency control "
-                f"({self.get_active_creation_count()}/{self._max_concurrent_creations} slots used)"
-            )
-            
-            return {
-                'success': False,
-                'message': 'Account creation method not implemented in wrapper',
-                'concurrency_info': {
-                    'max_concurrent': self._max_concurrent_creations,
-                    'active_count': self.get_active_creation_count(),
-                    'available_slots': self._creation_semaphore._value
+                
+                # Store progress callback for use in create_new_account
+                original_callback = self.progress_callback
+                self.progress_callback = progress_callback
+                
+                try:
+                    # Call the actual account creation method
+                    result = await self.create_new_account(config)
+                    
+                    # Add concurrency info to result
+                    if isinstance(result, dict):
+                        result['concurrency_info'] = {
+                            'max_concurrent': self._max_concurrent_creations,
+                            'active_count': self.get_active_creation_count(),
+                            'available_slots': self._creation_semaphore._value
+                        }
+                    
+                    return result
+                    
+                finally:
+                    # Restore original callback
+                    self.progress_callback = original_callback
+                    
+            except Exception as e:
+                logger.error(f"Account creation failed with error: {e}", exc_info=True)
+                return {
+                    'success': False,
+                    'message': f'Account creation failed: {str(e)}',
+                    'error': str(e),
+                    'concurrency_info': {
+                        'max_concurrent': self._max_concurrent_creations,
+                        'active_count': self.get_active_creation_count(),
+                        'available_slots': self._creation_semaphore._value
+                    }
                 }
-            }
         
     async def _get_proxy_pool_manager(self) -> Optional['ProxyPoolManager']:
         """Get or initialize the proxy pool manager."""

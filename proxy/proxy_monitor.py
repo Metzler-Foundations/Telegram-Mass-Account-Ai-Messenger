@@ -107,11 +107,14 @@ class ProxyTester(QThread):
         # Test 2: HTTP request through proxy
         try:
             start = time.time()
+            # NOTE: SSL verification disabled for proxy testing due to untrusted proxy certificates
+            # This is acceptable for proxy validation but should not be used in production traffic
+            # nosec B501 - Intentional for proxy testing only
             response = requests.get(
                 self.test_url,
                 proxies=proxies,
                 timeout=self.timeout,
-                verify=False  # Skip SSL verification for testing
+                verify=False  # nosec - Required for testing proxies with self-signed certs
             )
             http_time = (time.time() - start) * 1000
             

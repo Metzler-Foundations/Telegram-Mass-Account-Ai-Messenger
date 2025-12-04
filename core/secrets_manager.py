@@ -19,8 +19,6 @@ from datetime import datetime
 import base64
 import hashlib
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
 
 logger = logging.getLogger(__name__)
 

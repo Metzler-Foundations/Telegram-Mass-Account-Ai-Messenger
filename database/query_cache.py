@@ -21,7 +21,7 @@ class QueryCache:
     def _make_key(self, query: str, params: tuple) -> str:
         """Create cache key from query and params."""
         content = f"{query}:{params}"
-        return hashlib.md5(content.encode()).hexdigest()
+        return hashlib.md5(content.encode(), usedforsecurity=False).hexdigest()  # Used for caching, not security
     
     def get(self, query: str, params: tuple = ()) -> Optional[Any]:
         """Get cached query result."""

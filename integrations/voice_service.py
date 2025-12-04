@@ -350,7 +350,7 @@ class VoiceService:
     def _get_cache_path(self, text: str, voice_id: str) -> Path:
         """Generate cache file path for given text and voice."""
         # Create hash of text + voice_id for unique filename
-        content_hash = hashlib.md5(f"{text}:{voice_id}".encode()).hexdigest()
+        content_hash = hashlib.md5(f"{text}:{voice_id}".encode(), usedforsecurity=False).hexdigest()  # Used for cache keys, not security
         return self.cache_dir / f"voice_{content_hash}.mp3"
     
     def _check_cache(self, text: str, voice_id: str) -> Optional[Path]:
