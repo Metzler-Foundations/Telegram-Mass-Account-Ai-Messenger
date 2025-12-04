@@ -921,13 +921,18 @@ class AccountWarmupService:
             return False
 
     async def _update_profile_with_content(self, client: TelegramClient, profile_data: Dict):
-        """Update profile with AI-generated content."""
+        """Update profile with AI-generated content (sanitized)."""
+        from utils.input_validation import sanitize_html
+        
         if profile_data.get('bio'):
-            await client.update_profile(bio=profile_data['bio'])
+            bio = sanitize_html(profile_data['bio'])[:70]  # Sanitize and limit
+            await client.update_profile(bio=bio)
         if profile_data.get('first_name') or profile_data.get('last_name'):
+            first_name = sanitize_html(profile_data.get('first_name', ''))[:64] if profile_data.get('first_name') else None
+            last_name = sanitize_html(profile_data.get('last_name', ''))[:64] if profile_data.get('last_name') else None
             await client.update_profile(
-                first_name=profile_data.get('first_name'),
-                last_name=profile_data.get('last_name')
+                first_name=first_name,
+                last_name=last_name
             )
 
     async def _set_profile_photo(self, client: TelegramClient, profile_data: Dict):
@@ -1846,7 +1851,7 @@ class WarmupIntelligence:
             return None
 
     async def generate_bio_for_account(self, phone_number: str, profile_data: Dict[str, Any]) -> Optional[str]:
-        """Generate an intelligent bio for the account."""
+        """Generate an intelligent bio for the account (sanitized)."""
         if not self.gemini_service:
             return None
 
@@ -1862,11 +1867,16 @@ class WarmupIntelligence:
         """
 
         try:
+            from utils.input_validation import sanitize_html
+            
             response = await self.gemini_service.generate_reply(prompt, chat_id=f"bio_gen_{phone_number}")
-            if response and len(response) <= 70:
-                return response
-            elif response:
-                return response[:67] + "..."
+            if response:
+                # Sanitize AI-generated content
+                response = sanitize_html(response)
+                if len(response) <= 70:
+                    return response
+                else:
+                    return response[:67] + "..."
             return None
         except Exception as e:
             logger.warning(f"Failed to generate bio: {e}")

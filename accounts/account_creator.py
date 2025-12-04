@@ -2288,6 +2288,10 @@ class AccountCreator:
             if not bio_text:
                 bio_text = templates.get(region, "Open to new conversations.")
 
+        # Sanitize bio text for safety
+        from utils.input_validation import sanitize_html
+        bio_text = sanitize_html(bio_text)[:70]  # Telegram bio limit
+        
         try:
             await client.update_profile(bio=bio_text)
             logger.info("✏️ Bio configured")
