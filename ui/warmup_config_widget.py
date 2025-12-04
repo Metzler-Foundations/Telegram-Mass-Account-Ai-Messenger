@@ -61,7 +61,11 @@ class WarmupConfigWidget(QWidget):
         
         # Save button
         save_btn = QPushButton("💾 Save Configuration")
-        save_btn.clicked.connect(self.save_config)
+        
+        # Debounce to prevent double-saves
+        from utils.button_debouncer import protect_button
+        protect_button(save_btn, self.save_config, debounce_ms=1500)
+        
         header_layout.addWidget(save_btn)
         
         # Reset button

@@ -896,7 +896,11 @@ class CampaignManagerWidget(QWidget):
         
         create_btn = QPushButton("Create Campaign")
         create_btn.setObjectName("primary")
-        create_btn.clicked.connect(self.create_campaign)
+        
+        # Debounce to prevent double-clicks
+        from utils.button_debouncer import protect_button
+        protect_button(create_btn, self.create_campaign, debounce_ms=2000)
+        
         toolbar.addWidget(create_btn)
         
         pause_btn = QPushButton("Pause")

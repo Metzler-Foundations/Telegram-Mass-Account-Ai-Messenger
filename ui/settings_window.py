@@ -1404,8 +1404,11 @@ class SettingsWindow(QDialog):
         else:
             # Normal mode buttons
             save_button = QPushButton("Save Settings")
-            save_button.clicked.connect(self.save_settings)
             save_button.setObjectName("primary")
+            
+            # Debounce to prevent double-saves
+            from utils.button_debouncer import protect_button
+            protect_button(save_button, self.save_settings, debounce_ms=1500)
             save_button.setFixedWidth(120)
             save_button.setAutoDefault(False)
             save_button.setDefault(False)

@@ -91,7 +91,11 @@ class EngagementRuleDialog(QDialog):
         button_layout = QHBoxLayout()
         
         save_btn = QPushButton("Save")
-        save_btn.clicked.connect(self.accept)
+        
+        # Debounce to prevent double-clicks
+        from utils.button_debouncer import protect_button
+        protect_button(save_btn, self.accept, debounce_ms=1000)
+        
         button_layout.addWidget(save_btn)
         
         cancel_btn = QPushButton("Cancel")
