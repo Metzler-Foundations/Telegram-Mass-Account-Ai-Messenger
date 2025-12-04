@@ -124,6 +124,10 @@ class DeliveryAnalyticsWidget(QWidget):
         refresh_btn.clicked.connect(self.refresh_data)
         header_layout.addWidget(refresh_btn)
         
+        export_btn = QPushButton("📥 Export")
+        export_btn.clicked.connect(self.export_data)
+        header_layout.addWidget(export_btn)
+        
         layout.addLayout(header_layout)
         
         # Overall metrics
@@ -338,5 +342,57 @@ class DeliveryAnalyticsWidget(QWidget):
             
         except Exception as e:
             logger.error(f"Failed to refresh campaign stats: {e}")
+    
+    def export_data(self):
+        """Export delivery analytics data."""
+        try:
+            from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
+            from utils.export_manager import get_export_manager
+            from datetime import datetime
+            
+            # Ask for time period
+            period_options = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "All Time"]
+            period_choice, ok = QInputDialog.getItem(
+                self, "Export Period", "Select time period:", period_options, 0, False
+            )
+            
+            if not ok:
+                return
+            
+            days_map = {"Last 7 Days": 7, "Last 30 Days": 30, "Last 90 Days": 90, "All Time": None}
+            days = days_map.get(period_choice)
+            
+            # Get save path
+            default_name = f"delivery_analytics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Export Delivery Analytics", default_name, "CSV Files (*.csv)"
+            )
+            
+            if not file_path:
+                return
+            
+            # Perform export
+            exporter = get_export_manager()
+            success = exporter.export_delivery_analytics_to_csv(file_path, days=days or 30)
+            
+            if success:
+                QMessageBox.information(
+                    self, "Export Successful",
+                    f"Delivery analytics exported to:\n{file_path}"
+                )
+            else:
+                QMessageBox.warning(
+                    self, "Export Failed",
+                    "No delivery data found for export."
+                )
+                
+        except Exception as e:
+            logger.error(f"Failed to export delivery analytics: {e}")
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                self, "Export Error",
+                f"Failed to export data:\n{str(e)}"
+            )
+
 
 

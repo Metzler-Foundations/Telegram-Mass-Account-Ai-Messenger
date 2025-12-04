@@ -130,6 +130,15 @@ class WarmupConfig:
     # AI configurations
     use_gemini_for_responses: bool = True
     use_gemini_for_decisions: bool = True
+    
+    # Blackout windows (hours in UTC, 0-23)
+    blackout_window_1_start: Optional[int] = 2  # 2 AM UTC
+    blackout_window_1_end: Optional[int] = 6  # 6 AM UTC
+    blackout_window_2_start: Optional[int] = None
+    blackout_window_2_end: Optional[int] = None
+    
+    # Stage weights for time allocation (relative importance)
+    stage_weights: Dict[str, float] = None
 
     def __post_init__(self):
         if self.stage_delays is None:
@@ -143,6 +152,45 @@ class WarmupConfig:
                 'advanced_interactions': 120,
                 'stabilization': 168  # 1 week
             }
+        
+        if self.stage_weights is None:
+            self.stage_weights = {
+                'initial_setup': 0.5,           # Quick setup
+                'profile_completion': 1.0,      # Standard weight
+                'contact_building': 1.5,        # More important
+                'group_joining': 1.5,           # More important
+                'conversation_starters': 2.0,   # High importance
+                'activity_increase': 2.0,       # High importance
+                'advanced_interactions': 1.5,   # Moderate
+                'stabilization': 3.0            # Most critical
+            }
+    
+    def is_in_blackout_window(self, check_time: Optional[datetime] = None) -> bool:
+        """Check if current time is within a blackout window."""
+        if check_time is None:
+            check_time = datetime.now()
+        
+        current_hour = check_time.hour
+        
+        # Check window 1
+        if self.blackout_window_1_start is not None and self.blackout_window_1_end is not None:
+            if self._is_hour_in_range(current_hour, self.blackout_window_1_start, self.blackout_window_1_end):
+                return True
+        
+        # Check window 2
+        if self.blackout_window_2_start is not None and self.blackout_window_2_end is not None:
+            if self._is_hour_in_range(current_hour, self.blackout_window_2_start, self.blackout_window_2_end):
+                return True
+        
+        return False
+    
+    @staticmethod
+    def _is_hour_in_range(hour: int, start: int, end: int) -> bool:
+        """Check if hour is in range, handling overnight periods."""
+        if start <= end:
+            return start <= hour < end
+        else:  # Overnight (e.g., 22-6)
+            return hour >= start or hour < end
 
 
 class AccountWarmupService:
@@ -481,6 +529,17 @@ class AccountWarmupService:
         try:
             if not self._validate_job(job):
                 return False
+            
+            # Check blackout window
+            if self.config.is_in_blackout_window():
+                logger.info(f"⏸ Job {job.job_id} delayed - in blackout window")
+                job.status_message = "Waiting for blackout window to pass"
+                # Re-queue for later
+                job.next_attempt_at = datetime.now() + timedelta(hours=1)
+                self.job_queue.append(job)
+                self.save_jobs()
+                return True  # Not a failure, just delayed
+            
             # Get account client
             client = await self._get_account_client(job.phone_number)
             if not client:
@@ -641,7 +700,10 @@ class AccountWarmupService:
     async def _perform_contact_building(self, job: WarmupJob, client: TelegramClient) -> bool:
         """Build contacts gradually."""
         try:
-            contacts_to_add = min(self.config.contacts_per_day, 5)  # Start small
+            # Apply stage weight to activity count
+            base_contacts = self.config.contacts_per_day
+            stage_weight = self.config.stage_weights.get('contact_building', 1.0)
+            contacts_to_add = min(int(base_contacts * stage_weight), 10)
 
             for i in range(contacts_to_add):
                 # Use Gemini to find suitable contacts to add
@@ -664,7 +726,10 @@ class AccountWarmupService:
     async def _perform_group_joining(self, job: WarmupJob, client: TelegramClient) -> bool:
         """Join groups and channels."""
         try:
-            groups_to_join = min(self.config.groups_per_day, 3)  # Start with few groups
+            # Apply stage weight to activity count
+            base_groups = self.config.groups_per_day
+            stage_weight = self.config.stage_weights.get('group_joining', 1.0)
+            groups_to_join = min(int(base_groups * stage_weight), 5)
 
             for i in range(groups_to_join):
                 # Use Gemini to find suitable groups
@@ -687,7 +752,10 @@ class AccountWarmupService:
     async def _perform_conversation_starters(self, job: WarmupJob, client: TelegramClient) -> bool:
         """Start natural conversations."""
         try:
-            conversations_to_start = min(self.config.messages_per_day, 5)
+            # Apply stage weight to activity count
+            base_messages = self.config.messages_per_day
+            stage_weight = self.config.stage_weights.get('conversation_starters', 1.0)
+            conversations_to_start = min(int(base_messages * stage_weight), 15)
 
             for i in range(conversations_to_start):
                 # Use Gemini to generate natural conversation starters
@@ -1805,14 +1873,98 @@ class WarmupIntelligence:
             return None
 
     async def suggest_contact_to_add(self, phone_number: str) -> Optional[Dict[str, Any]]:
-        """Suggest a contact to add."""
-        # This would use various strategies to find suitable contacts
-        return None
+        """Suggest a contact to add using Gemini AI or fallback strategy."""
+        if not self.gemini_service:
+            # Fallback strategy: suggest common/safe contacts
+            # Generate a realistic-looking contact
+            import random
+            first_names = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Jamie']
+            last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis']
+            
+            # Generate a phone number (use fake but valid format)
+            country_code = '+1'
+            area_code = random.choice(['555', '556', '557'])  # Reserved for testing
+            number = f"{country_code}{area_code}{random.randint(1000000, 9999999)}"
+            
+            return {
+                'phone_number': number,
+                'first_name': random.choice(first_names),
+                'last_name': random.choice(last_names)
+            }
+        
+        # Use Gemini to suggest intelligent contacts
+        try:
+            prompt = f"""
+            For a Telegram account {phone_number}, suggest a realistic contact to add.
+            
+            Return in JSON format:
+            {{
+                "phone_number": "+1234567890",
+                "first_name": "Name",
+                "last_name": "Last"
+            }}
+            
+            Make it look natural and region-appropriate.
+            """
+            
+            response = await self.gemini_service.generate_reply(
+                prompt, 
+                chat_id=f"contact_suggest_{phone_number}"
+            )
+            
+            import json
+            contact_data = json.loads(response)
+            return contact_data
+            
+        except Exception as e:
+            logger.debug(f"Failed to get AI contact suggestion: {e}")
+            # Fall back to simple strategy
+            return None
 
     async def suggest_group_to_join(self, phone_number: str) -> Optional[Dict[str, Any]]:
-        """Suggest a group to join."""
-        # This would find appropriate groups based on account theme
-        return None
+        """Suggest a group to join using AI or fallback strategy."""
+        if not self.gemini_service:
+            # Fallback strategy: suggest popular public groups
+            # These are safe, general-purpose groups
+            safe_groups = [
+                {'username': 'telegram', 'chat_id': None},
+                {'username': 'durov', 'chat_id': None},
+            ]
+            
+            import random
+            return random.choice(safe_groups) if safe_groups else None
+        
+        # Use Gemini to suggest appropriate groups
+        try:
+            prompt = f"""
+            For a Telegram account {phone_number}, suggest a safe, public group to join.
+            
+            Return in JSON format:
+            {{
+                "username": "groupname",
+                "chat_id": null,
+                "reason": "why this group is appropriate"
+            }}
+            
+            Suggest groups that are:
+            - Public and easily joinable
+            - Active but not spammy
+            - General interest topics
+            - Safe and legitimate
+            """
+            
+            response = await self.gemini_service.generate_reply(
+                prompt,
+                chat_id=f"group_suggest_{phone_number}"
+            )
+            
+            import json
+            group_data = json.loads(response)
+            return group_data
+            
+        except Exception as e:
+            logger.debug(f"Failed to get AI group suggestion: {e}")
+            return None
 
     async def generate_conversation_starter(self, phone_number: str) -> Optional[Dict[str, Any]]:
         """Generate a natural conversation starter."""

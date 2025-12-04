@@ -803,10 +803,62 @@ class CampaignAnalyticsWidget(QWidget):
             QMessageBox.information(self, "No Campaign", "Please select a campaign first.")
             return
         
-        QMessageBox.information(
-            self, "Export",
-            "Analytics export functionality would save campaign statistics to CSV/JSON file."
-        )
+        try:
+            from PyQt6.QtWidgets import QFileDialog, QInputDialog
+            from utils.export_manager import get_export_manager
+            
+            # Ask for format
+            format_options = ["CSV (*.csv)", "JSON (*.json)"]
+            format_choice, ok = QInputDialog.getItem(
+                self, "Export Format", "Select export format:", format_options, 0, False
+            )
+            
+            if not ok:
+                return
+            
+            # Determine file extension
+            if "CSV" in format_choice:
+                ext = ".csv"
+                filter_str = "CSV Files (*.csv)"
+            else:
+                ext = ".json"
+                filter_str = "JSON Files (*.json)"
+            
+            # Get save path
+            default_name = f"campaign_{self.selected_campaign_id}_analytics_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Export Campaign Analytics", default_name, filter_str
+            )
+            
+            if not file_path:
+                return
+            
+            # Perform export
+            exporter = get_export_manager()
+            
+            if ext == ".csv":
+                success = exporter.export_campaign_analytics_to_csv(self.selected_campaign_id, file_path)
+            else:
+                # For JSON, use campaign export
+                success = exporter.export_campaigns_to_json(file_path, include_messages=True)
+            
+            if success:
+                QMessageBox.information(
+                    self, "Export Successful",
+                    f"Campaign analytics exported to:\n{file_path}"
+                )
+            else:
+                QMessageBox.warning(
+                    self, "Export Failed",
+                    "No data found for export."
+                )
+                
+        except Exception as e:
+            logger.error(f"Failed to export analytics: {e}")
+            QMessageBox.critical(
+                self, "Export Error",
+                f"Failed to export analytics:\n{str(e)}"
+            )
     
     def showEvent(self, event):
         """Called when widget is shown."""

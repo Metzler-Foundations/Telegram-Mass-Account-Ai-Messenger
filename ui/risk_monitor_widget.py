@@ -227,3 +227,4 @@ class RiskMonitorWidget(QWidget):
         return colors.get(risk_level, QColor("#b5bac1"))
 
 
+

@@ -82,19 +82,61 @@ class ReadReceiptPoller:
             
             logger.info(f"Checking read receipts for {len(messages_to_check)} messages")
             
-            # Would need Telegram client to check read status
-            # This is a simplified version - full implementation would:
-            # 1. Get message IDs and chat IDs
-            # 2. Call Telegram API to check read status
-            # 3. Update delivery_analytics for each read message
+            # Get active clients from campaign manager's account manager
+            if not hasattr(self.campaign_manager, 'account_manager'):
+                logger.debug("Account manager not available for read receipt checking")
+                return
             
-            # For now, log that we would check
-            for msg in messages_to_check[:10]:  # Limit to 10 per cycle
-                logger.debug(
-                    f"Would check read receipt for message to user {msg['user_id']} "
-                    f"in campaign {msg['campaign_id']}"
-                )
+            account_manager = self.campaign_manager.account_manager
+            if not account_manager or not hasattr(account_manager, 'active_clients'):
+                logger.debug("No active clients available for read receipt checking")
+                return
+            
+            # Group messages by account for efficient checking
+            messages_by_account = {}
+            for msg in messages_to_check[:50]:  # Limit to 50 per cycle
+                account_phone = msg['account_phone']
+                if account_phone not in messages_by_account:
+                    messages_by_account[account_phone] = []
+                messages_by_account[account_phone].append(msg)
+            
+            # Check read receipts for each account
+            for account_phone, messages in messages_by_account.items():
+                if account_phone not in account_manager.active_clients:
+                    continue
                 
+                client = account_manager.active_clients[account_phone]
+                pyrogram_client = client.client if hasattr(client, 'client') else client
+                
+                if not pyrogram_client:
+                    continue
+                
+                # Check each message
+                for msg in messages[:10]:  # Limit per account
+                    try:
+                        user_id = msg['user_id']
+                        message_id = msg['message_id']
+                        
+                        # Get chat history to check message status
+                        async for message in pyrogram_client.get_chat_history(user_id, limit=100):
+                            if message.id == message_id:
+                                # Check if message was read (outgoing messages show read status)
+                                if hasattr(message, 'read_date') and message.read_date:
+                                    # Message was read!
+                                    self.delivery_analytics.record_read_receipt(
+                                        campaign_id=msg['campaign_id'],
+                                        user_id=user_id,
+                                        read_at=message.read_date
+                                    )
+                                    logger.info(f"✓ Read receipt recorded for user {user_id}")
+                                break
+                        
+                        # Small delay to respect rate limits
+                        await asyncio.sleep(0.5)
+                        
+                    except Exception as e:
+                        logger.debug(f"Error checking message {message_id}: {e}")
+                        
         except Exception as e:
             logger.error(f"Error checking read receipts: {e}")
     

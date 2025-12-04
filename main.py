@@ -655,6 +655,56 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     logger.warning(f"Proxy cleanup unavailable: {e}")
                 
+                # Start warmup service
+                try:
+                    if self.warmup_service:
+                        loop.run_until_complete(self.warmup_service.start_warmup_service())
+                        logger.info("✅ Account warmup service started")
+                except Exception as e:
+                    logger.warning(f"Warmup service unavailable: {e}")
+                
+                # Start campaign scheduler
+                try:
+                    if hasattr(self, 'campaign_manager') and self.campaign_manager:
+                        if hasattr(self.campaign_manager, 'scheduler'):
+                            loop.run_until_complete(self.campaign_manager.scheduler.start())
+                            logger.info("✅ Campaign scheduler started")
+                except Exception as e:
+                    logger.warning(f"Campaign scheduler unavailable: {e}")
+                
+                # Start read receipt poller
+                try:
+                    if hasattr(self, 'campaign_manager') and self.campaign_manager:
+                        from campaigns.read_receipt_poller import get_read_receipt_poller
+                        from campaigns.delivery_analytics import get_delivery_analytics
+                        
+                        delivery_analytics = get_delivery_analytics()
+                        self.read_receipt_poller = get_read_receipt_poller(
+                            self.campaign_manager, 
+                            delivery_analytics
+                        )
+                        loop.run_until_complete(self.read_receipt_poller.start())
+                        logger.info("✅ Read receipt poller started")
+                except Exception as e:
+                    logger.warning(f"Read receipt poller unavailable: {e}")
+                
+                # Start response tracker
+                try:
+                    if hasattr(self, 'campaign_manager') and self.campaign_manager:
+                        from campaigns.response_tracker import get_response_tracker
+                        from campaigns.delivery_analytics import get_delivery_analytics
+                        
+                        delivery_analytics = get_delivery_analytics()
+                        self.response_tracker = get_response_tracker(
+                            self.campaign_manager,
+                            delivery_analytics
+                        )
+                        # Response tracker needs a client - we'll start it when we have one
+                        # For now, just initialize it
+                        logger.info("✅ Response tracker initialized (will start with first client)")
+                except Exception as e:
+                    logger.warning(f"Response tracker unavailable: {e}")
+                
                 # Keep loop running for background services
                 loop.run_forever()
                 

@@ -248,6 +248,7 @@ class CreateCampaignDialog(QDialog):
         
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Welcome Series Q1 2024")
+        self.name_input.setToolTip("Enter a descriptive name for this campaign.\nThis will help you identify it in analytics and reports.")
         
         name_label = QLabel("Campaign Name")
         name_label.setStyleSheet("font-weight: 500;")
@@ -257,6 +258,15 @@ class CreateCampaignDialog(QDialog):
         self.template_input.setPlaceholderText("Hi {first_name},\n\nI noticed you're interested in...")
         self.template_input.setMaximumHeight(180)
         self.template_input.setMinimumHeight(120)
+        self.template_input.setToolTip(
+            "Write your message template here.\n"
+            "Available variables:\n"
+            "  • {first_name} - User's first name\n"
+            "  • {last_name} - User's last name\n"
+            "  • {username} - User's @username\n"
+            "  • {name} - Full name\n"
+            "Keep messages natural and personalized for best results."
+        )
         
         template_label = QLabel("Message Template")
         template_label.setStyleSheet("font-weight: 500;")
@@ -268,6 +278,53 @@ class CreateCampaignDialog(QDialog):
         form_layout.addRow("", help_label)
         
         layout.addLayout(form_layout)
+        
+        # Template Variants (A/B Testing)
+        variant_group = QGroupBox("Template Variants (A/B Testing)")
+        variant_layout = QVBoxLayout(variant_group)
+        variant_layout.setContentsMargins(12, 24, 12, 12)
+        variant_layout.setSpacing(8)
+        
+        variant_subtitle = QLabel("Add multiple template variants for A/B testing")
+        variant_subtitle.setStyleSheet("color: #a1a1aa; font-size: 12px;")
+        variant_layout.addWidget(variant_subtitle)
+        
+        # Variant table
+        self.variant_table = QTableWidget()
+        self.variant_table.setColumnCount(3)
+        self.variant_table.setHorizontalHeaderLabels(["Variant Name", "Template", "Weight"])
+        self.variant_table.horizontalHeader().setStretchLastSection(True)
+        self.variant_table.setMinimumHeight(150)
+        self.variant_table.setMaximumHeight(250)
+        self.variant_table.setToolTip(
+            "Create multiple message variants for A/B testing.\n"
+            "Weight determines distribution (e.g., 1.0 = equal split).\n"
+            "System will automatically track which variant performs best.\n"
+            "Use chi-square testing to determine statistical significance."
+        )
+        variant_layout.addWidget(self.variant_table)
+        
+        # Variant controls
+        variant_controls = QHBoxLayout()
+        variant_controls.setSpacing(8)
+        
+        add_variant_btn = QPushButton("+ Add Variant")
+        add_variant_btn.setObjectName("secondary")
+        add_variant_btn.clicked.connect(self._add_variant_row)
+        variant_controls.addWidget(add_variant_btn)
+        
+        remove_variant_btn = QPushButton("Remove Selected")
+        remove_variant_btn.setObjectName("danger")
+        remove_variant_btn.clicked.connect(self._remove_variant_row)
+        variant_controls.addWidget(remove_variant_btn)
+        
+        variant_controls.addStretch()
+        variant_layout.addLayout(variant_controls)
+        
+        # Default variant (from main template)
+        self._add_default_variant()
+        
+        layout.addWidget(variant_group)
         
         # Target Selection
         target_group = QGroupBox("Target Audience")
@@ -282,6 +339,11 @@ class CreateCampaignDialog(QDialog):
         self.channel_list = QListWidget()
         self.channel_list.setMinimumHeight(120)
         self.channel_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.channel_list.setToolTip(
+            "Select one or more channels to target.\n"
+            "Members from selected channels will receive your message.\n"
+            "Hold Ctrl/Cmd to select multiple channels."
+        )
         for channel in self.channels:
             display = f"{channel.get('title', 'Unknown')} ({channel.get('member_count', 0)} members)"
             item = QTableWidgetItem(display) # Using QTableWidgetItem for QListWidget... wait, no. QListWidgetItem.
@@ -307,6 +369,12 @@ class CreateCampaignDialog(QDialog):
         self.account_list = QListWidget()
         self.account_list.setMinimumHeight(120)
         self.account_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.account_list.setToolTip(
+            "Select accounts to send messages from.\n"
+            "Using multiple accounts distributes sending load.\n"
+            "Only select warmed-up, healthy accounts for best results.\n"
+            "Hold Ctrl/Cmd to select multiple accounts."
+        )
         for account in self.accounts:
             display = f"{account.get('phone_number')} - {account.get('status', 'Unknown')}"
             from PyQt6.QtWidgets import QListWidgetItem
@@ -335,16 +403,85 @@ class CreateCampaignDialog(QDialog):
         
         layout.addLayout(buttons)
         
+    def _add_default_variant(self):
+        """Add default variant from main template."""
+        row = self.variant_table.rowCount()
+        self.variant_table.insertRow(row)
+        
+        name_item = QTableWidgetItem("default")
+        name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.variant_table.setItem(row, 0, name_item)
+        
+        template_item = QTableWidgetItem(self.template_input.toPlainText() or "")
+        self.variant_table.setItem(row, 1, template_item)
+        
+        weight_item = QTableWidgetItem("1.0")
+        self.variant_table.setItem(row, 2, weight_item)
+    
+    def _add_variant_row(self):
+        """Add a new variant row."""
+        row = self.variant_table.rowCount()
+        self.variant_table.insertRow(row)
+        
+        name_item = QTableWidgetItem(f"variant_{row}")
+        self.variant_table.setItem(row, 0, name_item)
+        
+        template_item = QTableWidgetItem("")
+        self.variant_table.setItem(row, 1, template_item)
+        
+        weight_item = QTableWidgetItem("1.0")
+        self.variant_table.setItem(row, 2, weight_item)
+    
+    def _remove_variant_row(self):
+        """Remove selected variant row."""
+        current_row = self.variant_table.currentRow()
+        if current_row >= 0:
+            # Don't allow removing the default variant
+            if current_row == 0 and self.variant_table.item(0, 0).text() == "default":
+                ErrorHandler.safe_warning(self, "Cannot Remove", "Default variant cannot be removed.")
+                return
+            self.variant_table.removeRow(current_row)
+    
     def get_data(self):
         """Get the campaign configuration."""
         selected_channels = [item.data(Qt.ItemDataRole.UserRole) for item in self.channel_list.selectedItems()]
         selected_accounts = [item.data(Qt.ItemDataRole.UserRole) for item in self.account_list.selectedItems()]
         
+        # Collect template variants
+        template_variants = []
+        for row in range(self.variant_table.rowCount()):
+            name_item = self.variant_table.item(row, 0)
+            template_item = self.variant_table.item(row, 1)
+            weight_item = self.variant_table.item(row, 2)
+            
+            if name_item and template_item:
+                variant_name = name_item.text().strip()
+                variant_template = template_item.text().strip()
+                try:
+                    variant_weight = float(weight_item.text() if weight_item else "1.0")
+                except ValueError:
+                    variant_weight = 1.0
+                
+                if variant_template:  # Only add non-empty variants
+                    template_variants.append({
+                        'name': variant_name,
+                        'template': variant_template,
+                        'weight': variant_weight
+                    })
+        
+        # Get primary template (from default variant or first variant)
+        primary_template = self.template_input.toPlainText()
+        if template_variants:
+            # Use first variant as primary if main template is empty
+            if not primary_template and template_variants:
+                primary_template = template_variants[0]['template']
+        
         return {
             "name": self.name_input.text(),
-            "template": self.template_input.toPlainText(),
+            "template": primary_template,
             "channels": selected_channels,
-            "accounts": selected_accounts
+            "accounts": selected_accounts,
+            "template_variants": template_variants if len(template_variants) > 1 else []
         }
 
 
@@ -903,16 +1040,28 @@ class CampaignManagerWidget(QWidget):
             
             account_phones = [acc['phone_number'] for acc in data['accounts']]
             
+            # Prepare config with template variants
+            config = {}
+            if data.get('template_variants') and len(data['template_variants']) > 1:
+                config['template_variants'] = data['template_variants']
+                config['template_label'] = 'default'
+            
             # Create campaign
             try:
                 self.campaign_manager.create_campaign(
                     name=data['name'],
                     template=data['template'],
                     target_member_ids=target_ids,
-                    account_ids=account_phones
+                    account_ids=account_phones,
+                    config=config
                 )
+                variant_count = len(data.get('template_variants', []))
+                variant_msg = f" with {variant_count} template variants" if variant_count > 1 else ""
                 self.refresh_campaigns()
-                ErrorHandler.safe_information(self, "Success", f"Campaign '{data['name']}' created with {len(target_ids)} targets.")
+                ErrorHandler.safe_information(
+                    self, "Success", 
+                    f"Campaign '{data['name']}' created with {len(target_ids)} targets{variant_msg}."
+                )
             except Exception as e:
                 ErrorHandler.safe_critical(self, "Error", f"Failed to create campaign: {e}")
 

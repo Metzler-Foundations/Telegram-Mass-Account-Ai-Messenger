@@ -1078,8 +1078,21 @@ class DMCampaignManager:
                 if risk_score.should_quarantine:
                     logger.critical(
                         f"🚨 Account {account_phone} risk score {risk_score.overall_score} - "
-                        f"QUARANTINE RECOMMENDED. Blocking message send."
+                        f"QUARANTINE RECOMMENDED. Blocking message send and pausing campaign."
                     )
+                    
+                    # Auto-pause campaign
+                    try:
+                        campaign_obj = self.get_campaign(campaign_id)
+                        if campaign_obj and campaign_obj.status == CampaignStatus.RUNNING:
+                            campaign_obj.status = CampaignStatus.PAUSED
+                            campaign_obj.config['auto_paused_reason'] = f'Account {account_phone} quarantined (risk: {risk_score.overall_score})'
+                            campaign_obj.config['auto_paused_at'] = datetime.now().isoformat()
+                            self._update_campaign_progress(campaign_id, campaign_obj)
+                            logger.warning(f"🛑 Auto-paused campaign {campaign_id} due to account quarantine")
+                    except Exception as e:
+                        logger.error(f"Failed to auto-pause campaign: {e}")
+                    
                     self._record_message(
                         campaign_id, user_id, account_phone, message_text,
                         MessageStatus.FAILED,
@@ -1135,7 +1148,7 @@ class DMCampaignManager:
                 await asyncio.sleep(delay)
         
         try:
-            await client.send_message(user_id, message_text)
+            sent = await client.send_message(user_id, message_text)
             
             # Record success in anti-detection
             if self._anti_detection_system:

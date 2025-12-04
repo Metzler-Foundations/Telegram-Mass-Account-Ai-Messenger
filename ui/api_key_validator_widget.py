@@ -235,3 +235,4 @@ class APIKeyValidatorWidget(QWidget):
         return self.input.text().strip()
 
 
+

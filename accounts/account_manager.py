@@ -1127,6 +1127,38 @@ class AccountManager:
                 # Start auto-reply if configured
                 if account_data.get('auto_reply_enabled', True):
                     await self._setup_auto_reply(phone_number, client, account_data)
+                
+                # Hook response tracker if available
+                try:
+                    from campaigns.response_tracker import get_response_tracker
+                    response_tracker = get_response_tracker()
+                    if response_tracker and client.client:
+                        await response_tracker.start(client.client)
+                        logger.info(f"✓ Response tracker hooked to {phone_number}")
+                except Exception as e:
+                    logger.debug(f"Response tracker not available for {phone_number}: {e}")
+                
+                # Hook engagement automation if available
+                try:
+                    from campaigns.engagement_automation import EngagementAutomation
+                    from pyrogram import filters
+                    
+                    # Create or get engagement automation instance
+                    if not hasattr(self, '_engagement_automation'):
+                        self._engagement_automation = EngagementAutomation()
+                    
+                    # Register message handler for engagement
+                    if client.client:
+                        @client.client.on_message(filters.group & ~filters.me)
+                        async def engagement_handler(client_obj, message):
+                            try:
+                                await self._engagement_automation.process_message(client_obj, message)
+                            except Exception as e:
+                                logger.debug(f"Engagement automation error: {e}")
+                        
+                        logger.info(f"✓ Engagement automation hooked to {phone_number}")
+                except Exception as e:
+                    logger.debug(f"Engagement automation not available for {phone_number}: {e}")
 
                 logger.info(f"✅ Started client for: {phone_number} (shard: {shard_id})")
                 return True

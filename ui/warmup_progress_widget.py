@@ -234,3 +234,4 @@ class WarmupProgressWidget(QWidget):
             self.status_label.setText(f"Error: {str(e)[:50]}")
 
 
+

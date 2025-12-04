@@ -97,13 +97,38 @@ class AnalyticsDashboard(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Title
+        # Title and header
+        header_layout = QHBoxLayout()
+        
         title = QLabel("📊 Real-Time Analytics")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
         title.setFont(title_font)
-        layout.addWidget(title)
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch()
+        
+        # Export button
+        from PyQt6.QtWidgets import QPushButton
+        export_btn = QPushButton("📥 Export All")
+        export_btn.clicked.connect(self.export_dashboard_data)
+        export_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5865f2;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #4752c4;
+            }
+        """)
+        header_layout.addWidget(export_btn)
+        
+        layout.addLayout(header_layout)
         
         # Empty state widget (initially hidden)
         from PyQt6.QtWidgets import QFrame
@@ -254,6 +279,30 @@ class AnalyticsDashboard(QWidget):
         
         member_group.setLayout(member_layout)
         content_layout.addWidget(member_group)
+        
+        # Cost Trends Chart
+        try:
+            from ui.cost_trend_chart import CostTrendChart
+            self.cost_chart = CostTrendChart()
+            content_layout.addWidget(self.cost_chart)
+        except Exception as e:
+            logger.warning(f"Could not load cost trend chart: {e}")
+            cost_error_label = QLabel("💰 Cost trend charts unavailable")
+            cost_error_label.setStyleSheet("color: #949ba4; padding: 20px;")
+            content_layout.addWidget(cost_error_label)
+        
+        # Risk Distribution Chart
+        try:
+            from ui.risk_distribution_chart import RiskDistributionChart
+            from monitoring.account_risk_monitor import get_risk_monitor
+            risk_monitor = get_risk_monitor()
+            self.risk_chart = RiskDistributionChart(risk_monitor=risk_monitor)
+            content_layout.addWidget(self.risk_chart)
+        except Exception as e:
+            logger.warning(f"Could not load risk distribution chart: {e}")
+            risk_error_label = QLabel("⚠️ Risk distribution charts unavailable")
+            risk_error_label.setStyleSheet("color: #949ba4; padding: 20px;")
+            content_layout.addWidget(risk_error_label)
         
         # Last update timestamp
         self.last_update_label = QLabel()
@@ -659,4 +708,91 @@ class AnalyticsDashboard(QWidget):
             stats['warmup_pct'] = 0
         
         return stats
+    
+    def export_dashboard_data(self):
+        """Export all dashboard data."""
+        try:
+            from PyQt6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
+            from utils.export_manager import get_export_manager
+            from datetime import datetime
+            
+            # Ask for export type
+            export_options = [
+                "Campaigns Only",
+                "Accounts Only", 
+                "Members Only",
+                "Risk Data Only",
+                "Cost Data Only",
+                "Complete Export (All Data)"
+            ]
+            export_choice, ok = QInputDialog.getItem(
+                self, "Export Dashboard Data", "Select what to export:", export_options, 5, False
+            )
+            
+            if not ok:
+                return
+            
+            # Get save directory
+            save_dir = QFileDialog.getExistingDirectory(
+                self, "Select Export Directory", "", QFileDialog.Option.ShowDirsOnly
+            )
+            
+            if not save_dir:
+                return
+            
+            exporter = get_export_manager()
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            exported_files = []
+            
+            try:
+                if "Campaigns" in export_choice or "Complete" in export_choice:
+                    file_path = f"{save_dir}/campaigns_{timestamp}.csv"
+                    count = exporter.export_campaigns_to_csv(file_path, include_messages=True)
+                    if count > 0:
+                        exported_files.append(file_path)
+                
+                if "Accounts" in export_choice or "Complete" in export_choice:
+                    file_path = f"{save_dir}/accounts_{timestamp}.csv"
+                    count = exporter.export_accounts_to_csv(file_path)
+                    if count > 0:
+                        exported_files.append(file_path)
+                
+                if "Members" in export_choice or "Complete" in export_choice:
+                    file_path = f"{save_dir}/members_{timestamp}.csv"
+                    count = exporter.export_members_to_csv(file_path)
+                    if count > 0:
+                        exported_files.append(file_path)
+                
+                if "Risk" in export_choice or "Complete" in export_choice:
+                    file_path = f"{save_dir}/risk_data_{timestamp}.csv"
+                    count = exporter.export_risk_data_to_csv(file_path)
+                    if count > 0:
+                        exported_files.append(file_path)
+                
+                if "Cost" in export_choice or "Complete" in export_choice:
+                    file_path = f"{save_dir}/cost_data_{timestamp}.csv"
+                    count = exporter.export_cost_data_to_csv(file_path)
+                    if count > 0:
+                        exported_files.append(file_path)
+                
+                if exported_files:
+                    QMessageBox.information(
+                        self, "Export Successful",
+                        f"Exported {len(exported_files)} file(s) to:\n{save_dir}"
+                    )
+                else:
+                    QMessageBox.warning(
+                        self, "Export Warning",
+                        "No data found to export."
+                    )
+            
+            except Exception as e:
+                logger.error(f"Export failed: {e}")
+                QMessageBox.critical(
+                    self, "Export Error",
+                    f"Failed to export data:\n{str(e)}"
+                )
+                
+        except Exception as e:
+            logger.error(f"Failed to setup export: {e}")
 

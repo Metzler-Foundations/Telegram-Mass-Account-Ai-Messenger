@@ -513,3 +513,4 @@ class EngagementWidget(QWidget):
                 QMessageBox.warning(self, "Error", f"Failed to update rule: {e}")
 
 
+
