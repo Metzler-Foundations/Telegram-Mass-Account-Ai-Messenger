@@ -560,7 +560,8 @@ class DMCampaignManager:
                     error_message TEXT,
                     retry_count INTEGER DEFAULT 0,
                     template_variant TEXT,
-                    FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+                    FOREIGN KEY(campaign_id) REFERENCES campaigns(id),
+                    UNIQUE(campaign_id, user_id)
                 )
             ''')
             
