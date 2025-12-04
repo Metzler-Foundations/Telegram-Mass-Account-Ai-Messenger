@@ -1057,6 +1057,11 @@ class DMCampaignManager:
         Returns:
             True if sent successfully
         """
+        # Idempotency check: Skip if already sent successfully
+        if self._is_message_already_sent(campaign_id, user_id):
+            logger.debug(f"Skipping duplicate send: campaign {campaign_id}, user {user_id}")
+            return False
+        
         # Check account risk before sending
         if self._risk_monitor:
             try:
@@ -1400,6 +1405,19 @@ class DMCampaignManager:
             self.rate_limiters[account_phone]['messages_sent'] += 1
             self.rate_limiters[account_phone]['messages_this_hour'] += 1
     
+    def _is_message_already_sent(self, campaign_id: int, user_id: int) -> bool:
+        """Check if message already sent to prevent duplicates."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    'SELECT 1 FROM campaign_messages WHERE campaign_id = ? AND user_id = ? AND status = ? LIMIT 1',
+                    (campaign_id, user_id, MessageStatus.SENT.value)
+                )
+                return cursor.fetchone() is not None
+        except Exception as e:
+            logger.error(f"Error checking message duplicate: {e}")
+            return False
+    
     def _record_message(
         self,
         campaign_id: int,
@@ -1411,7 +1429,7 @@ class DMCampaignManager:
         sent_at: Optional[datetime] = None,
         template_variant: str = "default",
     ):
-        """Record a message in the database."""
+        """Record a message in the database with idempotency support."""
         template_variant = template_variant or "default"
         with sqlite3.connect(self.db_path) as conn:
             if self._messages_have_variant:
@@ -1420,6 +1438,12 @@ class DMCampaignManager:
                     INSERT INTO campaign_messages
                     (campaign_id, user_id, account_phone, message_text, status, sent_at, error_message, template_variant)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(campaign_id, user_id) DO UPDATE SET
+                        account_phone = excluded.account_phone,
+                        status = excluded.status,
+                        sent_at = excluded.sent_at,
+                        error_message = excluded.error_message,
+                        retry_count = retry_count + 1
                     ''',
                     (
                         campaign_id,
@@ -1438,6 +1462,12 @@ class DMCampaignManager:
                     INSERT INTO campaign_messages
                     (campaign_id, user_id, account_phone, message_text, status, sent_at, error_message)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(campaign_id, user_id) DO UPDATE SET
+                        account_phone = excluded.account_phone,
+                        status = excluded.status,
+                        sent_at = excluded.sent_at,
+                        error_message = excluded.error_message,
+                        retry_count = retry_count + 1
                     ''',
                     (
                         campaign_id,
