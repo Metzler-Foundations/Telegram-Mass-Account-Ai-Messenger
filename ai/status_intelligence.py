@@ -100,10 +100,12 @@ class StatusIntelligence:
         """
         self.db_path = db_path
         self._init_database()
-        
+
         # In-memory tracking
         self._status_cache: Dict[int, UserStatusProfile] = {}
         self._pending_receipts: Dict[int, ReadReceiptData] = {}  # {message_id: data}
+        self._seen_receipts: set[int] = set()
+        self._load_seen_receipts()
         
         # Batch processing queue
         self._status_queue: deque = deque(maxlen=1000)
@@ -191,6 +193,17 @@ class StatusIntelligence:
         conn.commit()
         conn.close()
         logger.info("Status intelligence database initialized")
+
+    def _load_seen_receipts(self):
+        """Load previously stored read receipts to avoid reprocessing after restarts."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT message_id FROM read_receipts")
+            self._seen_receipts = {row[0] for row in cursor.fetchall()}
+            conn.close()
+        except Exception as exc:
+            logger.debug(f"Failed to hydrate read receipt cache: {exc}")
     
     async def track_user_status(self, client: Client, user_id: int) -> Optional[UserStatusProfile]:
         """Track and record user status.
@@ -271,23 +284,28 @@ class StatusIntelligence:
             profile = await self.track_user_status(client, user_id)
             if profile:
                 results[user_id] = profile.current_status
-            
-            # Rate limiting
+
+            # Rate limiting with jitter to avoid bursty patterns
             if i < len(user_ids) - 1:
                 delay = random.uniform(*delay_range)
-                await asyncio.sleep(delay)
+                jitter = random.uniform(0.05, 0.35)
+                await asyncio.sleep(delay + jitter)
         
         logger.info(f"Bulk checked status for {len(results)}/{len(user_ids)} users")
         return results
     
     def track_message_sent(self, message_id: int, chat_id: int, user_id: int):
         """Track a message sent to a user for read receipt monitoring.
-        
+
         Args:
             message_id: Message ID
             chat_id: Chat ID
             user_id: Recipient user ID
         """
+        if message_id in self._seen_receipts:
+            logger.debug(f"Skipping tracking for already persisted receipt {message_id}")
+            return
+
         receipt = ReadReceiptData(
             message_id=message_id,
             chat_id=chat_id,
@@ -311,25 +329,35 @@ class StatusIntelligence:
         Returns:
             True if read, False otherwise
         """
-        try:
-            # Get message
-            message = await client.get_messages(chat_id, message_id)
-            
-            # Check if read (this is simplified - actual implementation depends on chat type)
-            # For private chats, you'd need to check read receipts through updates
-            # This is a placeholder
-            if message and hasattr(message, 'mentioned'):
-                # Message exists, assume read if old enough
-                age = (datetime.now() - message.date).total_seconds()
-                if age > 60:  # Assume read after 1 minute (simplified)
+        backoff = 1.0
+        for attempt in range(3):
+            try:
+                message = await client.get_messages(chat_id, message_id)
+
+                if not message:
+                    return False
+
+                # Pyrogram exposes read_date for private dialogs; fall back to explicit views for channels
+                read_date = getattr(message, "read_date", None)
+                if read_date:
                     self._mark_as_read(message_id)
                     return True
-            
-            return False
-            
-        except Exception as e:
-            logger.debug(f"Error checking read receipt: {e}")
-            return False
+
+                if getattr(message, "views", None) is not None:
+                    # Consider channel messages read only when views are present
+                    if message.views > 0:
+                        self._mark_as_read(message_id)
+                        return True
+
+                # Otherwise keep the receipt pending until we have explicit confirmation
+                return False
+
+            except Exception as e:
+                logger.debug(f"Error checking read receipt (attempt {attempt + 1}): {e}")
+                await asyncio.sleep(backoff)
+                backoff *= 2
+
+        return False
     
     def _mark_as_read(self, message_id: int):
         """Mark a message as read."""
@@ -342,14 +370,16 @@ class StatusIntelligence:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR REPLACE INTO read_receipts 
+                INSERT OR REPLACE INTO read_receipts
                 (message_id, chat_id, sent_at, read_at, time_to_read)
                 VALUES (?, ?, ?, ?, ?)
             """, (receipt.message_id, receipt.chat_id, receipt.sent_at,
                   receipt.read_at, receipt.time_to_read))
             conn.commit()
             conn.close()
-            
+
+            self._seen_receipts.add(message_id)
+
             # Remove from pending
             del self._pending_receipts[message_id]
     

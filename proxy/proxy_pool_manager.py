@@ -524,6 +524,7 @@ class ProxyPoolManager:
         self.poll_tasks: Dict[str, asyncio.Task] = {}
         self.health_check_task: Optional[asyncio.Task] = None
         self.cleanup_task: Optional[asyncio.Task] = None
+        self._fetch_semaphore = asyncio.Semaphore(5)
         
         # Configuration (defaults)
         self.config = {
@@ -564,6 +565,9 @@ class ProxyPoolManager:
         
         # Initialize database
         self._init_database()
+
+        # Restore persisted statistics so historical health is not lost between restarts
+        self._load_stats()
 
         # Migrate proxy credentials to encrypted storage if needed
         self._migrate_proxy_credentials()
@@ -665,7 +669,19 @@ class ProxyPoolManager:
                     FOREIGN KEY(proxy_key) REFERENCES proxies(proxy_key)
                 )
             ''')
-            
+
+            conn.execute('''
+                CREATE TABLE IF NOT EXISTS proxy_pool_stats (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    total_fetched INTEGER DEFAULT 0,
+                    total_validated INTEGER DEFAULT 0,
+                    total_failed INTEGER DEFAULT 0,
+                    endpoints_polled INTEGER DEFAULT 0,
+                    last_full_poll TIMESTAMP
+                )
+            ''')
+            conn.execute("INSERT OR IGNORE INTO proxy_pool_stats (id) VALUES (1)")
+
             # Indexes for efficient queries
             conn.execute('CREATE INDEX IF NOT EXISTS idx_proxy_status ON proxies(status)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_proxy_score ON proxies(score DESC)')
@@ -682,7 +698,59 @@ class ProxyPoolManager:
             conn.execute('CREATE INDEX IF NOT EXISTS idx_proxy_status_score ON proxies(status, score DESC)')
 
             conn.commit()
-    
+
+    def _load_stats(self):
+        """Load persisted pool statistics so historical health is retained."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute("SELECT * FROM proxy_pool_stats WHERE id = 1")
+                row = cursor.fetchone()
+                if row:
+                    self.stats['total_fetched'] = row['total_fetched'] or 0
+                    self.stats['total_validated'] = row['total_validated'] or 0
+                    self.stats['total_failed'] = row['total_failed'] or 0
+                    self.stats['endpoints_polled'] = row['endpoints_polled'] or 0
+                    self.stats['last_full_poll'] = (
+                        datetime.fromisoformat(row['last_full_poll'])
+                        if row['last_full_poll'] else None
+                    )
+                    logger.info(
+                        "Restored proxy pool stats: fetched=%s validated=%s failed=%s",
+                        self.stats['total_fetched'],
+                        self.stats['total_validated'],
+                        self.stats['total_failed'],
+                    )
+        except Exception as exc:
+            logger.warning(f"Could not load proxy pool stats: {exc}")
+
+    def _persist_stats(self):
+        """Persist pool statistics to disk for restart continuity."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    '''
+                        INSERT INTO proxy_pool_stats (id, total_fetched, total_validated, total_failed, endpoints_polled, last_full_poll)
+                        VALUES (1, ?, ?, ?, ?, ?)
+                        ON CONFLICT(id) DO UPDATE SET
+                            total_fetched=excluded.total_fetched,
+                            total_validated=excluded.total_validated,
+                            total_failed=excluded.total_failed,
+                            endpoints_polled=excluded.endpoints_polled,
+                            last_full_poll=excluded.last_full_poll
+                    ''',
+                    (
+                        self.stats['total_fetched'],
+                        self.stats['total_validated'],
+                        self.stats['total_failed'],
+                        self.stats['endpoints_polled'],
+                        self.stats['last_full_poll'].isoformat() if self.stats['last_full_poll'] else None,
+                    ),
+                )
+                conn.commit()
+        except Exception as exc:
+            logger.warning(f"Could not persist proxy pool stats: {exc}")
+
     def _load_proxies(self):
         """Load proxies from database with optimized query."""
         try:
@@ -889,9 +957,10 @@ class ProxyPoolManager:
         
         tasks = [self._fetch_endpoint(endpoint) for endpoint in self.endpoints]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         total_new = sum(r for r in results if isinstance(r, int))
         self.stats['last_full_poll'] = datetime.now()
+        self._persist_stats()
         
         logger.info(f"✅ Fetched {total_new} new proxies from {len(self.endpoints)} endpoints")
     
@@ -909,6 +978,7 @@ class ProxyPoolManager:
                 # Fetch from endpoint
                 new_proxies = await self._fetch_endpoint(endpoint)
                 self.stats['endpoints_polled'] += 1
+                self._persist_stats()
                 
                 if new_proxies > 0:
                     logger.info(f"📡 {endpoint.name}: fetched {new_proxies} new proxies")
@@ -925,11 +995,12 @@ class ProxyPoolManager:
     async def _fetch_endpoint(self, endpoint: ProxyEndpoint) -> int:
         """Fetch proxies from a single endpoint."""
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-                async with session.get(endpoint.url) as response:
-                    if response.status != 200:
-                        endpoint.failure_count += 1
-                        logger.warning(f"Failed to fetch {endpoint.name}: HTTP {response.status}")
+            async with self._fetch_semaphore:
+                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                    async with session.get(endpoint.url) as response:
+                        if response.status != 200:
+                            endpoint.failure_count += 1
+                            logger.warning(f"Failed to fetch {endpoint.name}: HTTP {response.status}")
                         return 0
                     
                     content = await response.text()
@@ -957,6 +1028,9 @@ class ProxyPoolManager:
                                 self.proxies[proxy.proxy_key] = proxy
                                 new_count += 1
                                 self.stats['total_fetched'] += 1
+
+                    if new_count:
+                        self._persist_stats()
                     
                     return new_count
                     
@@ -1256,9 +1330,10 @@ class ProxyPoolManager:
                 proxy.uptime_percent = (proxy.success_count / total_attempts) * 100
             
             proxy.update_score()
-            
+
             # Save to database
             self._save_proxy(proxy)
+            self._persist_stats()
         
         # Log health check
         self._log_health_check(proxy, latency, success, error_msg)
@@ -1277,20 +1352,24 @@ class ProxyPoolManager:
     
     async def _cleanup_loop(self):
         """Cleanup loop for expired cooldowns, old logs, and low-quality proxies."""
+        error_backoff = 5
         while self.is_running:
             try:
                 await self._cleanup_cooldowns()
                 await self._cleanup_old_logs()
-                
+
                 # Run proxy cleanup less frequently (every 5 minutes)
                 if self.config['auto_cleanup_enabled']:
                     await self._cleanup_low_quality_proxies()
-                    
+
                 await asyncio.sleep(60)  # Run every minute
+                error_backoff = 5
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.error(f"Cleanup error: {e}")
+                await asyncio.sleep(min(error_backoff, 300))
+                error_backoff = min(error_backoff * 2, 300)
     
     async def _cleanup_cooldowns(self):
         """Check and reset proxies in cooldown."""

@@ -44,6 +44,14 @@ class PersistentConnectionManager:
                 await self.monitor_task
             except asyncio.CancelledError:
                 pass
+        for phone, task in list(self.reconnect_tasks.items()):
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+            self.reconnect_tasks.pop(phone, None)
         logger.info("🛑 Stopped persistent connection monitoring")
     
     async def _monitor_connections(self):
@@ -94,9 +102,13 @@ class PersistentConnectionManager:
         if phone_number in self.monitored_clients:
             # Cancel any ongoing reconnect task
             if phone_number in self.reconnect_tasks:
-                self.reconnect_tasks[phone_number].cancel()
-                del self.reconnect_tasks[phone_number]
-            
+                task = self.reconnect_tasks.pop(phone_number)
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
             del self.monitored_clients[phone_number]
             logger.info(f"Unregistered {phone_number} from connection monitoring")
     
@@ -156,7 +168,8 @@ class PersistentConnectionManager:
             
             # Schedule next reconnect attempt
             if client_info['reconnect_attempts'] < self.max_reconnect_attempts:
-                asyncio.create_task(self._reconnect_client(phone_number, client_info))
+                reconnect_task = asyncio.create_task(self._reconnect_client(phone_number, client_info))
+                self.reconnect_tasks[phone_number] = reconnect_task
             else:
                 logger.error(f"❌ CRITICAL: {phone_number} failed to reconnect after {self.max_reconnect_attempts} attempts. Account may be lost!")
     

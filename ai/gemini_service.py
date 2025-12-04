@@ -524,7 +524,11 @@ def create_gemini_service_for_account(api_key: str, account_data: Dict[str, Any]
                 default_prompt = DEFAULT_BRAIN_PROMPTS.get(AccountType(account_type), "")
                 if default_prompt:
                     service.set_brain_prompt(default_prompt)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning(
+                    "Failed to resolve default Gemini prompt for account type %s: %s",
+                    account_type,
+                    exc,
+                )
     
     return service

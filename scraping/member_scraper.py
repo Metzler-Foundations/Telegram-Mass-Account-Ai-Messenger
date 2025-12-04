@@ -702,19 +702,52 @@ class DistributedScrapingCoordinator:
 
     async def _scrape_channel_task(self, account_id: str, task: Dict) -> Dict:
         """Execute channel scraping task."""
-        # Placeholder - would integrate with actual scraping logic
         channel_id = task.get('channel_id')
+        if not channel_id:
+            return {'success': False, 'error': 'No channel_id provided'}
+
         logger.info(f"Scraping channel {channel_id} with account {account_id}")
-        await asyncio.sleep(random.uniform(1, 3))  # Simulate work
-        return {'success': True, 'channel_id': channel_id, 'members_found': random.randint(10, 100)}
+
+        scraper = getattr(self, "member_scraper", None)
+        if scraper and hasattr(scraper, "scrape_channel_members"):
+            return await scraper.scrape_channel_members(
+                channel_id,
+                analyze_messages=task.get('analyze_messages', True),
+                use_elite_scraping=task.get('use_elite_scraping', False)
+            )
+
+        if hasattr(self, "elite_scraper"):
+            return await self.elite_scraper.scrape_channel_comprehensive(
+                channel_id,
+                techniques=['direct_members', 'message_history', 'reaction_analysis']
+                if task.get('analyze_messages', True)
+                else ['direct_members'],
+                max_depth=2
+            )
+
+        return {'success': False, 'error': 'No scraping backend configured'}
 
     async def _analyze_member_task(self, account_id: str, task: Dict) -> Dict:
         """Execute member analysis task."""
-        # Placeholder - would integrate with actual analysis logic
         user_id = task.get('user_id')
+        if not user_id:
+            return {'success': False, 'error': 'No user_id provided'}
+
         logger.info(f"Analyzing member {user_id} with account {account_id}")
-        await asyncio.sleep(random.uniform(0.5, 2))  # Simulate work
-        return {'success': True, 'user_id': user_id, 'analysis_complete': True}
+
+        analyzer = getattr(self, "member_scraper", None)
+        if analyzer and hasattr(analyzer, "db"):
+            profile = analyzer.db.get_member(user_id)
+            if profile:
+                return {
+                    'success': True,
+                    'user_id': user_id,
+                    'analysis_complete': True,
+                    'score': profile.get('engagement_score'),
+                    'last_seen': profile.get('last_seen'),
+                }
+
+        return {'success': False, 'error': 'Member analysis backend not configured'}
 
 
 class MemberDatabase:
@@ -1996,8 +2029,8 @@ class MemberDatabase:
 
 class ThreatDetector:
     """Advanced threat detection system for identifying risky members."""
-    
-    def __init__(self):
+
+    def __init__(self, tuning: Optional[Dict[str, Any]] = None):
         """Initialize threat detector."""
         self.threat_keywords = [
             'admin', 'moderator', 'mod', 'owner', 'creator',
@@ -2009,6 +2042,25 @@ class ThreatDetector:
             r'admin', r'mod', r'owner', r'creator',
             r'security', r'enforcement', r'compliance'
         ]
+
+        self.weight_config = {
+            'owner': 100,
+            'admin': 80,
+            'moderator': 60,
+            'very_active': 40,
+            'active': 20,
+            'regular': 10,
+            'very_recent': 30,
+            'recent': 15,
+            'suspicious_pattern': 25,
+            'verified': 20,
+            'premium': 10,
+            'has_photo': 5
+        }
+        if tuning and isinstance(tuning, dict):
+            self.weight_config.update(tuning.get('weights', {}))
+
+        self.safe_threshold = (tuning or {}).get('safe_threshold', 50)
     
     def calculate_threat_score(self, member: ChatMember, message_count: int = 0,
                                is_admin: bool = False, is_moderator: bool = False,
@@ -2020,39 +2072,40 @@ class ThreatDetector:
         """
         threat_score = 0
         reasons = []
+        weights = self.weight_config
         
         # Owner is highest threat
         if is_owner or member.status == ChatMemberStatus.OWNER:
-            threat_score += 100
+            threat_score += weights.get('owner', 100)
             reasons.append("Channel/Group Owner")
         
         # Admin is high threat
         if is_admin or member.status == ChatMemberStatus.ADMINISTRATOR:
-            threat_score += 80
+            threat_score += weights.get('admin', 80)
             reasons.append("Administrator")
         
         # Moderator is medium-high threat
         if is_moderator:
-            threat_score += 60
+            threat_score += weights.get('moderator', 60)
             reasons.append("Moderator")
         
         # Very active users (likely to report)
         if message_count > 100:
-            threat_score += 40
+            threat_score += weights.get('very_active', 40)
             reasons.append(f"Very active ({message_count} messages)")
         elif message_count > 50:
-            threat_score += 20
+            threat_score += weights.get('active', 20)
             reasons.append(f"Active user ({message_count} messages)")
         elif message_count > 20:
-            threat_score += 10
+            threat_score += weights.get('regular', 10)
             reasons.append(f"Regular poster ({message_count} messages)")
         
         # Recent activity (more likely to notice and report)
         if last_message_days is not None and last_message_days <= 1:
-            threat_score += 30
+            threat_score += weights.get('very_recent', 30)
             reasons.append("Very recent activity")
         elif last_message_days is not None and last_message_days <= 7:
-            threat_score += 15
+            threat_score += weights.get('recent', 15)
             reasons.append("Recent activity")
         
         # Check username for suspicious patterns
@@ -2062,24 +2115,24 @@ class ThreatDetector:
         
         for pattern in self.suspicious_patterns:
             if re.search(pattern, username.lower()) or re.search(pattern, full_name):
-                threat_score += 25
+                threat_score += weights.get('suspicious_pattern', 25)
                 reasons.append("Suspicious username/name pattern")
                 break
         
         # Verified accounts (more likely to report)
         if getattr(member.user, 'is_verified', False):
-            threat_score += 20
+            threat_score += weights.get('verified', 20)
             reasons.append("Verified account")
         
         # Premium users (more engaged, more likely to report)
         if getattr(member.user, 'is_premium', False):
-            threat_score += 10
+            threat_score += weights.get('premium', 10)
             reasons.append("Premium user")
         
         # Accounts with profile photos (more engaged)
         if getattr(member.user, 'photo', None):
-            threat_score += 5
-        
+            threat_score += weights.get('has_photo', 5)
+
         return threat_score, reasons
     
     def is_safe_target(self, threat_score: int, reasons: List[str]) -> bool:
@@ -2093,7 +2146,7 @@ class ThreatDetector:
             True if safe to target, False otherwise
         """
         # High threat score = not safe
-        if threat_score >= 50:
+        if threat_score >= self.safe_threshold:
             return False
         
         # Has admin/mod/owner status = not safe
@@ -4526,7 +4579,8 @@ class EliteMemberScraper:
 class MemberScraper:
     """Advanced Telegram member scraper with comprehensive threat detection and elite anti-detection."""
 
-    def __init__(self, client: Client, db: MemberDatabase, anti_detection: EliteAntiDetectionSystem = None):
+    def __init__(self, client: Client, db: MemberDatabase, anti_detection: EliteAntiDetectionSystem = None,
+                 threat_config: Optional[Dict[str, Any]] = None):
         """Initialize the member scraper.
 
         Args:
@@ -4537,7 +4591,7 @@ class MemberScraper:
         self.client = self._resolve_pyrogram_client(client)
         self.db = db
         self.scraping_active = False
-        self.threat_detector = ThreatDetector()
+        self.threat_detector = ThreatDetector(threat_config)
         self.scraped_user_ids = set()  # Track already scraped users
 
         # Elite systems integration
@@ -4619,6 +4673,9 @@ class MemberScraper:
         try:
             self.scraping_active = True
             self.scraped_user_ids.clear()
+            members_scraped = 0
+            message_analysis = {}
+            admins_found = set()
 
             # Get chat information with retry logic
             chat = None
@@ -4751,7 +4808,17 @@ class MemberScraper:
             logger.error(f"Error scraping channel {channel_identifier}: {e}")
             import traceback
             logger.error(traceback.format_exc())
-            return {'success': False, 'error': str(e)}
+            partial = {
+                'success': False,
+                'error': str(e),
+                'members_scraped': locals().get('members_scraped', 0),
+                'channel_id': str(chat.id) if 'chat' in locals() and chat else None,
+                'partial_results': {
+                    'admins_found': list(locals().get('admins_found', [])),
+                    'message_analysis_sample': list(locals().get('message_analysis', {}).items())[:10],
+                },
+            }
+            return partial
         finally:
             self.scraping_active = False
 

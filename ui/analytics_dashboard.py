@@ -79,8 +79,10 @@ class AnalyticsDashboard(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._last_refresh_at: Optional[datetime] = None
+        self._min_refresh_interval = timedelta(seconds=5)
         self.setup_ui()
-        
+
         # Auto-refresh every 30 seconds
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_all_metrics)
@@ -189,6 +191,12 @@ class AnalyticsDashboard(QWidget):
         self.last_update_label = QLabel()
         self.last_update_label.setStyleSheet("color: #949ba4; font-size: 11px; padding: 10px;")
         content_layout.addWidget(self.last_update_label)
+
+        # Empty-state and degraded-mode banner
+        self.partial_data_label = QLabel()
+        self.partial_data_label.setStyleSheet("color: #f0b232; font-size: 11px; padding: 4px 10px;")
+        self.partial_data_label.setVisible(False)
+        content_layout.addWidget(self.partial_data_label)
         
         content_layout.addStretch()
         scroll.setWidget(content)
@@ -196,14 +204,21 @@ class AnalyticsDashboard(QWidget):
     
     def refresh_all_metrics(self):
         """Refresh ALL metrics with REAL database data."""
+        now = datetime.now()
+        if self._last_refresh_at and (now - self._last_refresh_at) < self._min_refresh_interval:
+            logger.info("Skipping analytics refresh: rate limit in effect")
+            return
         try:
             logger.info("Refreshing ALL analytics with REAL database data...")
-            
-            # Get REAL data from database
-            member_stats = self.get_real_member_stats()
-            campaign_stats = self.get_real_campaign_stats()
-            account_stats = self.get_real_account_stats()
-            
+
+            # Track any sources that failed to load so we can surface a partial-data message
+            errors: List[str] = []
+
+            # Get REAL data from database with defensive fallbacks
+            member_stats = self._safe_fetch(self.get_real_member_stats, self._empty_member_stats(), "member stats", errors)
+            campaign_stats = self._safe_fetch(self.get_real_campaign_stats, self._empty_campaign_stats(), "campaign stats", errors)
+            account_stats = self._safe_fetch(self.get_real_account_stats, self._empty_account_stats(), "account stats", errors)
+
             # Update overview cards
             self.total_members_card.set_value(
                 f"{member_stats['total']:,}",
@@ -309,61 +324,101 @@ class AnalyticsDashboard(QWidget):
                 f"{avg_per_channel:.0f}",
                 "Members per channel"
             )
-            
+
             # Update timestamp
-            self.last_update_label.setText(
-                f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
-                f"(Refreshes every 30 seconds)"
-            )
-            
+            if errors:
+                self.last_update_label.setText(
+                    f"⚠️ Partial data: {', '.join(errors)} — last attempted refresh at "
+                    f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+                self.partial_data_label.setText(
+                    "Database unavailable for " + ', '.join(errors) +
+                    ". Showing cached defaults. Check DB connections and retry."
+                )
+                self.partial_data_label.setVisible(True)
+            else:
+                self.last_update_label.setText(
+                    f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
+                    f"(Refreshes every 30 seconds)"
+                )
+                self.partial_data_label.setVisible(False)
+
             logger.info("✅ Analytics refreshed with REAL data")
-            
+            self._last_refresh_at = datetime.now()
+
         except Exception as e:
             logger.error(f"Failed to refresh analytics: {e}", exc_info=True)
             # Don't fail silently - show error to user
             self.last_update_label.setText(
                 f"❌ Update failed: {str(e)[:50]}... Check logs for details."
             )
+
+    @staticmethod
+    def _empty_member_stats() -> Dict[str, float]:
+        """Provide zeroed-out member stats to keep the UI stable on failures."""
+        return {
+            'total': 0,
+            'new_today': 0,
+            'with_username': 0,
+            'username_pct': 0.0,
+            'verified': 0,
+            'verified_pct': 0.0,
+            'premium': 0,
+            'premium_pct': 0.0,
+            'active_30d': 0,
+            'total_channels': 0
+        }
+
+    @staticmethod
+    def _empty_campaign_stats() -> Dict[str, float]:
+        """Provide zeroed-out campaign stats to keep the UI stable on failures."""
+        return {
+            'total': 0,
+            'running': 0,
+            'completed': 0,
+            'completion_rate': 0.0,
+            'total_sent': 0,
+            'sent_today': 0,
+            'total_failed': 0
+        }
+
+    @staticmethod
+    def _empty_account_stats() -> Dict[str, float]:
+        """Provide zeroed-out account stats to keep the UI stable on failures."""
+        return {
+            'total': 0,
+            'active': 0,
+            'percentage': 0.0,
+            'warmed_up': 0,
+            'warmup_pct': 0.0
+        }
+
+    def _safe_fetch(self, func, default: Dict[str, float], name: str, errors: List[str]) -> Dict[str, float]:
+        """Run a stats function and fall back gracefully if it fails."""
+        try:
+            return func()
+        except Exception as e:
+            logger.warning(f"Falling back to defaults for {name}: {e}", exc_info=True)
+            errors.append(name)
+            return default
     
     def get_real_member_stats(self) -> Dict:
         """Get REAL member statistics from database."""
-        stats = {}
-        
-        # Total members
-        all_members = member_queries.get_all_members()
-        stats['total'] = len(all_members)
-        
-        # New today
-        today = datetime.now().date()
-        stats['new_today'] = sum(
-            1 for m in all_members 
-            if m.get('scraped_at') and datetime.fromisoformat(m['scraped_at']).date() == today
-        )
-        
-        # With username
-        stats['with_username'] = sum(1 for m in all_members if m.get('username'))
-        stats['username_pct'] = (stats['with_username'] / max(stats['total'], 1)) * 100
-        
-        # Verified
-        stats['verified'] = sum(1 for m in all_members if m.get('is_verified'))
-        stats['verified_pct'] = (stats['verified'] / max(stats['total'], 1)) * 100
-        
-        # Premium
-        stats['premium'] = sum(1 for m in all_members if m.get('is_premium'))
-        stats['premium_pct'] = (stats['premium'] / max(stats['total'], 1)) * 100
-        
-        # Active in last 30 days
-        cutoff = datetime.now() - timedelta(days=30)
-        stats['active_30d'] = sum(
-            1 for m in all_members 
-            if m.get('last_seen') and datetime.fromisoformat(m['last_seen']) > cutoff
-        )
-        
-        # Channels
-        channels = member_queries.get_channels()
-        stats['total_channels'] = len(channels)
-        
-        return stats
+        raw_stats = member_queries.get_member_statistics()
+        total = max(raw_stats.get('total', 0), 1)
+
+        return {
+            'total': raw_stats.get('total', 0),
+            'new_today': raw_stats.get('new_today', 0),
+            'with_username': raw_stats.get('with_username', 0),
+            'username_pct': (raw_stats.get('with_username', 0) / total) * 100,
+            'verified': raw_stats.get('verified', 0),
+            'verified_pct': (raw_stats.get('verified', 0) / total) * 100,
+            'premium': raw_stats.get('premium', 0),
+            'premium_pct': (raw_stats.get('premium', 0) / total) * 100,
+            'active_30d': raw_stats.get('active_30d', 0),
+            'total_channels': raw_stats.get('total_channels', 0)
+        }
     
     def get_real_campaign_stats(self) -> Dict:
         """Get REAL campaign statistics from database."""
