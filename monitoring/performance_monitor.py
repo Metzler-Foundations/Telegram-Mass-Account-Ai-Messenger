@@ -40,6 +40,9 @@ class ResourceManager:
         self._workers = []
         self._shutdown_event = threading.Event()
 
+        # Progress tracking
+        self._requeue_count = 0
+
         # Resource monitoring
         self.resource_check_interval = 30  # seconds
         self._resource_monitor_task = None
@@ -169,6 +172,14 @@ class ResourceManager:
             # Put back in queue if resources still not available
             await asyncio.sleep(1)  # Wait before retrying
             await self.normal_priority_queue.put((coro, future))
+            self._requeue_count += 1
+            if self._requeue_count % 5 == 0:
+                logger.info(
+                    "Requeued %s operations due to resource pressure (active=%s, limit=%s)",
+                    self._requeue_count,
+                    self.active_operations,
+                    self.max_concurrent_operations,
+                )
             return
 
         with self._lock:

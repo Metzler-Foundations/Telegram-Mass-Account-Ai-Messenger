@@ -3,7 +3,8 @@ Comprehensive Feature Catalog and Completion Tasks
 Core Account Provisioning
 - Telegram account acquisition and registration
   - Enforce provider capability checks before dispatching runs across all configured providers and target countries.
-  - Implement pooled number inventory preflight to confirm at least N numbers are available per provider before starting bulk runs.
+  - Implement pooled number inventory preflight to confirm at least N numbers are available per provider before starting bulk runs. (Completed)
+  - Add SMSPool/TextVerified/DaisySMS availability probes so preflight errors surface vendor-specific issues. (Completed)
   - Add retryable, non-blocking SMS retrieval with jittered backoff and user-visible countdowns.
   - Centralize cancellation so proxy assignment, phone orders, and client sessions are released even when failures occur mid-run.
   - Record provider transaction IDs, operator, and cost in the database for every number lifecycle step.
@@ -32,32 +33,33 @@ Core Account Provisioning
 
 Proxy Management
 - Proxy pool ingestion, testing, and assignment
-  - Sanitize imported proxy lists and block directory traversal or invalid destination paths.
+  - Sanitize imported proxy lists and block directory traversal or invalid destination paths. (Completed)
   - Enforce encryption or redaction for persisted proxy credentials and historical test payloads.
-  - Add integrity checks for proxy DB backups before rotation and surface failures in the UI.
+  - Add integrity checks for proxy DB backups before rotation and surface failures in the UI. (Completed)
   - Provide per-endpoint cooldown visibility, last-test timestamps, and manual retest actions.
   - Cap concurrent feed polls and surface endpoints with repeated failures requiring operator intervention.
-  - Export health reports with sanitized filenames, explicit timezone stamps, and optional password protection.
+  - Export health reports with sanitized filenames and explicit timezone stamps. (Password protection pending)
+  - Redact proxy credentials in exported health reports while keeping keys for correlation. (Completed)
   - Allow per-account assignment locking to prevent proxy churn during critical flows.
   - Add automated cleanup of failed/expired proxies with operator notifications and audit logs.
 
 Scraping and Member Intelligence
 - Channel/member scraping
-  - Validate channel identifiers, sanitize export filenames, and prevent traversal in user-specified output paths.
+  - Validate channel identifiers, sanitize export filenames, and prevent traversal in user-specified output paths. (Completed)
   - Implement per-account risk scoring with throttling, randomized pauses, and ban-probability gates.
   - Handle private/supergroup differences, message history gaps, and pagination limits.
   - Capture partial results on failures and emit clear diagnostics to the UI and logs.
   - Support resumable scraping jobs with persisted cursors and duplicate suppression.
 
 - Threat detection and anti-detection
-  - Persist applied weight overrides and surface them alongside risk outcomes for debugging.
+  - Persist applied weight overrides and surface them alongside risk outcomes for debugging. (Completed)
   - Provide UI toggles for group-level disables and per-scope cooldown indicators.
   - Add anomaly alerts for spike detection (joins/leaves/messages) with configurable thresholds.
   - Integrate proxy health signals into risk calculations to downgrade noisy proxies.
 
 Campaigns and Scheduling
 - Direct messaging campaigns
-  - Record which template variant was sent for A/B comparisons and aggregate stats.
+  - Record which template variant was sent for A/B comparisons and aggregate stats. (Completed)
   - Validate message length and media constraints per target; preflight blocked users and rate limits.
   - Provide per-target error reporting and retry policies with exponential backoff and jitter.
   - Surface delivery, read receipts, and response-time analytics per campaign.
@@ -65,7 +67,8 @@ Campaigns and Scheduling
 - Engagement/reaction automation
   - Add per-rule enable/disable toggles and UI visibility of cooldowns.
   - Deduplicate reactions across overlapping rules and log suppression reasons.
-  - Enforce retention pruning with alerts on failures or locked tables.
+  - Enforce retention pruning with alerts on failures or locked tables. (Completed)
+  - Allow per-group disable/enable toggles without database edits. (Completed)
 
 - Intelligent scheduler
   - Respect blackout windows and timezone preferences with UI confirmation of detected timezone.
@@ -86,23 +89,24 @@ Analytics and Dashboards
 
 Onboarding and Settings
 - Setup wizard
-  - Debounce repeated validation attempts and repair corrupted files instead of loop retries.
+  - Debounce repeated validation attempts and repair corrupted files instead of loop retries. (Completed)
   - Verify provider keys, proxy inputs, and storage paths with immediate inline errors.
   - Persist progress checkpoints and validate stage files before marking completion.
 
 - Settings window
   - Persist all toggles (advanced features, timezone, delays) with read-back verification.
   - Validate provider and country combos before enabling account runs.
-  - Provide status feedback when timezone detection fails and document fallback behavior.
+  - Provide status feedback when timezone detection fails and document fallback behavior. (Completed)
 
 Messaging and Conversations
 - Status intelligence and receipts
   - Use actual receipt metadata with retry/backoff; persist receipts for restart safety.
-  - Add jitter to bulk status checks and guard against FloodWait collisions.
-  - Surface per-message sentiment and reaction timelines for conversations.
+  - Add jitter to bulk status checks and guard against FloodWait collisions. (Completed)
+ - Surface per-message sentiment and reaction timelines for conversations.
 
 - Conversation analysis
-  - Limit sentiment history depth per user to bound storage.
+  - Limit sentiment history depth per user to bound storage. (Completed)
+  - Index conversation stage history by user/timestamp to keep pruning and lookups fast. (Completed)
   - Store response time calculations deterministically and expose anomalies.
 
 Persistent Connections and Monitoring

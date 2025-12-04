@@ -11,10 +11,12 @@ Features:
 
 import asyncio
 import logging
+import re
 import socket
 import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+from pathlib import Path
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QGroupBox,
@@ -1145,8 +1147,11 @@ class ProxyManagementWidget(QWidget):
     def _export_health_results(self):
         """Export current proxy health data for audits."""
         import csv
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filepath = f"proxy_health_{timestamp}.csv"
+        now = datetime.now().astimezone()
+        timestamp = now.strftime('%Y%m%d_%H%M%S')
+        tz_name = re.sub(r"[^A-Za-z0-9_.-]", "_", now.tzname() or "UTC")
+        safe_suffix = re.sub(r"[^A-Za-z0-9_.-]", "_", f"{timestamp}_{tz_name}")
+        filepath = Path.cwd() / f"proxy_health_{safe_suffix}.csv"
 
         try:
             proxies: List[Dict[str, Any]] = []
@@ -1173,8 +1178,16 @@ class ProxyManagementWidget(QWidget):
                 ErrorHandler.safe_information(self, "No Data", "No proxy data available to export.")
                 return
 
+            def _redact(value: Optional[str]) -> str:
+                if not value:
+                    return ''
+                text = str(value)
+                if len(text) <= 2:
+                    return '*' * len(text)
+                return f"{text[0]}***{text[-1]}"
+
             with open(filepath, 'w', newline='') as csvfile:
-                fieldnames = ['proxy_key', 'ip', 'port', 'protocol', 'username', 'password', 'status', 'score', 'latency_ms', 'last_tested']
+                fieldnames = ['proxy_key', 'ip', 'port', 'protocol', 'username_redacted', 'password_redacted', 'status', 'score', 'latency_ms', 'last_tested', 'timezone']
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
                 for proxy in proxies:
@@ -1183,16 +1196,24 @@ class ProxyManagementWidget(QWidget):
                         'ip': proxy.get('ip'),
                         'port': proxy.get('port'),
                         'protocol': proxy.get('protocol'),
-                        'username': proxy.get('username') or '',
-                        'password': proxy.get('password') or '',
+                        'username_redacted': _redact(proxy.get('username')),
+                        'password_redacted': _redact(proxy.get('password')),
                         'status': proxy.get('status'),
                         'score': proxy.get('score'),
                         'latency_ms': proxy.get('latency_ms'),
-                        'last_tested': proxy.get('last_tested') or proxy.get('last_check')
+                        'last_tested': proxy.get('last_tested') or proxy.get('last_check'),
+                        'timezone': tz_name
                     })
 
-            self._log(f"Exported {len(proxies)} proxies to {filepath}")
-            self.status_label.setText(f"Exported proxy health to {filepath}")
+            safe_path = filepath.resolve()
+            try:
+                safe_path.relative_to(Path.cwd())
+            except ValueError:
+                logger.warning("Export path escaped working directory; normalizing to current directory")
+                safe_path = Path.cwd() / filepath.name
+
+            self._log(f"Exported {len(proxies)} proxies to {safe_path}")
+            self.status_label.setText(f"Exported proxy health to {safe_path}")
         except Exception as exc:
             logger.error(f"Failed to export proxy health: {exc}")
             self.status_label.setText(f"Export failed: {str(exc)[:50]}")

@@ -43,6 +43,7 @@ class SetupWizardManager:
         self.settings_data = settings_data
         self.wizard_complete_file = Path(".wizard_complete")
         self.wizard_progress_file = Path(".wizard_progress.json")
+        self._last_write_ts: float = 0.0
 
     def is_wizard_needed(self) -> bool:
         """Check if wizard should be shown (first-time or missing required settings)."""
@@ -137,6 +138,9 @@ class SetupWizardManager:
     
     def mark_wizard_complete(self):
         """Mark wizard as completed with metadata."""
+        if not self._can_write_config():
+            return
+
         try:
             import datetime
             completion_data = {
@@ -150,14 +154,19 @@ class SetupWizardManager:
                     "optional_settings"
                 ]
             }
-            with open(self.wizard_complete_file, 'w') as f:
+            temp_path = self.wizard_complete_file.with_suffix(self.wizard_complete_file.suffix + ".tmp")
+            with open(temp_path, 'w') as f:
                 json.dump(completion_data, f, indent=2)
+            temp_path.replace(self.wizard_complete_file)
             logger.info("Wizard marked as complete with metadata")
         except Exception as e:
             logger.error(f"Failed to mark wizard as complete: {e}")
-    
+
     def save_step_progress(self, step: int, settings: Dict[str, Any]):
         """Save progress after each successful step."""
+        if not self._can_write_config():
+            return
+
         try:
             progress_data = {
                 "current_step": step,
@@ -165,11 +174,22 @@ class SetupWizardManager:
                 "timestamp": datetime.datetime.now().isoformat(),
                 "partial_settings": settings
             }
-            with open(self.wizard_progress_file, 'w') as f:
+            temp_path = self.wizard_progress_file.with_suffix(self.wizard_progress_file.suffix + ".tmp")
+            with open(temp_path, 'w') as f:
                 json.dump(progress_data, f, indent=2)
+            temp_path.replace(self.wizard_progress_file)
             logger.info(f"Saved wizard progress at step {step}")
         except Exception as e:
             logger.error(f"Failed to save wizard progress: {e}")
+
+    def _can_write_config(self, min_interval_seconds: float = 0.75) -> bool:
+        """Throttle repeated writes to avoid rapid-fire corruption during retries."""
+        now = time.monotonic()
+        if now - self._last_write_ts < min_interval_seconds:
+            logger.warning("Wizard write skipped due to rapid retry; waiting to avoid corruption")
+            return False
+        self._last_write_ts = now
+        return True
 
     def load_step_progress(self) -> Optional[Dict[str, Any]]:
         """Load saved progress if exists."""
@@ -2816,7 +2836,24 @@ class SettingsWindow(QDialog):
 
         if file_path:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                candidate_path = Path(file_path)
+                try:
+                    resolved = candidate_path.resolve(strict=True)
+                except FileNotFoundError:
+                    ErrorHandler.safe_warning(self, "File Missing", "Selected proxy file does not exist.")
+                    return
+
+                try:
+                    resolved.relative_to(Path.cwd())
+                except ValueError:
+                    ErrorHandler.safe_warning(
+                        self,
+                        "Invalid Location",
+                        "Proxy file must reside inside the application working directory to prevent path traversal.",
+                    )
+                    return
+
+                with open(resolved, 'r', encoding='utf-8') as f:
                     proxies = f.read().strip()
                     self.proxy_list_edit.setPlainText(proxies)
                     self.update_proxy_count()

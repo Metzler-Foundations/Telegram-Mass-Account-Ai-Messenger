@@ -2058,9 +2058,20 @@ class ThreatDetector:
             'has_photo': 5
         }
         if tuning and isinstance(tuning, dict):
-            self.weight_config.update(tuning.get('weights', {}))
+            overrides = tuning.get('weights', {})
+            if overrides:
+                logger.info(
+                    "Applying threat-detector weight overrides: %s",
+                    {k: overrides[k] for k in sorted(overrides.keys())}
+                )
+            self.weight_config.update(overrides)
 
         self.safe_threshold = (tuning or {}).get('safe_threshold', 50)
+        logger.debug(
+            "Threat detector initialized with safe_threshold=%s and %d weights",
+            self.safe_threshold,
+            len(self.weight_config)
+        )
     
     def calculate_threat_score(self, member: ChatMember, message_count: int = 0,
                                is_admin: bool = False, is_moderator: bool = False,

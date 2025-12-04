@@ -10,6 +10,7 @@ Supports:
 import csv
 import json
 import logging
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +24,33 @@ try:
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     EXCEL_AVAILABLE = True
 except ImportError:
-    EXCEL_AVAILABLE = False
+EXCEL_AVAILABLE = False
+
+
+def _sanitize_filename(filename: str) -> str:
+    """Sanitize filenames to avoid invalid characters or traversal."""
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]", "_", filename or "export")
+    return safe_name or "export"
+
+
+def normalize_export_path(filepath: str) -> Path:
+    """Resolve export path safely within the working directory."""
+    base_dir = Path.cwd()
+    candidate = Path(filepath)
+    sanitized_name = _sanitize_filename(candidate.name)
+
+    parent = candidate.parent if candidate.parent != Path('.') else base_dir
+    candidate_path = parent / sanitized_name
+
+    try:
+        resolved = candidate_path.resolve()
+        resolved.relative_to(base_dir)
+        return resolved
+    except Exception as exc:
+        logger.warning(
+            "Invalid export path '%s' (%s); falling back to working directory", filepath, exc
+        )
+        return base_dir / sanitized_name
 
 
 class ExportManager:
@@ -64,7 +91,9 @@ class ExportManager:
             'activity_score', 'engagement_potential', 'last_seen', 'scraped_at'
         ]
         
-        with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        safe_path = normalize_export_path(filepath)
+
+        with open(safe_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=columns)
             writer.writeheader()
             
@@ -76,7 +105,7 @@ class ExportManager:
                     row['threat_indicators'] = '; '.join(row['threat_indicators'])
                 writer.writerow(row)
         
-        logger.info(f"Exported {len(members)} members to {filepath}")
+        logger.info(f"Exported {len(members)} members to {safe_path}")
         return len(members)
     
     def export_members_to_json(self, filepath: str, filters: Dict = None, pretty: bool = True) -> int:
@@ -95,13 +124,15 @@ class ExportManager:
         if not members:
             return 0
         
-        with open(filepath, 'w', encoding='utf-8') as f:
+        safe_path = normalize_export_path(filepath)
+
+        with open(safe_path, 'w', encoding='utf-8') as f:
             if pretty:
                 json.dump(members, f, indent=2, default=str, ensure_ascii=False)
             else:
                 json.dump(members, f, default=str, ensure_ascii=False)
-        
-        logger.info(f"Exported {len(members)} members to {filepath}")
+
+        logger.info(f"Exported {len(members)} members to {safe_path}")
         return len(members)
     
     def export_members_to_excel(self, filepath: str, filters: Dict = None) -> int:
@@ -185,8 +216,10 @@ class ExportManager:
             adjusted_width = min(max_length + 2, 50)
             ws.column_dimensions[column].width = adjusted_width
         
-        wb.save(filepath)
-        logger.info(f"Exported {len(members)} members to {filepath}")
+        safe_path = normalize_export_path(filepath)
+
+        wb.save(safe_path)
+        logger.info(f"Exported {len(members)} members to {safe_path}")
         return len(members)
     
     def _get_filtered_members(self, filters: Dict = None) -> List[Dict]:
@@ -266,7 +299,9 @@ class ExportManager:
             'recurring', 'recurrence_interval'
         ]
         
-        with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        safe_path = normalize_export_path(filepath)
+
+        with open(safe_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.DictWriter(f, fieldnames=columns)
             writer.writeheader()
             
@@ -279,10 +314,10 @@ class ExportManager:
         
         # Export messages separately if requested
         if include_messages:
-            messages_filepath = filepath.replace('.csv', '_messages.csv')
+            messages_filepath = safe_path.with_suffix("_messages.csv")
             self._export_campaign_messages(messages_filepath)
-        
-        logger.info(f"Exported {len(campaigns)} campaigns to {filepath}")
+
+        logger.info(f"Exported {len(campaigns)} campaigns to {safe_path}")
         return len(campaigns)
     
     def export_campaigns_to_json(self, filepath: str, include_messages: bool = False, pretty: bool = True) -> int:
@@ -305,13 +340,15 @@ class ExportManager:
             for campaign in campaigns:
                 campaign['messages'] = self._get_campaign_messages(campaign['id'])
         
-        with open(filepath, 'w', encoding='utf-8') as f:
+        safe_path = normalize_export_path(filepath)
+
+        with open(safe_path, 'w', encoding='utf-8') as f:
             if pretty:
                 json.dump(campaigns, f, indent=2, default=str, ensure_ascii=False)
             else:
                 json.dump(campaigns, f, default=str, ensure_ascii=False)
-        
-        logger.info(f"Exported {len(campaigns)} campaigns to {filepath}")
+
+        logger.info(f"Exported {len(campaigns)} campaigns to {safe_path}")
         return len(campaigns)
     
     def export_campaign_analytics(self, campaign_id: int, filepath: str) -> bool:
@@ -372,10 +409,12 @@ class ExportManager:
                     'exported_at': datetime.now().isoformat()
                 }
                 
-                with open(filepath, 'w', encoding='utf-8') as f:
+                safe_path = normalize_export_path(filepath)
+
+                with open(safe_path, 'w', encoding='utf-8') as f:
                     json.dump(analytics, f, indent=2, default=str, ensure_ascii=False)
-                
-                logger.info(f"Exported analytics for campaign {campaign_id} to {filepath}")
+
+                logger.info(f"Exported analytics for campaign {campaign_id} to {safe_path}")
                 return True
                 
         except Exception as e:
@@ -407,7 +446,7 @@ class ExportManager:
             logger.error(f"Error fetching campaign messages: {e}")
             return []
     
-    def _export_campaign_messages(self, filepath: str):
+    def _export_campaign_messages(self, filepath: Path):
         """Export all campaign messages to CSV."""
         try:
             with sqlite3.connect(self.campaign_db_path) as conn:
@@ -421,14 +460,16 @@ class ExportManager:
             columns = ['id', 'campaign_id', 'user_id', 'account_phone', 
                       'message_text', 'status', 'sent_at', 'error_message', 'retry_count']
             
-            with open(filepath, 'w', newline='', encoding='utf-8') as f:
+            safe_path = normalize_export_path(str(filepath))
+
+            with open(safe_path, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.DictWriter(f, fieldnames=columns)
                 writer.writeheader()
                 for msg in messages:
                     row = {col: msg.get(col, '') for col in columns}
                     writer.writerow(row)
-            
-            logger.info(f"Exported {len(messages)} messages to {filepath}")
+
+            logger.info(f"Exported {len(messages)} messages to {safe_path}")
         except Exception as e:
             logger.error(f"Error exporting messages: {e}")
 

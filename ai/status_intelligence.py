@@ -279,6 +279,20 @@ class StatusIntelligence:
             Dictionary mapping user_id to OnlineStatus
         """
         results = {}
+
+        # Enforce per-client pacing to prevent FloodWait collisions when bulk refreshing
+        client_key = getattr(client, "phone_number", None) or getattr(client, "session_name", None) or "default"
+        min_gap = max(delay_range[0], 1.5)
+        last_bulk = self._pending_receipts.get("_last_bulk_check", {})  # reuse dict store
+        last_seen = last_bulk.get(client_key)
+        if last_seen:
+            elapsed = (datetime.now() - last_seen).total_seconds()
+            if elapsed < min_gap:
+                sleep_for = min_gap - elapsed
+                logger.info(f"Throttling bulk status checks for {client_key} by {sleep_for:.2f}s to avoid FloodWait")
+                await asyncio.sleep(sleep_for)
+        last_bulk[client_key] = datetime.now()
+        self._pending_receipts["_last_bulk_check"] = last_bulk
         
         for i, user_id in enumerate(user_ids):
             profile = await self.track_user_status(client, user_id)
