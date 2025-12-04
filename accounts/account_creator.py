@@ -22,6 +22,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from enum import Enum
 
+# Import rate limiter for API call protection
+try:
+    from utils.rate_limiter import get_rate_limiter
+    RATE_LIMITER_AVAILABLE = True
+except ImportError:
+    RATE_LIMITER_AVAILABLE = False
+
 from pyrogram import Client
 from pyrogram.errors import (
     FloodWait, PhoneNumberInvalid, PhoneCodeInvalid, PhoneCodeExpired,
@@ -116,6 +123,13 @@ class PhoneNumberProvider:
         # Rate limiting for API calls
         self.last_api_call = {}  # provider -> timestamp
         self.min_call_interval = 2.0  # Minimum seconds between API calls per provider
+        
+        # Use centralized rate limiter if available
+        self._rate_limiter = None
+        try:
+            from utils.rate_limiter import get_rate_limiter
+            self._rate_limiter = get_rate_limiter()
+        except: pass
         
         # Popular SMS verification services with real API configurations
         self.providers = {

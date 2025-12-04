@@ -24,7 +24,7 @@ try:
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     EXCEL_AVAILABLE = True
 except ImportError:
-EXCEL_AVAILABLE = False
+    EXCEL_AVAILABLE = False
 
 
 def _sanitize_filename(filename: str) -> str:

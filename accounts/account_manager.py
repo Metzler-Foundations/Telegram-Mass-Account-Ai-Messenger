@@ -1376,7 +1376,9 @@ class AccountManager:
 
             logger.info(f"Stopped client: {phone_number}")
             return True
-        return False
+        except Exception as e:
+            logger.error(f"Error stopping client {phone_number}: {e}")
+            return False
 
     async def start_all_clients(self, max_concurrent: int = 20):
         """Start all saved accounts with controlled concurrency."""
