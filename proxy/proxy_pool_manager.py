@@ -24,6 +24,7 @@ import hashlib
 import random
 import sqlite3
 import base64
+import shutil
 from typing import Dict, List, Optional, Set, Tuple, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field, asdict
@@ -506,6 +507,7 @@ class ProxyPoolManager:
         self.db_path = db_path
         self.config_path = config_path
         self.credential_manager = ProxyCredentialManager()
+        self._last_backup_error: Optional[str] = None
 
         # Proxy storage
         self.proxies: Dict[str, Proxy] = {}  # proxy_key -> Proxy
@@ -566,6 +568,12 @@ class ProxyPoolManager:
         # Initialize database
         self._init_database()
 
+        # Verify database health and rotate a checksum-backed snapshot for recovery
+        if not self._verify_database_integrity():
+            logger.warning("Proxy database integrity check failed; writes may be unsafe until repaired")
+        else:
+            self._create_integrity_checked_backup()
+
         # Restore persisted statistics so historical health is not lost between restarts
         self._load_stats()
 
@@ -615,7 +623,83 @@ class ProxyPoolManager:
                     logger.info(f"  Auto cleanup: {self.config['auto_cleanup_enabled']}")
         except Exception as e:
             logger.warning(f"Failed to load config from file, using defaults: {e}")
-    
+
+    @staticmethod
+    def _hash_file(path: Path) -> Optional[str]:
+        """Compute a SHA256 hash for a file."""
+        try:
+            digest = hashlib.sha256()
+            with open(path, 'rb') as handle:
+                for chunk in iter(lambda: handle.read(65536), b""):
+                    digest.update(chunk)
+            return digest.hexdigest()
+        except Exception as exc:
+            logger.error(f"Failed to hash file {path}: {exc}")
+            return None
+
+    def _verify_database_integrity(self, db_path: Optional[Path] = None) -> bool:
+        """Run PRAGMA integrity_check to ensure the proxy database is readable."""
+        target = Path(db_path) if db_path else Path(self.db_path)
+        if not target.exists():
+            return True
+
+        try:
+            with sqlite3.connect(target) as conn:
+                result = conn.execute("PRAGMA integrity_check").fetchone()
+                if result and result[0].lower() == "ok":
+                    return True
+                logger.error(f"Proxy DB integrity check failed for {target}: {result}")
+        except Exception as exc:
+            logger.error(f"Proxy DB integrity check error for {target}: {exc}")
+        return False
+
+    def _create_integrity_checked_backup(self) -> Optional[Path]:
+        """Create a proxy DB backup with checksum verification and prune old snapshots."""
+        db_file = Path(self.db_path)
+        if not db_file.exists():
+            return None
+
+        backup_dir = db_file.parent / "backups"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = backup_dir / f"proxy_pool_{timestamp}.db"
+
+        try:
+            shutil.copy2(db_file, backup_path)
+            original_hash = self._hash_file(db_file)
+            backup_hash = self._hash_file(backup_path)
+
+            if not original_hash or not backup_hash or original_hash != backup_hash:
+                raise ValueError("Backup checksum mismatch")
+
+            if not self._verify_database_integrity(backup_path):
+                raise ValueError("Backup failed integrity check")
+
+            self._prune_old_backups(backup_dir, keep=5)
+            logger.info(f"Created integrity-checked proxy DB backup at {backup_path}")
+            self._last_backup_error = None
+            return backup_path
+        except Exception as exc:
+            self._last_backup_error = str(exc)
+            logger.error(f"Failed to create proxy DB backup: {exc}")
+            try:
+                backup_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+        return None
+
+    @staticmethod
+    def _prune_old_backups(backup_dir: Path, keep: int = 5):
+        """Keep only the most recent N backups to avoid unbounded growth."""
+        try:
+            backups = sorted(backup_dir.glob("proxy_pool_*.db"), reverse=True)
+            for stale in backups[keep:]:
+                stale.unlink()
+                logger.info(f"Removed old proxy DB backup: {stale}")
+        except Exception as exc:
+            logger.warning(f"Failed to prune old proxy DB backups: {exc}")
+
     def _init_database(self):
         """Initialize the proxy database."""
         with sqlite3.connect(self.db_path) as conn:
@@ -1337,18 +1421,34 @@ class ProxyPoolManager:
         
         # Log health check
         self._log_health_check(proxy, latency, success, error_msg)
-    
+
     def _log_health_check(self, proxy: Proxy, latency: float, success: bool, error_msg: Optional[str]):
         """Log health check result to database."""
+        safe_error = self._sanitize_error_message(error_msg, proxy)
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute('''
                     INSERT INTO proxy_health_log (proxy_key, latency_ms, success, error_message)
                     VALUES (?, ?, ?, ?)
-                ''', (proxy.proxy_key, latency, success, error_msg))
+                ''', (proxy.proxy_key, latency, success, safe_error))
                 conn.commit()
         except Exception as e:
             logger.error(f"Failed to log health check: {e}")
+
+    @staticmethod
+    def _sanitize_error_message(error_msg: Optional[str], proxy: Proxy) -> Optional[str]:
+        """Redact credentials and connection strings before persisting errors."""
+        if not error_msg:
+            return None
+
+        sanitized = str(error_msg)
+        for secret in (proxy.username, proxy.password):
+            if secret:
+                sanitized = sanitized.replace(secret, "***")
+
+        # Strip user:pass@ from URLs
+        sanitized = re.sub(r"(\w+://)([^@\s]+)@", r"\1***@", sanitized)
+        return sanitized[:200]
     
     async def _cleanup_loop(self):
         """Cleanup loop for expired cooldowns, old logs, and low-quality proxies."""

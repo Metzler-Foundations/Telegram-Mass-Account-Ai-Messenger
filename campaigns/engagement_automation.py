@@ -73,11 +73,12 @@ class EngagementRule:
     # Rate limiting
     max_reactions_per_hour: int = 20
     max_reactions_per_group_per_hour: int = 10
-    
+
     # Filters
     exclude_keywords: List[str] = field(default_factory=list)
     only_reply_to_messages: bool = False
     min_message_length: int = 10
+    disabled_groups: List[int] = field(default_factory=list)
     
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
@@ -147,9 +148,16 @@ class EngagementAutomation:
                 only_reply_to_messages INTEGER,
                 min_message_length INTEGER,
                 created_at TIMESTAMP,
-                updated_at TIMESTAMP
+                updated_at TIMESTAMP,
+                disabled_groups TEXT DEFAULT '[]'
             )
         """)
+
+        try:
+            cursor.execute("ALTER TABLE engagement_rules ADD COLUMN disabled_groups TEXT DEFAULT '[]'")
+        except sqlite3.OperationalError:
+            # Column already exists
+            pass
         
         # Engagement log
         cursor.execute("""
@@ -193,7 +201,7 @@ class EngagementAutomation:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM engagement_rules WHERE enabled = 1")
-        
+
         for row in cursor.fetchall():
             rule = EngagementRule(
                 rule_id=row[0],
@@ -213,7 +221,8 @@ class EngagementAutomation:
                 only_reply_to_messages=bool(row[14]),
                 min_message_length=row[15] or 10,
                 created_at=datetime.fromisoformat(row[16]) if row[16] else datetime.now(),
-                updated_at=datetime.fromisoformat(row[17]) if row[17] else datetime.now()
+                updated_at=datetime.fromisoformat(row[17]) if row[17] else datetime.now(),
+                disabled_groups=json.loads(row[18]) if len(row) > 18 and row[18] else []
             )
             self._rules[rule.rule_id] = rule
         
@@ -229,7 +238,7 @@ class EngagementAutomation:
         
         cursor.execute("""
             INSERT OR REPLACE INTO engagement_rules VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             )
         """, (
             rule.rule_id, rule.name, int(rule.enabled),
@@ -247,14 +256,45 @@ class EngagementAutomation:
             int(rule.only_reply_to_messages),
             rule.min_message_length,
             rule.created_at.isoformat(),
-            rule.updated_at.isoformat()
+            rule.updated_at.isoformat(),
+            json.dumps(rule.disabled_groups)
         ))
         
         conn.commit()
         conn.close()
-        
+
         self._rules[rule.rule_id] = rule
         logger.info(f"Added/updated engagement rule: {rule.name}")
+
+    def disable_group_for_rule(self, rule_id: str, group_id: int) -> bool:
+        """Disable engagement for a specific group without turning off the rule."""
+        rule = self._rules.get(rule_id)
+        if not rule:
+            logger.warning("Cannot disable group %s for missing rule %s", group_id, rule_id)
+            return False
+
+        if group_id in rule.disabled_groups:
+            return True
+
+        rule.disabled_groups.append(group_id)
+        self.add_rule(rule)
+        logger.info("Disabled group %s for rule %s", group_id, rule_id)
+        return True
+
+    def enable_group_for_rule(self, rule_id: str, group_id: int) -> bool:
+        """Re-enable engagement for a previously disabled group."""
+        rule = self._rules.get(rule_id)
+        if not rule:
+            logger.warning("Cannot enable group %s for missing rule %s", group_id, rule_id)
+            return False
+
+        if group_id not in rule.disabled_groups:
+            return True
+
+        rule.disabled_groups = [gid for gid in rule.disabled_groups if gid != group_id]
+        self.add_rule(rule)
+        logger.info("Enabled group %s for rule %s", group_id, rule_id)
+        return True
     
     async def process_message(self, client: Client, message: Message) -> bool:
         """Process a message for potential engagement.
@@ -299,6 +339,10 @@ class EngagementAutomation:
         """
         # Check group targeting
         if rule.target_groups and message.chat.id not in rule.target_groups:
+            return False
+
+        # Per-group disable toggle
+        if rule.disabled_groups and message.chat.id in rule.disabled_groups:
             return False
         
         # Check user targeting
@@ -472,15 +516,23 @@ class EngagementAutomation:
         """Delete stale engagement stats to prevent unbounded growth."""
         try:
             cutoff = datetime.now() - timedelta(days=self.stats_retention_days)
-            conn.execute(
+            stats_result = conn.execute(
                 "DELETE FROM engagement_stats WHERE last_engagement IS NOT NULL AND last_engagement < ?",
-                (cutoff,)
+                (cutoff,),
             )
-            conn.execute(
+            log_result = conn.execute(
                 "DELETE FROM engagement_log WHERE timestamp < ?",
-                (cutoff,)
+                (cutoff,),
             )
             conn.commit()
+
+            removed_stats = stats_result.rowcount if stats_result is not None else 0
+            removed_logs = log_result.rowcount if log_result is not None else 0
+            if removed_stats == 0 and removed_logs == 0:
+                logger.warning(
+                    "Engagement pruning completed without removing records. Check retention window (%s days) or DB locks.",
+                    self.stats_retention_days,
+                )
         except Exception as exc:
             logger.debug(f"Engagement stats pruning failed: {exc}")
 

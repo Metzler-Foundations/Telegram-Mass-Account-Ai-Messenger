@@ -212,6 +212,122 @@ class PhoneNumberProvider:
             logger.error(f"Failed to get number from {provider} after retries: {e}")
             return None
 
+    def check_inventory(self, provider: str, country: str, api_key: str, requested: int) -> Dict[str, Any]:
+        """Best-effort inventory probe to avoid starting runs without enough numbers."""
+        if provider not in self.providers:
+            return {
+                'success': False,
+                'error': f"Unsupported phone provider '{provider}'"
+            }
+
+        if not api_key:
+            return {
+                'success': False,
+                'error': f"Phone provider API key is required for {provider}"
+            }
+
+        try:
+            if provider == "5sim":
+                available = self._check_5sim_inventory(country, api_key)
+                return {'success': True, 'available': available}
+
+            if provider == "sms-activate":
+                available = self._check_sms_activate_inventory(country, api_key)
+                return {'success': True, 'available': available}
+
+            if provider == "sms-hub":
+                available = self._check_sms_hub_inventory(country, api_key)
+                return {'success': True, 'available': available}
+
+            if provider == "smspool":
+                available, warning = self._check_smspool_inventory(country, api_key, provider_config)
+                return {'success': True, 'available': available, 'warning': warning}
+
+            if provider == "textverified":
+                available, warning = self._check_textverified_inventory(country, api_key, provider_config)
+                return {'success': True, 'available': available, 'warning': warning}
+
+            if provider == "daisysms":
+                available, warning = self._check_daisysms_inventory(country, api_key, provider_config)
+                return {'success': True, 'available': available, 'warning': warning}
+
+            # Providers without safe availability endpoints fall back to warning-only mode
+            return {
+                'success': True,
+                'available': None,
+                'warning': (
+                    f"{provider} does not expose a safe availability endpoint; proceeding without a guaranteed "
+                    f"inventory check for {requested} requested numbers."
+                )
+            }
+        except Exception as exc:
+            return {
+                'success': False,
+                'error': f"Inventory check failed for {provider}: {exc}"
+            }
+
+    def _check_smspool_inventory(self, country: str, api_key: str, config: Dict) -> Tuple[Optional[int], Optional[str]]:
+        """Best-effort SMSPool inventory check using service availability endpoints."""
+        try:
+            response = requests.get(
+                f"{config['api_url']}/request/quantity",
+                params={
+                    'key': api_key,
+                    'country': country,
+                    'service': config.get('service_code', 'tg')
+                },
+                timeout=8,
+            )
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, dict):
+                if 'quantity' in data:
+                    return int(data['quantity']), None
+                if 'success' in data and not data.get('success'):
+                    return None, data.get('message', 'SMSPool reported no availability information')
+            return None, "SMSPool availability endpoint returned an unexpected payload"
+        except Exception as exc:
+            logger.warning(f"SMSPool availability check failed: {exc}")
+            return None, f"SMSPool availability check failed: {exc}"
+
+    def _check_textverified_inventory(self, country: str, api_key: str, config: Dict) -> Tuple[Optional[int], Optional[str]]:
+        """Best-effort TextVerified availability probe based on minimum price listings."""
+        try:
+            headers = {'Authorization': f"Bearer {api_key}"}
+            response = requests.get(
+                f"{config['api_url']}/availability",
+                params={'service': config.get('service_code', 'telegram'), 'country': country},
+                headers=headers,
+                timeout=8,
+            )
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, dict) and 'available' in data:
+                return int(data['available']), None
+            return None, "TextVerified availability endpoint returned an unexpected payload"
+        except Exception as exc:
+            logger.warning(f"TextVerified availability check failed: {exc}")
+            return None, f"TextVerified availability check failed: {exc}"
+
+    def _check_daisysms_inventory(self, country: str, api_key: str, config: Dict) -> Tuple[Optional[int], Optional[str]]:
+        """Best-effort DaisySMS stock check using pricing/stock listing endpoints."""
+        try:
+            response = requests.get(
+                f"{config['api_url']}/stock",
+                params={'api_key': api_key, 'service': config.get('service_code', 'telegram'), 'country': country},
+                timeout=8,
+            )
+            response.raise_for_status()
+            data = response.json()
+            if isinstance(data, dict):
+                stock = data.get('stock') or data.get('available')
+                if stock is not None:
+                    return int(stock), None
+            return None, "DaisySMS availability endpoint returned an unexpected payload"
+        except Exception as exc:
+            logger.warning(f"DaisySMS availability check failed: {exc}")
+            return None, f"DaisySMS availability check failed: {exc}"
+
     def _get_smspool_number(self, country: str, api_key: str, config: Dict) -> Optional[Dict]:
         """Get number from SMSPool.net API."""
         try:
@@ -277,6 +393,109 @@ class PhoneNumberProvider:
 
         except Exception as e:
             logger.error(f"TextVerified API call failed: {e}")
+
+        return None
+
+    def _check_5sim_inventory(self, country: str, api_key: str) -> int:
+        """Return available 5SIM numbers for a country/service without purchasing."""
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        }
+
+        provider_config = self.providers.get("5sim", {})
+        url = f"{provider_config.get('api_url')}/guest/products/{country.lower()}/{provider_config.get('service_code')}"
+        response = requests.get(url, headers=headers, timeout=30)
+        response.raise_for_status()
+
+        products = response.json()
+        available_total = 0
+
+        if isinstance(products, dict):
+            for details in products.values():
+                qty = details.get("Qty") or details.get("qty") or details.get("count") or 0
+                available_total += qty or 0
+        elif isinstance(products, list):
+            for entry in products:
+                qty = entry.get("Qty") or entry.get("qty") or entry.get("count") or 0
+                available_total += qty or 0
+
+        return available_total
+
+    def _check_sms_activate_inventory(self, country: str, api_key: str) -> Optional[int]:
+        """Check SMS-Activate availability for the Telegram service in a country."""
+        country_codes = {
+            "US": "0", "GB": "44", "DE": "49", "FR": "33", "IT": "39",
+            "ES": "34", "BR": "55", "RU": "7"
+        }
+
+        country_code = country_codes.get(country, "0")
+        params = {
+            "api_key": api_key,
+            "action": "getNumbersStatus",
+            "country": country_code,
+        }
+
+        provider_config = self.providers.get("sms-activate", {})
+        response = requests.get(provider_config.get("api_url"), params=params, timeout=30)
+        response.raise_for_status()
+
+        try:
+            status = response.json()
+        except json.JSONDecodeError:
+            logger.warning(f"SMS-Activate inventory returned non-JSON payload: {response.text}")
+            return None
+
+        service_key = provider_config.get("service_code")
+        if not service_key:
+            return None
+
+        # Keys are often formatted as tg_0 or tg0 depending on provider
+        candidates = [f"{service_key}_{country_code}", f"{service_key}{country_code}"]
+        for candidate in candidates:
+            if candidate in status:
+                try:
+                    return int(status[candidate])
+                except (TypeError, ValueError):
+                    return None
+
+        return None
+
+    def _check_sms_hub_inventory(self, country: str, api_key: str) -> Optional[int]:
+        """Check SMS-Hub availability using the shared handler API status endpoint."""
+        country_codes = {
+            "US": "1", "GB": "44", "DE": "49", "FR": "33", "IT": "39",
+            "ES": "34", "BR": "55", "RU": "7", "IN": "91"
+        }
+
+        country_code = country_codes.get(country, "1")
+        params = {
+            "api_key": api_key,
+            "action": "getNumbersStatus",
+            "country": country_code,
+        }
+
+        provider_config = self.providers.get("sms-hub", {})
+        response = requests.get(provider_config.get("api_url"), params=params, timeout=30)
+        response.raise_for_status()
+
+        try:
+            status = response.json()
+        except json.JSONDecodeError:
+            logger.warning(f"SMS-Hub inventory returned non-JSON payload: {response.text}")
+            return None
+
+        service_key = provider_config.get("service_code")
+        if not service_key:
+            return None
+
+        candidates = [f"{service_key}_{country_code}", f"{service_key}{country_code}"]
+        for candidate in candidates:
+            if candidate in status:
+                try:
+                    return int(status[candidate])
+                except (TypeError, ValueError):
+                    return None
 
         return None
 
@@ -1049,6 +1268,40 @@ class AccountCreator:
 
         return None
 
+    def _preflight_number_inventory(self, count: int, config: Dict) -> Dict[str, Any]:
+        """Best-effort check that a provider can supply the requested number of phone numbers."""
+        country = config.get('country', 'US')
+        provider = config.get('phone_provider', 'sms-activate')
+        api_key = config.get('provider_api_key')
+
+        validation = self._validate_provider_config(provider, country, api_key)
+        if validation:
+            return validation
+
+        check_result = self.phone_provider.check_inventory(provider, country, api_key, count)
+        if not check_result.get('success'):
+            return {
+                'success': False,
+                'error': check_result.get('error', 'Phone provider inventory preflight failed')
+            }
+
+        available = check_result.get('available')
+        warning = check_result.get('warning')
+
+        if available is not None and available < count:
+            return {
+                'success': False,
+                'error': (
+                    f"Only {available} numbers available from {provider} for {country}, "
+                    f"but {count} requested. Reduce the batch size or switch providers."
+                )
+            }
+
+        if warning:
+            logger.warning(warning)
+
+        return {'success': True}
+
     def _get_delay_range(self, config: Dict, realistic_timing: bool) -> Tuple[float, float]:
         """Return (min_delay, max_delay) for inter-account waits."""
         delay_config = config.get('inter_account_delay') or {}
@@ -1083,7 +1336,14 @@ class AccountCreator:
         self.creation_stats['total_failed'] = 0
 
         logger.info(f"Starting bulk creation of {count} accounts")
-        
+
+        inventory_check = self._preflight_number_inventory(count, config)
+        if not inventory_check.get('success'):
+            error = inventory_check.get('error', 'Phone number inventory check failed')
+            logger.error(error)
+            self.creation_active = False
+            return [{'success': False, 'error': error}]
+
         for i in range(count):
             if not self.creation_active:
                 logger.info("Bulk creation stopped by user")

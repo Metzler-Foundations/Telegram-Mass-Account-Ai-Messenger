@@ -8,6 +8,7 @@ Features:
 - Identify optimal conversation flows
 """
 
+import hashlib
 import logging
 import sqlite3
 import json
@@ -55,7 +56,12 @@ class ConversationAnalyzer:
         self.db_path = db_path
         self._init_database()
         self.flow_retention_days = 90
+        self.max_sentiment_records_per_user = 500
+        self._stage_has_user_id = False
+        self._ensure_stage_schema()
+        self._ensure_stage_indexes()
         self._prune_old_flows()
+        self._prune_sentiment_history()
     
     def _init_database(self):
         """Initialize analytics database."""
@@ -125,6 +131,60 @@ class ConversationAnalyzer:
         conn.close()
         logger.info("Conversation analytics database initialized")
 
+    def _ensure_stage_schema(self):
+        """Add missing columns to conversation_stages for sentiment tracking."""
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute("PRAGMA table_info(conversation_stages)")
+            columns = {row[1] for row in cursor.fetchall()}
+
+            if "user_id" not in columns:
+                try:
+                    cursor.execute("ALTER TABLE conversation_stages ADD COLUMN user_id INTEGER")
+                    conn.commit()
+                    columns.add("user_id")
+                except sqlite3.OperationalError as exc:
+                    logger.warning(f"Failed to add user_id to conversation_stages: {exc}")
+
+            if "timestamp" not in columns:
+                try:
+                    cursor.execute("ALTER TABLE conversation_stages ADD COLUMN timestamp TIMESTAMP")
+                    conn.commit()
+                except sqlite3.OperationalError as exc:
+                    logger.warning(f"Failed to backfill timestamp column: {exc}")
+
+            self._stage_has_user_id = "user_id" in columns
+        except Exception as exc:
+            logger.error(f"Failed to verify stage schema: {exc}")
+        finally:
+            if conn:
+                conn.close()
+
+    def _ensure_stage_indexes(self):
+        """Create indexes to keep stage lookups and pruning efficient."""
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            if self._stage_has_user_id:
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_conversation_stages_user_timestamp "
+                    "ON conversation_stages(user_id, timestamp)"
+                )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_conversation_stages_flow "
+                "ON conversation_stages(flow_id)"
+            )
+            conn.commit()
+        except Exception as exc:
+            logger.warning(f"Failed to ensure conversation stage indexes: {exc}")
+        finally:
+            if conn:
+                conn.close()
+
     def _prune_old_flows(self):
         """Remove stale conversation flows and associated data."""
         try:
@@ -144,6 +204,48 @@ class ConversationAnalyzer:
             conn.close()
         except Exception as exc:
             logger.debug(f"Failed to prune old conversation flows: {exc}")
+
+    def _prune_sentiment_history(self):
+        """Limit sentiment history depth per user to bound storage growth."""
+        if not self._stage_has_user_id:
+            return
+
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                SELECT user_id, COUNT(*) AS cnt
+                FROM conversation_stages
+                WHERE user_id IS NOT NULL
+                GROUP BY user_id
+                HAVING cnt > ?
+                """,
+                (self.max_sentiment_records_per_user,)
+            )
+
+            for user_id, _ in cursor.fetchall():
+                cursor.execute(
+                    """
+                    DELETE FROM conversation_stages
+                    WHERE id IN (
+                        SELECT id FROM conversation_stages
+                        WHERE user_id = ?
+                        ORDER BY COALESCE(timestamp, '1970-01-01') DESC, id DESC
+                        LIMIT -1 OFFSET ?
+                    )
+                    """,
+                    (user_id, self.max_sentiment_records_per_user)
+                )
+
+            conn.commit()
+        except Exception as exc:
+            logger.error(f"Failed to prune sentiment history: {exc}")
+        finally:
+            if conn:
+                conn.close()
     
     def analyze_conversation(self, flow_id: str, user_id: int,
                            messages: List[str], responses: List[str],
@@ -193,13 +295,15 @@ class ConversationAnalyzer:
             if i < len(responses):
                 # Extract keywords
                 keywords = self._extract_keywords(msg)
-                
+
                 # Check if message got a response
                 got_response = bool(responses[i])
                 was_successful = outcome == "success"
-                
+
+                deterministic_id = hashlib.sha256(msg.strip().encode('utf-8')).hexdigest()[:16]
+
                 pattern = MessagePattern(
-                    pattern_id=f"pattern_{hash(msg[:50])}",
+                    pattern_id=f"pattern_{deterministic_id}",
                     message_template=self._templatize_message(msg),
                     keywords=keywords,
                     response_rate=1.0 if got_response else 0.0,
@@ -293,14 +397,29 @@ class ConversationAnalyzer:
         for i, (msg, resp) in enumerate(zip(messages, responses)):
             resp_time = response_times[i] if i < len(response_times) else 0
             sentiment = self._score_sentiment(resp)
-            cursor.execute("""
-                INSERT INTO conversation_stages
-                (flow_id, stage_number, our_message, user_response, response_time, sentiment_score, timestamp)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (flow_id, i+1, msg, resp, resp_time, sentiment, datetime.now()))
+            sent_at, responded_at = (timestamps[i] if timestamps and i < len(timestamps) else (None, None))
+            stage_timestamp = responded_at or sent_at or datetime.now()
+            columns = [
+                "flow_id", "stage_number", "our_message", "user_response",
+                "response_time", "sentiment_score", "timestamp"
+            ]
+            params = [flow_id, i + 1, msg, resp, resp_time, sentiment, stage_timestamp]
+
+            if self._stage_has_user_id:
+                columns.append("user_id")
+                params.append(user_id)
+
+            placeholders = ", ".join(["?"] * len(columns))
+            cursor.execute(
+                f"INSERT INTO conversation_stages ({', '.join(columns)}) VALUES ({placeholders})",
+                params
+            )
         
         conn.commit()
         conn.close()
+
+        # Enforce per-user sentiment history limits after each flow save
+        self._prune_sentiment_history()
     
     def _update_pattern(self, pattern: MessagePattern):
         """Update or create message pattern."""
@@ -402,6 +521,4 @@ class ConversationAnalyzer:
         conn.close()
         return insights
 
-
-import random
 

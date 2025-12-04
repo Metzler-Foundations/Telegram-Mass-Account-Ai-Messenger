@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+
+from integrations.export_manager import normalize_export_path
 from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QComboBox, QCheckBox, QGroupBox, QFormLayout, QFileDialog,
@@ -429,22 +431,24 @@ class DataExporter:
             if not data:
                 logger.warning("No data to export")
                 return False
-            
-            with open(file_path, 'w', newline='', encoding='utf-8') as f:
+
+            safe_path = normalize_export_path(file_path)
+
+            with open(safe_path, 'w', newline='', encoding='utf-8') as f:
                 # Get all unique keys from all dicts
                 fieldnames = set()
                 for item in data:
                     fieldnames.update(item.keys())
-                
+
                 fieldnames = sorted(list(fieldnames))
                 
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
                 writer.writerows(data)
-            
-            logger.info(f"Exported {len(data)} records to CSV: {file_path}")
+
+            logger.info(f"Exported {len(data)} records to CSV: {safe_path}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to export to CSV: {e}")
             return False
@@ -453,16 +457,18 @@ class DataExporter:
     def export_to_json(data: List[Dict], file_path: str, options: Dict = None) -> bool:
         """Export data to JSON."""
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
+            safe_path = normalize_export_path(file_path)
+
+            with open(safe_path, 'w', encoding='utf-8') as f:
                 json.dump({
                     'exported_at': datetime.now().isoformat(),
                     'count': len(data),
                     'data': data
                 }, f, indent=2, ensure_ascii=False, default=str)
-            
-            logger.info(f"Exported {len(data)} records to JSON: {file_path}")
+
+            logger.info(f"Exported {len(data)} records to JSON: {safe_path}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to export to JSON: {e}")
             return False
@@ -510,9 +516,11 @@ class DataExporter:
                         pass  # Skip cells with None or non-string values
                 adjusted_width = min(max_length + 2, 50)
                 ws.column_dimensions[column_letter].width = adjusted_width
-            
-            wb.save(file_path)
-            logger.info(f"Exported {len(data)} records to Excel: {file_path}")
+
+            safe_path = normalize_export_path(file_path)
+
+            wb.save(safe_path)
+            logger.info(f"Exported {len(data)} records to Excel: {safe_path}")
             return True
             
         except ImportError:
@@ -526,7 +534,9 @@ class DataExporter:
     def export_to_txt(data: List[Dict], file_path: str, options: Dict = None) -> bool:
         """Export data to plain text."""
         try:
-            with open(file_path, 'w', encoding='utf-8') as f:
+            safe_path = normalize_export_path(file_path)
+
+            with open(safe_path, 'w', encoding='utf-8') as f:
                 f.write(f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"Total Records: {len(data)}\n")
                 f.write("=" * 80 + "\n\n")
@@ -537,9 +547,9 @@ class DataExporter:
                         f.write(f"  {key}: {value}\n")
                     f.write("\n")
             
-            logger.info(f"Exported {len(data)} records to TXT: {file_path}")
+            logger.info(f"Exported {len(data)} records to TXT: {safe_path}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to export to TXT: {e}")
             return False

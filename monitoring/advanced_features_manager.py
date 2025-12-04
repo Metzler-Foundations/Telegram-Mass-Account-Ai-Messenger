@@ -38,23 +38,29 @@ class AdvancedFeaturesManager:
         Args:
             enabled_features: List of features to enable. None = enable all.
                 Options: 'intelligence', 'engagement', 'discovery', 'status',
-                        'shadowban', 'network', 'competitor', 'media', 'scheduler'
+                        'shadowban', 'recovery', 'network', 'competitor', 'media',
+                        'scheduler'
         """
         self.state_file = Path("advanced_features_state.json")
         state = self._load_state()
 
         self.enabled_features = enabled_features or state.get('enabled_features') or [
             'intelligence', 'engagement', 'discovery', 'status',
-            'shadowban', 'network', 'competitor', 'media', 'scheduler'
+            'shadowban', 'recovery', 'network', 'competitor', 'media', 'scheduler'
         ]
 
+        self.timezone_detection_error: Optional[str] = None
         self.timezone_preference = state.get('timezone') or self._load_timezone_preference()
         if not self.timezone_preference:
             try:
                 timezone = datetime.now().astimezone().tzinfo
                 self.timezone_preference = getattr(timezone, "key", None) or getattr(timezone, "zone", None) or "UTC"
-            except Exception:
+            except Exception as exc:
                 self.timezone_preference = "UTC"
+                self.timezone_detection_error = f"Failed to detect timezone automatically: {exc}"
+                logger.warning(self.timezone_detection_error)
+        if not self.timezone_detection_error and self.timezone_preference == "UTC":
+            self.timezone_detection_error = "Timezone detection unavailable; defaulted to UTC"
         
         logger.info(f"Initializing Advanced Features Manager with: {self.enabled_features}")
         
@@ -64,7 +70,7 @@ class AdvancedFeaturesManager:
         self.group_discovery = GroupDiscoveryEngine() if 'discovery' in self.enabled_features else None
         self.status_tracker = StatusIntelligence() if 'status' in self.enabled_features else None
         self.shadowban = ShadowBanDetector() if 'shadowban' in self.enabled_features else None
-        self.recovery = RecoveryProtocol() if 'shadowban' in self.enabled_features else None
+        self.recovery = RecoveryProtocol() if 'recovery' in self.enabled_features or 'shadowban' in self.enabled_features else None
         self.network = NetworkAnalytics() if 'network' in self.enabled_features else None
         self.competitor = CompetitorIntelligence() if 'competitor' in self.enabled_features else None
         self.media = MediaIntelligence() if 'media' in self.enabled_features else None
@@ -216,7 +222,15 @@ class AdvancedFeaturesManager:
             self._persist_state(current_state)
             self.timezone_preference = timezone_name
         except Exception as exc:
-            logger.debug(f"Failed to persist timezone preference: {exc}")
+            self.timezone_detection_error = f"Failed to persist timezone preference: {exc}"
+            logger.warning(self.timezone_detection_error)
+
+    def get_timezone_status(self) -> Dict[str, Any]:
+        """Expose timezone preference and any detection errors for the UI layer."""
+        return {
+            "timezone": self.timezone_preference,
+            "error": self.timezone_detection_error,
+        }
     
     # === Status & Timing Features ===
     

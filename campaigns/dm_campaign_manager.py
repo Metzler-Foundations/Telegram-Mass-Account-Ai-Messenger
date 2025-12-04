@@ -437,7 +437,8 @@ class DMCampaignManager:
         # Message tracking for diversity analysis
         self.messages_sent_today: Dict[str, List[str]] = {}  # account -> messages
         self.account_risk_alerts: Dict[str, List[str]] = {}  # account -> alerts
-        
+        self._messages_have_variant = False
+
         # Campaign scheduler
         self.scheduler = CampaignScheduler(self)
         
@@ -524,6 +525,7 @@ class DMCampaignManager:
                     sent_at TIMESTAMP,
                     error_message TEXT,
                     retry_count INTEGER DEFAULT 0,
+                    template_variant TEXT,
                     FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
                 )
             ''')
@@ -540,12 +542,31 @@ class DMCampaignManager:
             conn.execute('CREATE INDEX IF NOT EXISTS idx_messages_user ON campaign_messages(user_id)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_messages_sent_at ON campaign_messages(sent_at DESC)')
             conn.execute('CREATE INDEX IF NOT EXISTS idx_messages_account ON campaign_messages(account_phone)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_messages_variant ON campaign_messages(template_variant)')
 
-            # Composite indexes for complex queries
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_messages_campaign_status ON campaign_messages(campaign_id, status)')
-            conn.execute('CREATE INDEX IF NOT EXISTS idx_campaign_status_created ON campaigns(status, created_at DESC)')
-            
-            conn.commit()
+            self._ensure_message_schema(conn)
+
+    def _ensure_message_schema(self, conn: sqlite3.Connection):
+        """Backfill missing columns for message analytics."""
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(campaign_messages)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        if "template_variant" not in columns:
+            try:
+                cursor.execute("ALTER TABLE campaign_messages ADD COLUMN template_variant TEXT")
+                conn.commit()
+                columns.add("template_variant")
+            except sqlite3.OperationalError as exc:
+                logger.warning(f"Failed to add template_variant column: {exc}")
+
+        self._messages_have_variant = "template_variant" in columns
+
+        # Composite indexes for complex queries
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_messages_campaign_status ON campaign_messages(campaign_id, status)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_campaign_status_created ON campaigns(status, created_at DESC)')
+
+        conn.commit()
     
     def create_campaign(self, name: str, template: str, target_member_ids: List[int],
                        account_ids: List[str], config: Dict = None,
@@ -736,6 +757,43 @@ class DMCampaignManager:
         self.active_campaigns[campaign.id] = campaign
         logger.info(f"Created campaign: {campaign.name} (ID: {campaign.id}), status: {initial_status.value}")
         return campaign
+
+    def _select_template_variant(self, campaign: Campaign, user_id: int) -> Tuple[str, str]:
+        """Select which template variant to send and return (template, label)."""
+        config = campaign.config or {}
+        variant_config = config.get('template_variants') or config.get('templates') or []
+
+        parsed_variants = []
+        for idx, entry in enumerate(variant_config):
+            if isinstance(entry, dict):
+                template_text = entry.get('template')
+                if not template_text:
+                    continue
+                label = entry.get('name') or entry.get('label') or f"variant_{idx + 1}"
+                try:
+                    weight = float(entry.get('weight', 1.0))
+                except (TypeError, ValueError):
+                    weight = 1.0
+                weight = max(weight, 0.0)
+                parsed_variants.append((template_text, label, weight))
+
+        if not parsed_variants:
+            default_label = config.get('template_label', 'default')
+            return campaign.template, default_label
+
+        total_weight = sum(v[2] for v in parsed_variants) or len(parsed_variants)
+        chooser = random.Random(user_id)
+        roll = chooser.uniform(0, total_weight)
+
+        cumulative = 0.0
+        for template_text, label, weight in parsed_variants:
+            cumulative += weight or 1.0
+            if roll <= cumulative:
+                return template_text, label
+
+        # Fallback to last variant if rounding issues occur
+        fallback_template, fallback_label, _ = parsed_variants[-1]
+        return fallback_template, fallback_label
     
     async def start_campaign(self, campaign_id: int) -> bool:
         """Start a campaign.
@@ -866,18 +924,36 @@ class DMCampaignManager:
                         # Get member data from cache (O(1) lookup)
                         member = member_cache.get(user_id)
 
+                        template_text, template_label = self._select_template_variant(campaign, user_id)
+
                         if not member:
                             logger.warning(f"Member {user_id} not found in database")
-                            self._record_message(campaign_id, user_id, account_phone, "", MessageStatus.INVALID_USER, "Member not found")
+                            self._record_message(
+                                campaign_id,
+                                user_id,
+                                account_phone,
+                                "",
+                                MessageStatus.INVALID_USER,
+                                "Member not found",
+                                template_variant=template_label,
+                            )
                             async with targets_lock:
                                 campaign.failed_count += 1
                             continue
 
                         # Render message
-                        message_text = MessageTemplateEngine.render(campaign.template, member)
+                        message_text = MessageTemplateEngine.render(template_text, member)
 
                         # Send message
-                        success = await self._send_message(client, campaign_id, user_id, account_phone, message_text, campaign)
+                        success = await self._send_message(
+                            client,
+                            campaign_id,
+                            user_id,
+                            account_phone,
+                            message_text,
+                            campaign,
+                            template_label,
+                        )
 
                         # Update campaign stats (thread-safe)
                         async with targets_lock:
@@ -939,7 +1015,8 @@ class DMCampaignManager:
             self.running_campaigns.discard(campaign_id)
     
     async def _send_message(self, client: Client, campaign_id: int, user_id: int,
-                           account_phone: str, message_text: str, campaign: Campaign) -> bool:
+                           account_phone: str, message_text: str, campaign: Campaign,
+                           template_variant: str) -> bool:
         """Send a message to a user with enhanced anti-detection.
         
         Returns:
@@ -949,8 +1026,15 @@ class DMCampaignManager:
         if len(message_text) > max_length:
             logger.warning(f"Message length {len(message_text)} exceeds platform max; trimming to {max_length}")
             message_text = message_text[:max_length]
-            self._record_message(campaign_id, user_id, account_phone, message_text,
-                               MessageStatus.FAILED, f"Message exceeded max length {max_length}")
+            self._record_message(
+                campaign_id,
+                user_id,
+                account_phone,
+                message_text,
+                MessageStatus.FAILED,
+                f"Message exceeded max length {max_length}",
+                template_variant=template_variant,
+            )
             return False
 
         # Check with anti-detection system first
@@ -959,8 +1043,15 @@ class DMCampaignManager:
             
             if not can_send:
                 logger.warning(f"Anti-detection blocked message from {account_phone}: {reason}")
-                self._record_message(campaign_id, user_id, account_phone, message_text,
-                                   MessageStatus.RATE_LIMITED, f"Anti-detection: {reason}")
+                self._record_message(
+                    campaign_id,
+                    user_id,
+                    account_phone,
+                    message_text,
+                    MessageStatus.RATE_LIMITED,
+                    f"Anti-detection: {reason}",
+                    template_variant=template_variant,
+                )
                 return False
             
             if delay > 0:
@@ -980,8 +1071,16 @@ class DMCampaignManager:
             self.messages_sent_today[account_phone].append(message_text)
             
             # Record success
-            self._record_message(campaign_id, user_id, account_phone, message_text,
-                               MessageStatus.SENT, None, datetime.now())
+            self._record_message(
+                campaign_id,
+                user_id,
+                account_phone,
+                message_text,
+                MessageStatus.SENT,
+                None,
+                datetime.now(),
+                template_variant,
+            )
             
             # Update rate limiter
             self._update_rate_limiter(account_phone)
@@ -1002,8 +1101,15 @@ class DMCampaignManager:
             
             await asyncio.sleep(wait_time + random.randint(5, 15))  # Add jitter
             
-            self._record_message(campaign_id, user_id, account_phone, message_text,
-                               MessageStatus.RATE_LIMITED, f"FloodWait: {wait_time}s")
+            self._record_message(
+                campaign_id,
+                user_id,
+                account_phone,
+                message_text,
+                MessageStatus.RATE_LIMITED,
+                f"FloodWait: {wait_time}s",
+                template_variant=template_variant,
+            )
             return False
             
         except (UserBlocked, UserPrivacyRestricted) as e:
@@ -1012,8 +1118,15 @@ class DMCampaignManager:
                 self._anti_detection_system.record_error(account_phone, type(e).__name__, str(e))
             
             status = MessageStatus.BLOCKED if isinstance(e, UserBlocked) else MessageStatus.PRIVACY_RESTRICTED
-            self._record_message(campaign_id, user_id, account_phone, message_text,
-                               status, str(e))
+            self._record_message(
+                campaign_id,
+                user_id,
+                account_phone,
+                message_text,
+                status,
+                str(e),
+                template_variant=template_variant,
+            )
             campaign.blocked_count += 1
             return False
             
@@ -1022,8 +1135,15 @@ class DMCampaignManager:
             if self._anti_detection_system:
                 self._anti_detection_system.record_error(account_phone, type(e).__name__, str(e))
             
-            self._record_message(campaign_id, user_id, account_phone, message_text,
-                               MessageStatus.INVALID_USER, str(e))
+            self._record_message(
+                campaign_id,
+                user_id,
+                account_phone,
+                message_text,
+                MessageStatus.INVALID_USER,
+                str(e),
+                template_variant=template_variant,
+            )
             return False
             
         except Exception as e:
@@ -1033,8 +1153,15 @@ class DMCampaignManager:
             if self._anti_detection_system:
                 self._anti_detection_system.record_error(account_phone, type(e).__name__, str(e))
             
-            self._record_message(campaign_id, user_id, account_phone, message_text,
-                               MessageStatus.FAILED, str(e))
+            self._record_message(
+                campaign_id,
+                user_id,
+                account_phone,
+                message_text,
+                MessageStatus.FAILED,
+                str(e),
+                template_variant=template_variant,
+            )
             return False
     
     async def _check_account_health(self, account_phone: str, campaign: Campaign):
@@ -1157,24 +1284,55 @@ class DMCampaignManager:
             self.rate_limiters[account_phone]['messages_sent'] += 1
             self.rate_limiters[account_phone]['messages_this_hour'] += 1
     
-    def _record_message(self, campaign_id: int, user_id: int, account_phone: Optional[str],
-                       message_text: str, status: MessageStatus, error_message: Optional[str] = None,
-                       sent_at: Optional[datetime] = None):
+    def _record_message(
+        self,
+        campaign_id: int,
+        user_id: int,
+        account_phone: Optional[str],
+        message_text: str,
+        status: MessageStatus,
+        error_message: Optional[str] = None,
+        sent_at: Optional[datetime] = None,
+        template_variant: str = "default",
+    ):
         """Record a message in the database."""
+        template_variant = template_variant or "default"
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute('''
-                INSERT INTO campaign_messages
-                (campaign_id, user_id, account_phone, message_text, status, sent_at, error_message)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                campaign_id,
-                user_id,
-                account_phone,
-                message_text,
-                status.value,
-                sent_at,
-                error_message
-            ))
+            if self._messages_have_variant:
+                conn.execute(
+                    '''
+                    INSERT INTO campaign_messages
+                    (campaign_id, user_id, account_phone, message_text, status, sent_at, error_message, template_variant)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (
+                        campaign_id,
+                        user_id,
+                        account_phone,
+                        message_text,
+                        status.value,
+                        sent_at,
+                        error_message,
+                        template_variant,
+                    ),
+                )
+            else:
+                conn.execute(
+                    '''
+                    INSERT INTO campaign_messages
+                    (campaign_id, user_id, account_phone, message_text, status, sent_at, error_message)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''',
+                    (
+                        campaign_id,
+                        user_id,
+                        account_phone,
+                        message_text,
+                        status.value,
+                        sent_at,
+                        error_message,
+                    ),
+                )
             conn.commit()
     
     def _mark_user_as_messaged(self, user_id: int, account_phone: str, campaign_id: int):
