@@ -275,3 +275,4 @@ class CostTrendChart(QWidget):
         except Exception as e:
             logger.error(f"Failed to refresh cost chart: {e}", exc_info=True)
 
+

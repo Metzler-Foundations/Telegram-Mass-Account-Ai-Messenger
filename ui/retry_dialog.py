@@ -282,3 +282,4 @@ def show_error_with_retry(
     result = dialog.exec()
     return result == QDialog.DialogCode.Accepted
 
+

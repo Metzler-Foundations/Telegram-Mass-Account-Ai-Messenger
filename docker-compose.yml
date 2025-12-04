@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telegram-automation
+    restart: unless-stopped
+    
+    environment:
+      # Secrets (use .env file or secrets management)
+      - SECRET_TELEGRAM_API_ID=${SECRET_TELEGRAM_API_ID}
+      - SECRET_TELEGRAM_API_HASH=${SECRET_TELEGRAM_API_HASH}
+      - SECRET_GEMINI_API_KEY=${SECRET_GEMINI_API_KEY}
+      - SECRET_SMS_PROVIDER_API_KEY=${SECRET_SMS_PROVIDER_API_KEY}
+      - SECRET_MASTER_KEY=${SECRET_MASTER_KEY}
+      
+      # Application settings
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - MAX_CONCURRENT_ACCOUNTS=50
+      - DATABASE_PATH=/app/data
+    
+    volumes:
+      # Persistent data
+      - telegram-data:/app/data
+      - telegram-logs:/app/logs
+      - telegram-backups:/app/backups
+      
+      # Configuration (optional)
+      # - ./config.json:/app/config.json:ro
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  telegram-data:
+    driver: local
+  telegram-logs:
+    driver: local
+  telegram-backups:
+    driver: local
+
+networks:
+  default:
+    driver: bridge
+

@@ -204,3 +204,4 @@ class RiskDistributionChart(QWidget):
         except Exception as e:
             logger.error(f"Failed to refresh risk chart: {e}", exc_info=True)
 
+

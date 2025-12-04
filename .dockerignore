@@ -1,0 +1,72 @@
+# Version control
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+
+# Databases (don't copy to image)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+
+# Backups
+backups/
+*.backup
+
+# Session files
+*.session
+*.session-journal
+
+# Encryption keys
+*.key
+*.key.secure
+encryption_key.bin*
+
+# Config with secrets
+config.json
+api_keys.json
+.secrets.encrypted
+
+# Test files
+tests/
+htmlcov/
+.coverage
+.pytest_cache/
+.tox/
+
+# Documentation (optional, include if needed)
+# *.md
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
