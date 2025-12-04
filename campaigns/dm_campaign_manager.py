@@ -48,6 +48,22 @@ except ImportError:
     ENHANCED_ANTI_DETECTION_AVAILABLE = False
     logger.warning("Enhanced anti-detection not available for campaigns")
 
+# Import delivery analytics
+try:
+    from campaigns.delivery_analytics import get_delivery_analytics
+    DELIVERY_ANALYTICS_AVAILABLE = True
+except ImportError:
+    DELIVERY_ANALYTICS_AVAILABLE = False
+    logger.warning("Delivery analytics not available")
+
+# Import risk monitor
+try:
+    from monitoring.account_risk_monitor import get_risk_monitor
+    RISK_MONITOR_AVAILABLE = True
+except ImportError:
+    RISK_MONITOR_AVAILABLE = False
+    logger.warning("Risk monitor not available")
+
 
 class CampaignStatus(Enum):
     """Campaign status enumeration."""
@@ -433,6 +449,24 @@ class DMCampaignManager:
                 logger.info("Enhanced anti-detection enabled for campaigns")
             except Exception as e:
                 logger.warning(f"Failed to initialize anti-detection: {e}")
+        
+        # Delivery analytics integration
+        self._delivery_analytics = None
+        if DELIVERY_ANALYTICS_AVAILABLE:
+            try:
+                self._delivery_analytics = get_delivery_analytics()
+                logger.info("✓ Delivery analytics enabled for campaigns")
+            except Exception as e:
+                logger.warning(f"Failed to initialize delivery analytics: {e}")
+        
+        # Risk monitoring integration
+        self._risk_monitor = None
+        if RISK_MONITOR_AVAILABLE:
+            try:
+                self._risk_monitor = get_risk_monitor()
+                logger.info("✓ Risk monitoring enabled for campaigns")
+            except Exception as e:
+                logger.warning(f"Failed to initialize risk monitor: {e}")
         
         # Message tracking for diversity analysis
         self.messages_sent_today: Dict[str, List[str]] = {}  # account -> messages
@@ -1017,11 +1051,53 @@ class DMCampaignManager:
     async def _send_message(self, client: Client, campaign_id: int, user_id: int,
                            account_phone: str, message_text: str, campaign: Campaign,
                            template_variant: str) -> bool:
-        """Send a message to a user with enhanced anti-detection.
+        """Send a message to a user with enhanced anti-detection and risk monitoring.
         
         Returns:
             True if sent successfully
         """
+        # Check account risk before sending
+        if self._risk_monitor:
+            try:
+                # Get FloodWait count from our tracking
+                floodwait_count = self._get_account_floodwait_count(account_phone)
+                
+                # Calculate current risk
+                risk_score = self._risk_monitor.calculate_risk_score(
+                    phone_number=account_phone,
+                    floodwaits_24h=floodwait_count,
+                    errors_24h=self.account_risk_alerts.get(account_phone, [])[:24].__len__() if account_phone in self.account_risk_alerts else 0,
+                    messages_1h=len([m for m in self.messages_sent_today.get(account_phone, [])]) if account_phone in self.messages_sent_today else 0,
+                    has_shadowban=False  # Would check shadowban detector
+                )
+                
+                # Save risk score
+                self._risk_monitor.save_risk_score(risk_score)
+                
+                # Block if should quarantine
+                if risk_score.should_quarantine:
+                    logger.critical(
+                        f"🚨 Account {account_phone} risk score {risk_score.overall_score} - "
+                        f"QUARANTINE RECOMMENDED. Blocking message send."
+                    )
+                    self._record_message(
+                        campaign_id, user_id, account_phone, message_text,
+                        MessageStatus.FAILED,
+                        f"Account quarantined (risk score: {risk_score.overall_score})",
+                        template_variant=template_variant
+                    )
+                    return False
+                
+                # Warn on high risk
+                if risk_score.overall_score > 60:
+                    logger.warning(
+                        f"⚠️ Account {account_phone} risk score {risk_score.overall_score} - "
+                        f"HIGH RISK. Recommendations: {'; '.join(risk_score.recommended_actions[:2])}"
+                    )
+                    
+            except Exception as e:
+                logger.debug(f"Could not check account risk: {e}")
+        
         max_length = campaign.config.get('max_message_length', 4096) if campaign and campaign.config else 4096
         if len(message_text) > max_length:
             logger.warning(f"Message length {len(message_text)} exceeds platform max; trimming to {max_length}")
@@ -1082,6 +1158,19 @@ class DMCampaignManager:
                 template_variant,
             )
             
+            # Record in delivery analytics for tracking
+            if self._delivery_analytics:
+                try:
+                    self._delivery_analytics.record_message_sent(
+                        message_id=sent.id if hasattr(sent, 'id') else 0,
+                        campaign_id=campaign_id,
+                        user_id=user_id,
+                        account_phone=account_phone,
+                        sent_at=datetime.now()
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not record delivery analytics: {e}")
+            
             # Update rate limiter
             self._update_rate_limiter(account_phone)
             
@@ -1091,13 +1180,26 @@ class DMCampaignManager:
             return True
             
         except FloodWait as e:
-            # Rate limited - record error and wait
+            # Rate limited - record error and wait with actionable guidance
             wait_time = e.value
-            logger.warning(f"Rate limited for {wait_time}s, waiting...")
             
-            # Record in anti-detection
+            # Provide actionable guidance to operators
+            guidance = self._get_floodwait_guidance(wait_time, account_phone)
+            logger.warning(
+                f"⚠️ FloodWait for account {account_phone}: {wait_time}s\n"
+                f"   Guidance: {guidance}"
+            )
+            
+            # Record in anti-detection with guidance
             if self._anti_detection_system:
-                self._anti_detection_system.record_error(account_phone, "FloodWait", str(e))
+                self._anti_detection_system.record_error(
+                    account_phone, 
+                    "FloodWait", 
+                    f"{str(e)} | Guidance: {guidance}"
+                )
+            
+            # Store FloodWait event for analytics and operator visibility
+            self._record_floodwait_event(account_phone, wait_time, campaign_id, guidance)
             
             await asyncio.sleep(wait_time + random.randint(5, 15))  # Add jitter
             
@@ -1107,7 +1209,7 @@ class DMCampaignManager:
                 account_phone,
                 message_text,
                 MessageStatus.RATE_LIMITED,
-                f"FloodWait: {wait_time}s",
+                f"FloodWait: {wait_time}s | {guidance}",
                 template_variant=template_variant,
             )
             return False
@@ -1627,4 +1729,201 @@ class DMCampaignManager:
             recurring=bool(row.get('recurring', 0)),
             recurrence_interval=row.get('recurrence_interval')
         )
+    
+    def _get_floodwait_guidance(self, wait_time: int, account_phone: str) -> str:
+        """
+        Provide actionable guidance based on FloodWait duration.
+        
+        Args:
+            wait_time: FloodWait duration in seconds
+            account_phone: Account that triggered the FloodWait
+            
+        Returns:
+            Actionable guidance string for operators
+        """
+        if wait_time < 60:
+            # Short wait - normal rate limiting
+            return (
+                "Short FloodWait (<1min). Normal rate limiting. "
+                "Consider increasing delays between messages or reducing concurrent accounts."
+            )
+        elif wait_time < 300:
+            # 1-5 minutes - moderate rate limiting
+            return (
+                f"Moderate FloodWait ({wait_time//60}min). "
+                "Account may be sending too fast. "
+                "Recommendation: Increase min_delay to 30-60s and reduce hourly limit."
+            )
+        elif wait_time < 3600:
+            # 5-60 minutes - significant rate limiting
+            return (
+                f"Significant FloodWait ({wait_time//60}min). "
+                f"Account {account_phone} hitting Telegram rate limits. "
+                "Recommendation: Pause campaign on this account for 1 hour, "
+                "reduce hourly message limit to 10-15, and increase delays to 120-300s."
+            )
+        elif wait_time < 86400:
+            # 1-24 hours - severe rate limiting
+            hours = wait_time // 3600
+            return (
+                f"⚠️ SEVERE FloodWait ({hours}h). "
+                f"Account {account_phone} may be at risk of ban. "
+                "Recommendation: Immediately pause all campaigns on this account, "
+                "review anti-detection settings, and consider account warmup protocol."
+            )
+        else:
+            # 24+ hours - critical
+            days = wait_time // 86400
+            return (
+                f"🚨 CRITICAL FloodWait ({days}d). "
+                f"Account {account_phone} is likely flagged and at high ban risk. "
+                "Recommendation: Quarantine account, stop all activity, "
+                "enable shadowban monitoring, and consider account rotation."
+            )
+    
+    def _record_floodwait_event(
+        self, 
+        account_phone: str, 
+        wait_time: int, 
+        campaign_id: int, 
+        guidance: str
+    ):
+        """
+        Record FloodWait event for analytics and operator visibility.
+        
+        Args:
+            account_phone: Account that triggered FloodWait
+            wait_time: FloodWait duration in seconds
+            campaign_id: Campaign ID
+            guidance: Actionable guidance message
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Ensure floodwait_events table exists
+                conn.execute('''
+                    CREATE TABLE IF NOT EXISTS floodwait_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        campaign_id INTEGER,
+                        account_phone TEXT NOT NULL,
+                        wait_time_seconds INTEGER NOT NULL,
+                        severity TEXT NOT NULL,
+                        guidance TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
+                    )
+                ''')
+                
+                # Create index for fast lookups
+                conn.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_floodwait_account 
+                    ON floodwait_events(account_phone, timestamp DESC)
+                ''')
+                
+                conn.execute('''
+                    CREATE INDEX IF NOT EXISTS idx_floodwait_campaign 
+                    ON floodwait_events(campaign_id, timestamp DESC)
+                ''')
+                
+                # Determine severity
+                if wait_time < 60:
+                    severity = "low"
+                elif wait_time < 300:
+                    severity = "moderate"
+                elif wait_time < 3600:
+                    severity = "high"
+                elif wait_time < 86400:
+                    severity = "severe"
+                else:
+                    severity = "critical"
+                
+                # Insert event
+                conn.execute('''
+                    INSERT INTO floodwait_events 
+                    (campaign_id, account_phone, wait_time_seconds, severity, guidance)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (campaign_id, account_phone, wait_time, severity, guidance))
+                
+                conn.commit()
+                logger.info(f"Recorded FloodWait event for {account_phone}: {severity} ({wait_time}s)")
+                
+        except Exception as e:
+            logger.error(f"Failed to record FloodWait event: {e}")
+    
+    def _get_account_floodwait_count(self, account_phone: str, hours: int = 24) -> int:
+        """Get FloodWait count for an account in the last N hours."""
+        try:
+            cutoff = datetime.now() - timedelta(hours=hours)
+            
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute('''
+                    SELECT COUNT(*) FROM floodwait_events
+                    WHERE account_phone = ? AND timestamp >= ?
+                ''', (account_phone, cutoff))
+                
+                return cursor.fetchone()[0] or 0
+        except Exception as e:
+            logger.debug(f"Could not get FloodWait count: {e}")
+            return 0
+    
+    def get_floodwait_history(
+        self, 
+        account_phone: Optional[str] = None, 
+        campaign_id: Optional[int] = None,
+        severity: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Get FloodWait history for analysis and operator review.
+        
+        Args:
+            account_phone: Filter by account (optional)
+            campaign_id: Filter by campaign (optional)
+            severity: Filter by severity level (optional)
+            limit: Maximum number of events to return
+            
+        Returns:
+            List of FloodWait events
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                
+                # Build query with filters
+                query = "SELECT * FROM floodwait_events WHERE 1=1"
+                params = []
+                
+                if account_phone:
+                    query += " AND account_phone = ?"
+                    params.append(account_phone)
+                
+                if campaign_id:
+                    query += " AND campaign_id = ?"
+                    params.append(campaign_id)
+                
+                if severity:
+                    query += " AND severity = ?"
+                    params.append(severity)
+                
+                query += " ORDER BY timestamp DESC LIMIT ?"
+                params.append(limit)
+                
+                cursor = conn.execute(query, params)
+                
+                events = []
+                for row in cursor:
+                    events.append({
+                        'id': row['id'],
+                        'campaign_id': row['campaign_id'],
+                        'account_phone': row['account_phone'],
+                        'wait_time_seconds': row['wait_time_seconds'],
+                        'severity': row['severity'],
+                        'guidance': row['guidance'],
+                        'timestamp': row['timestamp']
+                    })
+                
+                return events
+                
+        except Exception as e:
+            logger.error(f"Failed to get FloodWait history: {e}")
+            return []
 

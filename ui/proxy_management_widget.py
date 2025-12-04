@@ -931,6 +931,21 @@ class ProxyManagementWidget(QWidget):
             stats = self.proxy_pool_manager.get_proxy_stats()
             self.stats_widget.update_stats(stats)
             
+            # Check for backup errors and surface them
+            if hasattr(self.proxy_pool_manager, '_last_backup_error') and self.proxy_pool_manager._last_backup_error:
+                error_msg = self.proxy_pool_manager._last_backup_error
+                self._log(f"⚠️ Proxy backup error: {error_msg}")
+                # Show warning banner if backup failed recently (only once per error)
+                if not hasattr(self, '_last_shown_backup_error') or self._last_shown_backup_error != error_msg:
+                    self._last_shown_backup_error = error_msg
+                    from PyQt6.QtWidgets import QMessageBox
+                    QMessageBox.warning(
+                        self,
+                        "Proxy Backup Failure",
+                        f"Proxy database backup failed:\n{error_msg}\n\n"
+                        "Please check disk space and permissions."
+                    )
+            
             # Load current page (uses pagination)
             self.proxy_table.load_page()
             
@@ -1145,8 +1160,10 @@ class ProxyManagementWidget(QWidget):
             self._log("Cleanup complete")
 
     def _export_health_results(self):
-        """Export current proxy health data for audits."""
+        """Export current proxy health data for audits with optional encryption."""
         import csv
+        from PyQt6.QtWidgets import QMessageBox, QInputDialog
+        
         now = datetime.now().astimezone()
         timestamp = now.strftime('%Y%m%d_%H%M%S')
         tz_name = re.sub(r"[^A-Za-z0-9_.-]", "_", now.tzname() or "UTC")
@@ -1154,6 +1171,34 @@ class ProxyManagementWidget(QWidget):
         filepath = Path.cwd() / f"proxy_health_{safe_suffix}.csv"
 
         try:
+            # Ask if user wants encrypted export with full credentials
+            reply = QMessageBox.question(
+                self, 
+                "Export Options",
+                "Do you want to export with full credentials (encrypted)?\n\n"
+                "YES: Export with encrypted credentials (password protected)\n"
+                "NO: Export with redacted credentials (no password)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+            )
+            
+            if reply == QMessageBox.StandardButton.Cancel:
+                return
+                
+            include_credentials = reply == QMessageBox.StandardButton.Yes
+            encryption_password = None
+            
+            if include_credentials:
+                password, ok = QInputDialog.getText(
+                    self,
+                    "Encryption Password",
+                    "Enter a password to encrypt the export file:",
+                    echo=QInputDialog.EchoMode.Password
+                )
+                if not ok or not password:
+                    self.status_label.setText("Export cancelled - no password provided")
+                    return
+                encryption_password = password
+            
             proxies: List[Dict[str, Any]] = []
             if self.manual_mode or not self.proxy_pool_manager:
                 proxies = list(self.proxy_table.proxies.values())
@@ -1186,25 +1231,110 @@ class ProxyManagementWidget(QWidget):
                     return '*' * len(text)
                 return f"{text[0]}***{text[-1]}"
 
-            with open(filepath, 'w', newline='') as csvfile:
-                fieldnames = ['proxy_key', 'ip', 'port', 'protocol', 'username_redacted', 'password_redacted', 'status', 'score', 'latency_ms', 'last_tested', 'timezone']
+            # Write to temporary CSV
+            temp_filepath = filepath if not encryption_password else filepath.with_suffix('.csv.tmp')
+            
+            with open(temp_filepath, 'w', newline='') as csvfile:
+                if include_credentials:
+                    fieldnames = ['proxy_key', 'ip', 'port', 'protocol', 'username', 'password', 'status', 'score', 'latency_ms', 'last_tested', 'timezone']
+                else:
+                    fieldnames = ['proxy_key', 'ip', 'port', 'protocol', 'username_redacted', 'password_redacted', 'status', 'score', 'latency_ms', 'last_tested', 'timezone']
+                    
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
                 for proxy in proxies:
-                    writer.writerow({
-                        'proxy_key': proxy.get('proxy_key') or f"{proxy.get('ip')}:{proxy.get('port')}",
-                        'ip': proxy.get('ip'),
-                        'port': proxy.get('port'),
-                        'protocol': proxy.get('protocol'),
-                        'username_redacted': _redact(proxy.get('username')),
-                        'password_redacted': _redact(proxy.get('password')),
-                        'status': proxy.get('status'),
-                        'score': proxy.get('score'),
-                        'latency_ms': proxy.get('latency_ms'),
-                        'last_tested': proxy.get('last_tested') or proxy.get('last_check'),
-                        'timezone': tz_name
-                    })
+                    if include_credentials:
+                        writer.writerow({
+                            'proxy_key': proxy.get('proxy_key') or f"{proxy.get('ip')}:{proxy.get('port')}",
+                            'ip': proxy.get('ip'),
+                            'port': proxy.get('port'),
+                            'protocol': proxy.get('protocol'),
+                            'username': proxy.get('username', ''),
+                            'password': proxy.get('password', ''),
+                            'status': proxy.get('status'),
+                            'score': proxy.get('score'),
+                            'latency_ms': proxy.get('latency_ms'),
+                            'last_tested': proxy.get('last_tested') or proxy.get('last_check'),
+                            'timezone': tz_name
+                        })
+                    else:
+                        writer.writerow({
+                            'proxy_key': proxy.get('proxy_key') or f"{proxy.get('ip')}:{proxy.get('port')}",
+                            'ip': proxy.get('ip'),
+                            'port': proxy.get('port'),
+                            'protocol': proxy.get('protocol'),
+                            'username_redacted': _redact(proxy.get('username')),
+                            'password_redacted': _redact(proxy.get('password')),
+                            'status': proxy.get('status'),
+                            'score': proxy.get('score'),
+                            'latency_ms': proxy.get('latency_ms'),
+                            'last_tested': proxy.get('last_tested') or proxy.get('last_check'),
+                            'timezone': tz_name
+                        })
 
+            # Encrypt the file if password was provided
+            if encryption_password:
+                try:
+                    from cryptography.fernet import Fernet
+                    from cryptography.hazmat.primitives import hashes
+                    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+                    import base64
+                    
+                    # Read the CSV content
+                    with open(temp_filepath, 'rb') as f:
+                        csv_data = f.read()
+                    
+                    # Derive encryption key from password
+                    salt = b'proxy_export_salt_v1'  # Static salt for consistency
+                    kdf = PBKDF2(
+                        algorithm=hashes.SHA256(),
+                        length=32,
+                        salt=salt,
+                        iterations=100000,
+                    )
+                    key = base64.urlsafe_b64encode(kdf.derive(encryption_password.encode()))
+                    cipher = Fernet(key)
+                    
+                    # Encrypt the data
+                    encrypted_data = cipher.encrypt(csv_data)
+                    
+                    # Write encrypted file
+                    final_filepath = filepath.with_suffix('.enc')
+                    with open(final_filepath, 'wb') as f:
+                        f.write(encrypted_data)
+                    
+                    # Remove temporary file
+                    temp_filepath.unlink()
+                    filepath = final_filepath
+                    
+                    self._log(f"Exported {len(proxies)} proxies to encrypted file {filepath}")
+                    self.status_label.setText(f"Exported encrypted proxy data to {filepath.name}")
+                    
+                    QMessageBox.information(
+                        self,
+                        "Export Complete",
+                        f"Encrypted export saved to:\n{filepath}\n\n"
+                        "To decrypt, you'll need the password you provided.\n"
+                        "Keep this file secure!"
+                    )
+                    
+                except ImportError:
+                    # Cryptography not available, save unencrypted but warn
+                    logger.error("cryptography package not available for encryption")
+                    filepath = temp_filepath
+                    ErrorHandler.safe_warning(
+                        self,
+                        "Encryption Unavailable",
+                        "Could not encrypt export (cryptography package not installed).\n"
+                        "File saved unencrypted - handle with care!"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to encrypt export: {e}")
+                    # Clean up temp file
+                    if temp_filepath.exists():
+                        temp_filepath.unlink()
+                    raise
+            
             safe_path = filepath.resolve()
             try:
                 safe_path.relative_to(Path.cwd())
@@ -1212,8 +1342,10 @@ class ProxyManagementWidget(QWidget):
                 logger.warning("Export path escaped working directory; normalizing to current directory")
                 safe_path = Path.cwd() / filepath.name
 
-            self._log(f"Exported {len(proxies)} proxies to {safe_path}")
-            self.status_label.setText(f"Exported proxy health to {safe_path}")
+            if not encryption_password:
+                self._log(f"Exported {len(proxies)} proxies to {safe_path}")
+                self.status_label.setText(f"Exported proxy health to {safe_path}")
+                
         except Exception as exc:
             logger.error(f"Failed to export proxy health: {exc}")
             self.status_label.setText(f"Export failed: {str(exc)[:50]}")

@@ -339,6 +339,7 @@ class CampaignAnalyticsWidget(QWidget):
         super().__init__(parent)
         self.campaign_manager = campaign_manager
         self.selected_campaign_id = None
+        self._has_campaigns = False
         self.setup_ui()
         self.setup_timer()
     
@@ -354,6 +355,42 @@ class CampaignAnalyticsWidget(QWidget):
         header.addWidget(title)
         
         header.addStretch()
+        
+        # Empty state (initially hidden)
+        self.empty_state_frame = QFrame()
+        self.empty_state_frame.setStyleSheet("""
+            QFrame {
+                background-color: #2b2d31;
+                border-radius: 10px;
+                padding: 60px;
+            }
+        """)
+        empty_layout = QVBoxLayout(self.empty_state_frame)
+        
+        empty_icon = QLabel("📭")
+        empty_icon_font = QFont()
+        empty_icon_font.setPointSize(64)
+        empty_icon.setFont(empty_icon_font)
+        empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.addWidget(empty_icon)
+        
+        empty_title = QLabel("No Campaigns Yet")
+        empty_title_font = QFont()
+        empty_title_font.setPointSize(20)
+        empty_title_font.setBold(True)
+        empty_title.setFont(empty_title_font)
+        empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_title.setStyleSheet("color: #b5bac1; margin-top: 20px;")
+        empty_layout.addWidget(empty_title)
+        
+        self.empty_desc = QLabel("Create your first campaign to start tracking delivery and engagement metrics.")
+        self.empty_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_desc.setStyleSheet("color: #949ba4; font-size: 13px; margin-top: 10px;")
+        self.empty_desc.setWordWrap(True)
+        empty_layout.addWidget(self.empty_desc)
+        
+        empty_layout.addStretch()
+        self.empty_state_frame.setVisible(False)
         
         # Campaign selector
         header.addWidget(QLabel("Campaign:"))
@@ -373,6 +410,9 @@ class CampaignAnalyticsWidget(QWidget):
         header.addWidget(export_btn)
         
         layout.addLayout(header)
+        
+        # Add empty state widget to layout
+        layout.addWidget(self.empty_state_frame)
         
         # Summary cards
         summary_layout = QHBoxLayout()
@@ -557,17 +597,44 @@ class CampaignAnalyticsWidget(QWidget):
         self.campaign_selector.addItem("-- Select Campaign --", None)
         
         if not self.campaign_manager:
+            self._show_empty_state("Campaign manager not available. Check configuration.")
             return
         
         try:
             campaigns = self.campaign_manager.get_all_campaigns()
-            for campaign in campaigns:
-                self.campaign_selector.addItem(
-                    f"{campaign.name} ({campaign.status.value})",
-                    campaign.id
-                )
+            
+            if not campaigns or len(campaigns) == 0:
+                self._show_empty_state("No campaigns created yet. Create your first campaign to see analytics!")
+                self._has_campaigns = False
+            else:
+                self._hide_empty_state()
+                self._has_campaigns = True
+                for campaign in campaigns:
+                    self.campaign_selector.addItem(
+                        f"{campaign.name} ({campaign.status.value})",
+                        campaign.id
+                    )
         except Exception as e:
             logger.error(f"Failed to load campaigns: {e}")
+            self._show_empty_state(f"Error loading campaigns: {str(e)[:100]}")
+    
+    def _show_empty_state(self, message: str):
+        """Show empty state with custom message."""
+        self.empty_desc.setText(message)
+        self.empty_state_frame.setVisible(True)
+        
+        # Hide data widgets
+        for child in self.findChildren(QGroupBox):
+            if child != self.empty_state_frame:
+                child.setVisible(False)
+    
+    def _hide_empty_state(self):
+        """Hide empty state and show data widgets."""
+        self.empty_state_frame.setVisible(False)
+        
+        # Show data widgets
+        for child in self.findChildren(QGroupBox):
+            child.setVisible(True)
     
     def _on_campaign_selected(self, index: int):
         """Handle campaign selection."""

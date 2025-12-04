@@ -1,11 +1,11 @@
 {
   "telegram": {
-    "api_id": "38276957",
-    "api_hash": "bf6d3904316fce66946fb5c93188a972",
-    "phone_number": "+15407420394"
+    "api_id": null,
+    "api_hash": null,
+    "phone_number": null
   },
   "gemini": {
-    "api_key": "AIzaSyA7gM7p4ecuIIve9_hFLF2ENyZLYNCqpjI"
+    "api_key": null
   },
   "openai": {
     "api_key": ""
@@ -15,7 +15,7 @@
   },
   "sms_providers": {
     "provider": "daisysms",
-    "api_key": "j8ODu6TRJyyz1gCndy12yVYRcFh8Nd"
+    "api_key": null
   },
   "brain": {
     "prompt": "You are a helpful assistant. Respond naturally and helpfully to user messages.",

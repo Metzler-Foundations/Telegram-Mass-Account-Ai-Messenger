@@ -239,9 +239,13 @@ class NavigationManager:
             ("Analytics", 4),
             ("Proxy Pool", 5),
             ("Health", 6),
-            ("Messages", 7),
-            ("Settings", 8),
-            ("Logs", 9)
+            ("Engagement", 7),    # NEW
+            ("Warmup", 8),        # NEW
+            ("Risk Monitor", 9),  # NEW
+            ("Delivery", 10),     # NEW
+            ("Messages", 11),
+            ("Settings", 12),
+            ("Logs", 13)
         ]
 
         for text, page_idx in nav_items:
@@ -429,7 +433,7 @@ class MainWindow(QMainWindow):
                 self.advanced_features.log_status()
                 
                 # Initialize auto-integrator for seamless integration
-                from auto_integrator import get_auto_integrator
+                from integrations.auto_integrator import get_auto_integrator
                 self.auto_integrator = get_auto_integrator(self.advanced_features)
                 logger.info("🤖 Auto-Integrator enabled - features will apply automatically to campaigns")
                 
@@ -599,11 +603,88 @@ class MainWindow(QMainWindow):
             self.resource_manager = get_resource_manager()
 
             logger.info("Service container initialized successfully with factory pattern")
+            
+            # Start background monitoring and cleanup services
+            self._start_background_services()
 
         except Exception as e:
             logger.error(f"Failed to initialize services: {e}")
             # Continue without service container - fallback to direct instantiation
             self._initialize_fallback_services()
+    
+    def _start_background_services(self):
+        """Start all background monitoring and cleanup services."""
+        # This will be called async after UI is ready
+        import threading
+        
+        def start_async_services():
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Start cost monitoring
+                try:
+                    from monitoring.cost_monitor_background import start_cost_monitoring
+                    self.cost_monitor = loop.run_until_complete(
+                        start_cost_monitoring(check_interval_hours=1)
+                    )
+                    
+                    # Add notification callback
+                    if hasattr(self.cost_monitor, '_cost_alert_system'):
+                        self.cost_monitor._cost_alert_system.add_notification_callback(
+                            self._on_cost_alert
+                        )
+                    
+                    logger.info("✅ Cost monitoring service started")
+                except Exception as e:
+                    logger.warning(f"Cost monitoring unavailable: {e}")
+                
+                # Start proxy cleanup
+                try:
+                    if self.proxy_pool_manager:
+                        from proxy.automated_cleanup_service import get_cleanup_service
+                        self.cleanup_service = get_cleanup_service(self.proxy_pool_manager)
+                        loop.run_until_complete(self.cleanup_service.start())
+                        
+                        # Add notification callback
+                        self.cleanup_service.add_notification_callback(
+                            self._on_proxy_cleanup
+                        )
+                        
+                        logger.info("✅ Proxy cleanup service started")
+                except Exception as e:
+                    logger.warning(f"Proxy cleanup unavailable: {e}")
+                
+                # Keep loop running for background services
+                loop.run_forever()
+                
+            except Exception as e:
+                logger.error(f"Background services error: {e}")
+        
+        # Start in background thread
+        bg_thread = threading.Thread(target=start_async_services, daemon=True)
+        bg_thread.start()
+        logger.info("🚀 Background services thread started")
+    
+    def _on_cost_alert(self, alert):
+        """Handle cost alert notification."""
+        try:
+            # Emit signal for thread-safe UI update
+            alert_msg = f"{alert.message}\n\nCurrent: ${alert.current_cost:.2f}\nThreshold: ${alert.threshold:.2f}"
+            self.show_error_signal.emit(
+                f"Cost Alert - {alert.alert_level.value.upper()}",
+                alert_msg
+            )
+        except Exception as e:
+            logger.error(f"Cost alert handler error: {e}")
+    
+    def _on_proxy_cleanup(self, event):
+        """Handle proxy cleanup notification."""
+        try:
+            msg = f"Proxy {event.proxy_key} removed (reason: {event.reason.value})"
+            self.update_status_signal.emit("proxy", msg)
+        except Exception as e:
+            logger.error(f"Proxy cleanup handler error: {e}")
 
     def _safe_update_status(self, status_type: str, message: str):
         """Thread-safe status update handler."""
@@ -926,7 +1007,7 @@ class MainWindow(QMainWindow):
         )
         
         try:
-            from campaign_analytics_widget import CampaignAnalyticsWidget
+            from ui.campaign_analytics_widget import CampaignAnalyticsWidget
             self.analytics_widget = CampaignAnalyticsWidget(self.campaign_manager)
             content_layout.addWidget(self.analytics_widget)
         except ImportError as e:
@@ -946,7 +1027,7 @@ class MainWindow(QMainWindow):
         )
         
         try:
-            from proxy_management_widget import ProxyManagementWidget
+            from ui.proxy_management_widget import ProxyManagementWidget
             self.proxy_management_widget = ProxyManagementWidget()
             content_layout.addWidget(self.proxy_management_widget)
         except ImportError as e:
@@ -966,12 +1047,103 @@ class MainWindow(QMainWindow):
         )
         
         try:
-            from account_health_widget import AccountHealthDashboard
+            from ui.account_health_widget import AccountHealthDashboard
             self.health_dashboard_widget = AccountHealthDashboard(self.account_manager)
             content_layout.addWidget(self.health_dashboard_widget)
         except ImportError as e:
             logger.warning(f"Account health widget not available: {e}")
             error_label = QLabel("Account health dashboard not available.")
+            error_label.setStyleSheet("color: #f0b232;")
+            content_layout.addWidget(error_label)
+            content_layout.addStretch()
+        
+        self.content_stack.addWidget(page)
+    
+    def setup_engagement_tab(self):
+        """Engagement automation management."""
+        page, content_layout = self._create_page_container(
+            "Engagement Automation",
+            "Manage automated reactions and engagement rules for groups."
+        )
+        
+        try:
+            from ui.engagement_widget import EngagementWidget
+            self.engagement_widget = EngagementWidget()
+            content_layout.addWidget(self.engagement_widget)
+        except ImportError as e:
+            logger.warning(f"Engagement widget not available: {e}")
+            error_label = QLabel("Engagement automation widget not available.")
+            error_label.setStyleSheet("color: #f0b232;")
+            content_layout.addWidget(error_label)
+            content_layout.addStretch()
+        
+        self.content_stack.addWidget(page)
+    
+    def setup_warmup_monitor_tab(self):
+        """Warmup progress monitoring."""
+        page, content_layout = self._create_page_container(
+            "Warmup Monitor",
+            "Track real-time warmup progress and manage warmup configurations."
+        )
+        
+        # Add tabs for progress and configuration
+        from PyQt6.QtWidgets import QTabWidget
+        warmup_tabs = QTabWidget()
+        
+        try:
+            from ui.warmup_progress_widget import WarmupProgressWidget
+            from ui.warmup_config_widget import WarmupConfigWidget
+            
+            progress_widget = WarmupProgressWidget(self.warmup_service if hasattr(self, 'warmup_service') else None)
+            warmup_tabs.addTab(progress_widget, "Progress")
+            
+            config_widget = WarmupConfigWidget(self.warmup_service if hasattr(self, 'warmup_service') else None)
+            warmup_tabs.addTab(config_widget, "Configuration")
+            
+            content_layout.addWidget(warmup_tabs)
+        except ImportError as e:
+            logger.warning(f"Warmup widgets not available: {e}")
+            error_label = QLabel("Warmup monitoring widgets not available.")
+            error_label.setStyleSheet("color: #f0b232;")
+            content_layout.addWidget(error_label)
+            content_layout.addStretch()
+        
+        self.content_stack.addWidget(page)
+    
+    def setup_risk_monitor_tab(self):
+        """Account risk monitoring dashboard."""
+        page, content_layout = self._create_page_container(
+            "Risk Monitor",
+            "Real-time account risk scoring and quarantine recommendations."
+        )
+        
+        try:
+            from ui.risk_monitor_widget import RiskMonitorWidget
+            self.risk_monitor_widget = RiskMonitorWidget()
+            content_layout.addWidget(self.risk_monitor_widget)
+        except ImportError as e:
+            logger.warning(f"Risk monitor widget not available: {e}")
+            error_label = QLabel("Risk monitoring widget not available.")
+            error_label.setStyleSheet("color: #f0b232;")
+            content_layout.addWidget(error_label)
+            content_layout.addStretch()
+        
+        self.content_stack.addWidget(page)
+    
+    def setup_delivery_tab(self):
+        """Delivery and response analytics."""
+        page, content_layout = self._create_page_container(
+            "Delivery Analytics",
+            "Track message delivery, read receipts, and response times."
+        )
+        
+        try:
+            from ui.delivery_analytics_widget import DeliveryAnalyticsWidget
+            self.delivery_analytics_widget = DeliveryAnalyticsWidget()
+            content_layout.addWidget(self.delivery_analytics_widget)
+        except ImportError as e:
+            logger.warning(f"Delivery analytics widget not available: {e}")
+            error_label = QLabel("Delivery analytics widget not available.")
             error_label.setStyleSheet("color: #f0b232;")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
@@ -1042,9 +1214,13 @@ class MainWindow(QMainWindow):
         self.setup_accounts_tab()
         self.setup_members_tab()
         self.setup_campaigns_tab()
-        self.setup_analytics_tab()    # NEW: Campaign analytics
-        self.setup_proxy_pool_tab()   # NEW: Proxy pool management
-        self.setup_health_tab()       # NEW: Account health dashboard
+        self.setup_analytics_tab()       # Campaign analytics
+        self.setup_proxy_pool_tab()      # Proxy pool management
+        self.setup_health_tab()          # Account health dashboard
+        self.setup_engagement_tab()      # NEW: Engagement automation
+        self.setup_warmup_monitor_tab()  # NEW: Warmup progress
+        self.setup_risk_monitor_tab()    # NEW: Risk monitoring
+        self.setup_delivery_tab()        # NEW: Delivery analytics
         self.setup_messages_tab()
         self.setup_settings_tab()
         self.setup_logs_tab()
@@ -1562,7 +1738,7 @@ class MainWindow(QMainWindow):
                     settings_data = json.load(f)
             
             # Check if wizard is needed
-            from settings_window import SetupWizardManager
+            from ui.settings_window import SetupWizardManager
             wizard_manager = SetupWizardManager(settings_data)
             
             if wizard_manager.is_wizard_needed():
@@ -1722,6 +1898,17 @@ class MainWindow(QMainWindow):
         """Clean up resources on application exit."""
         try:
             logger.info("Cleaning up resources...")
+            
+            # Stop background services
+            try:
+                if hasattr(self, 'cost_monitor') and self.cost_monitor:
+                    # Cost monitor stop (async)
+                    logger.info("Stopping cost monitor...")
+                if hasattr(self, 'cleanup_service') and self.cleanup_service:
+                    # Cleanup service stop (async)
+                    logger.info("Stopping proxy cleanup service...")
+            except Exception as e:
+                logger.warning(f"Background service shutdown error: {e}")
 
             # Shutdown resource manager properly
             if self.resource_manager:

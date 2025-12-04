@@ -1629,6 +1629,14 @@ class ProxyPoolManager:
     
     async def _reassign_proxy(self, account_phone: str) -> Optional[Proxy]:
         """Reassign a new proxy to an account whose proxy died."""
+        # Check if proxy assignment is locked
+        if self.is_proxy_locked(account_phone):
+            logger.warning(
+                f"🔒 Cannot reassign proxy for {account_phone} - assignment is locked. "
+                "Unlock with unlock_proxy_assignment() if reassignment is needed."
+            )
+            return None
+        
         # Remove old assignment
         if account_phone in self.assigned_proxies:
             old_key = self.assigned_proxies[account_phone]
@@ -1647,17 +1655,108 @@ class ProxyPoolManager:
         
         return new_proxy
     
-    def _save_assignment(self, account_phone: str, proxy_key: str):
-        """Save proxy assignment to database."""
+    def _save_assignment(self, account_phone: str, proxy_key: str, is_locked: bool = False):
+        """Save proxy assignment to database with optional locking."""
         try:
             with sqlite3.connect(self.db_path) as conn:
+                # Add is_locked column if it doesn't exist
+                try:
+                    conn.execute('ALTER TABLE proxy_assignments ADD COLUMN is_locked INTEGER DEFAULT 0')
+                except sqlite3.OperationalError:
+                    pass  # Column already exists
+                
                 conn.execute('''
-                    INSERT OR REPLACE INTO proxy_assignments (account_phone, proxy_key, is_permanent)
-                    VALUES (?, ?, 1)
-                ''', (account_phone, proxy_key))
+                    INSERT OR REPLACE INTO proxy_assignments (account_phone, proxy_key, is_permanent, is_locked)
+                    VALUES (?, ?, 1, ?)
+                ''', (account_phone, proxy_key, 1 if is_locked else 0))
                 conn.commit()
         except Exception as e:
             logger.error(f"Failed to save assignment: {e}")
+    
+    async def lock_proxy_assignment(self, account_phone: str) -> bool:
+        """
+        Lock the current proxy assignment for an account to prevent reassignment.
+        
+        Useful for:
+        - Critical operations (warmup, campaigns)
+        - Long-running sessions
+        - Accounts requiring consistent IP
+        
+        Args:
+            account_phone: Phone number to lock assignment for
+            
+        Returns:
+            True if lock was successful
+        """
+        async with self._lock:
+            if account_phone not in self.assigned_proxies:
+                logger.warning(f"Cannot lock proxy - no assignment exists for {account_phone}")
+                return False
+            
+            proxy_key = self.assigned_proxies[account_phone]
+            
+            try:
+                with sqlite3.connect(self.db_path) as conn:
+                    # Add is_locked column if needed
+                    try:
+                        conn.execute('ALTER TABLE proxy_assignments ADD COLUMN is_locked INTEGER DEFAULT 0')
+                    except sqlite3.OperationalError:
+                        pass
+                    
+                    conn.execute('''
+                        UPDATE proxy_assignments
+                        SET is_locked = 1
+                        WHERE account_phone = ?
+                    ''', (account_phone,))
+                    conn.commit()
+                
+                logger.info(f"🔒 Locked proxy {proxy_key} for account {account_phone}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Failed to lock proxy assignment: {e}")
+                return False
+    
+    async def unlock_proxy_assignment(self, account_phone: str) -> bool:
+        """
+        Unlock proxy assignment for an account, allowing reassignment.
+        
+        Args:
+            account_phone: Phone number to unlock
+            
+        Returns:
+            True if unlock was successful
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute('''
+                    UPDATE proxy_assignments
+                    SET is_locked = 0
+                    WHERE account_phone = ?
+                ''', (account_phone,))
+                conn.commit()
+            
+            logger.info(f"🔓 Unlocked proxy assignment for account {account_phone}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to unlock proxy assignment: {e}")
+            return False
+    
+    def is_proxy_locked(self, account_phone: str) -> bool:
+        """Check if an account's proxy assignment is locked."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute('''
+                    SELECT is_locked FROM proxy_assignments
+                    WHERE account_phone = ?
+                ''', (account_phone,))
+                row = cursor.fetchone()
+                return bool(row['is_locked']) if row else False
+        except Exception as e:
+            logger.debug(f"Could not check lock status: {e}")
+            return False
     
     async def release_proxy(self, account_phone: str):
         """Release a proxy back to the pool."""

@@ -163,9 +163,13 @@ class SetupWizardManager:
             logger.error(f"Failed to mark wizard as complete: {e}")
 
     def save_step_progress(self, step: int, settings: Dict[str, Any]):
-        """Save progress after each successful step."""
+        """Save progress after each successful step with user-facing throttle feedback."""
         if not self._can_write_config():
-            return
+            # Throttled - provide user-facing feedback
+            logger.info("Progress save deferred due to rate limiting (prevents file corruption)")
+            # Note: We return a status indicator that can be used by the UI
+            # The actual save will happen on the next attempt after the throttle window
+            return False  # Indicates save was deferred
 
         try:
             progress_data = {
@@ -1739,7 +1743,19 @@ class SettingsWindow(QDialog):
         # Save progress after successful validation
         try:
             partial_settings = self.collect_ui_settings()
-            self.wizard_manager.save_step_progress(self.current_wizard_step, partial_settings)
+            save_result = self.wizard_manager.save_step_progress(self.current_wizard_step, partial_settings)
+            
+            # Provide user feedback if save was throttled
+            if save_result is False:
+                # Save was deferred due to throttling - show brief notification
+                if hasattr(self, 'status_label') and self.status_label:
+                    self.status_label.setText(
+                        "⏳ Progress save deferred (rate limit) - will save on next action"
+                    )
+                    self.status_label.setStyleSheet("color: #f0b232;")  # Warning color
+                    # Reset status after a moment
+                    from PyQt6.QtCore import QTimer
+                    QTimer.singleShot(3000, lambda: self.status_label.setText(""))
         except Exception as e:
             logger.warning(f"Failed to save progress: {e}")
         

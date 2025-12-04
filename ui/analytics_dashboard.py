@@ -81,6 +81,7 @@ class AnalyticsDashboard(QWidget):
         super().__init__(parent)
         self._last_refresh_at: Optional[datetime] = None
         self._min_refresh_interval = timedelta(seconds=5)
+        self._showing_empty_state = False
         self.setup_ui()
 
         # Auto-refresh every 30 seconds
@@ -104,7 +105,45 @@ class AnalyticsDashboard(QWidget):
         title.setFont(title_font)
         layout.addWidget(title)
         
-        # Scroll area
+        # Empty state widget (initially hidden)
+        from PyQt6.QtWidgets import QFrame
+        self.empty_state_widget = QFrame()
+        self.empty_state_widget.setStyleSheet("""
+            QFrame {
+                background-color: #2b2d31;
+                border-radius: 10px;
+                padding: 40px;
+            }
+        """)
+        empty_layout = QVBoxLayout(self.empty_state_widget)
+        
+        empty_icon = QLabel("📊")
+        empty_icon_font = QFont()
+        empty_icon_font.setPointSize(48)
+        empty_icon.setFont(empty_icon_font)
+        empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_layout.addWidget(empty_icon)
+        
+        empty_title = QLabel("No Data Available")
+        empty_title_font = QFont()
+        empty_title_font.setPointSize(18)
+        empty_title_font.setBold(True)
+        empty_title.setFont(empty_title_font)
+        empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        empty_title.setStyleSheet("color: #b5bac1; margin-top: 20px;")
+        empty_layout.addWidget(empty_title)
+        
+        self.empty_message = QLabel("Start by creating accounts and running campaigns to see analytics here.")
+        self.empty_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_message.setStyleSheet("color: #949ba4; font-size: 12px; margin-top: 10px;")
+        self.empty_message.setWordWrap(True)
+        empty_layout.addWidget(self.empty_message)
+        
+        empty_layout.addStretch()
+        self.empty_state_widget.setVisible(False)
+        layout.addWidget(self.empty_state_widget)
+        
+        # Scroll area (for actual data)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -162,6 +201,35 @@ class AnalyticsDashboard(QWidget):
         campaign_group.setLayout(campaign_layout)
         content_layout.addWidget(campaign_group)
         
+        # Template Variant Analytics (A/B Testing)
+        variant_group = QGroupBox("🧪 Template Variant Performance (A/B Testing)")
+        variant_layout = QVBoxLayout()
+        
+        # Info label
+        variant_info = QLabel("Performance breakdown by message template variant")
+        variant_info.setStyleSheet("color: #949ba4; font-size: 11px; margin-bottom: 5px;")
+        variant_layout.addWidget(variant_info)
+        
+        # Variant stats container - will be populated dynamically
+        from PyQt6.QtWidgets import QTextEdit
+        self.variant_stats_display = QTextEdit()
+        self.variant_stats_display.setReadOnly(True)
+        self.variant_stats_display.setMaximumHeight(150)
+        self.variant_stats_display.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1f22;
+                color: #b5bac1;
+                border: 1px solid #2b2d31;
+                border-radius: 5px;
+                padding: 10px;
+                font-family: monospace;
+            }
+        """)
+        variant_layout.addWidget(self.variant_stats_display)
+        
+        variant_group.setLayout(variant_layout)
+        content_layout.addWidget(variant_group)
+        
         # Member insights
         member_group = QGroupBox("👥 Member Insights")
         member_layout = QGridLayout()
@@ -218,6 +286,20 @@ class AnalyticsDashboard(QWidget):
             member_stats = self._safe_fetch(self.get_real_member_stats, self._empty_member_stats(), "member stats", errors)
             campaign_stats = self._safe_fetch(self.get_real_campaign_stats, self._empty_campaign_stats(), "campaign stats", errors)
             account_stats = self._safe_fetch(self.get_real_account_stats, self._empty_account_stats(), "account stats", errors)
+            
+            # Check if we have any real data
+            has_data = (
+                member_stats['total'] > 0 or 
+                campaign_stats['total'] > 0 or 
+                account_stats['total'] > 0
+            )
+            
+            # Show/hide empty state
+            if not has_data:
+                self._show_empty_state("No data available yet. Create accounts or campaigns to begin.")
+                return
+            else:
+                self._hide_empty_state()
 
             # Update overview cards
             self.total_members_card.set_value(
@@ -324,6 +406,23 @@ class AnalyticsDashboard(QWidget):
                 f"{avg_per_channel:.0f}",
                 "Members per channel"
             )
+            
+            # Update template variant analytics
+            if 'variant_breakdown' in campaign_stats and campaign_stats['variant_breakdown']:
+                variant_text = "Template Variant Performance:\n\n"
+                for variant, stats in sorted(campaign_stats['variant_breakdown'].items()):
+                    variant_text += f"📊 {variant}:\n"
+                    variant_text += f"   Total: {stats['total']:,} | "
+                    variant_text += f"Sent: {stats['sent']:,} | "
+                    variant_text += f"Failed: {stats['failed']:,} | "
+                    variant_text += f"Success: {stats['success_rate']:.1f}%\n\n"
+                self.variant_stats_display.setPlainText(variant_text)
+            else:
+                self.variant_stats_display.setPlainText(
+                    "No template variant data available yet.\n\n"
+                    "Template variants will appear here once campaigns with\n"
+                    "A/B testing are sent."
+                )
 
             # Update timestamp
             if errors:
@@ -461,7 +560,84 @@ class AnalyticsDashboard(QWidget):
         else:
             stats['completion_rate'] = 0
         
+        # Get template variant analytics
+        stats['variant_breakdown'] = self.get_template_variant_analytics()
+        
         return stats
+    
+    def _show_empty_state(self, message: str = "No data available"):
+        """Show empty state and hide data widgets."""
+        self._showing_empty_state = True
+        self.empty_message.setText(message)
+        self.empty_state_widget.setVisible(True)
+        
+        # Hide scroll area with data
+        for child in self.findChildren(QScrollArea):
+            child.setVisible(False)
+    
+    def _hide_empty_state(self):
+        """Hide empty state and show data widgets."""
+        self._showing_empty_state = False
+        self.empty_state_widget.setVisible(False)
+        
+        # Show scroll area with data
+        for child in self.findChildren(QScrollArea):
+            child.setVisible(True)
+    
+    def get_template_variant_analytics(self) -> Dict[str, Dict[str, int]]:
+        """Get analytics breakdown by template variant."""
+        try:
+            import sqlite3
+            conn = sqlite3.connect('campaigns.db')
+            conn.row_factory = sqlite3.Row
+            
+            # Query variant performance
+            cursor = conn.execute('''
+                SELECT 
+                    COALESCE(template_variant, 'default') as variant,
+                    status,
+                    COUNT(*) as count,
+                    AVG(CASE 
+                        WHEN status = 'sent' THEN 1.0
+                        ELSE 0.0
+                    END) as success_rate
+                FROM campaign_messages
+                WHERE template_variant IS NOT NULL OR status != 'pending'
+                GROUP BY COALESCE(template_variant, 'default'), status
+                ORDER BY variant, status
+            ''')
+            
+            variant_stats = {}
+            for row in cursor:
+                variant = row['variant']
+                status = row['status']
+                count = row['count']
+                
+                if variant not in variant_stats:
+                    variant_stats[variant] = {
+                        'total': 0,
+                        'sent': 0,
+                        'failed': 0,
+                        'blocked': 0,
+                        'pending': 0,
+                        'success_rate': 0.0
+                    }
+                
+                variant_stats[variant]['total'] += count
+                if status in variant_stats[variant]:
+                    variant_stats[variant][status] += count
+            
+            # Calculate success rates
+            for variant, stats in variant_stats.items():
+                if stats['total'] > 0:
+                    stats['success_rate'] = (stats['sent'] / stats['total']) * 100
+            
+            conn.close()
+            return variant_stats
+            
+        except Exception as e:
+            logger.error(f"Failed to get template variant analytics: {e}")
+            return {}
     
     def get_real_account_stats(self) -> Dict:
         """Get REAL account statistics from database."""

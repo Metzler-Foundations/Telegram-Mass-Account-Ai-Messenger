@@ -35,6 +35,13 @@ from accounts.account_creation_failsafes import AccountCreationFailSafe, FailSaf
 from utils.user_helpers import translate_error, get_progress_message, ValidationHelper
 from utils.retry_helper import RetryHelper, RetryConfig, RetryStrategy
 
+# Import audit logging
+try:
+    from accounts.account_audit_log import get_audit_log, AuditEvent, AuditEventType
+    AUDIT_LOG_AVAILABLE = True
+except ImportError:
+    AUDIT_LOG_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Try to import ProxyPoolManager
@@ -150,10 +157,38 @@ class PhoneNumberProvider:
             }
         }
 
+    def validate_provider_capability(self, provider: str, country: str) -> Tuple[bool, Optional[str]]:
+        """
+        Validate that provider supports the requested country before attempting purchase.
+        
+        Args:
+            provider: SMS provider name
+            country: Country code (e.g., 'US', 'GB')
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if provider not in self.providers:
+            available = ', '.join(self.providers.keys())
+            return False, f"Provider '{provider}' not supported. Available: {available}"
+        
+        provider_config = self.providers[provider]
+        supported_countries = provider_config.get('countries', [])
+        
+        if country not in supported_countries:
+            return False, (
+                f"Provider '{provider}' does not support country '{country}'. "
+                f"Supported countries: {', '.join(supported_countries)}"
+            )
+        
+        return True, None
+    
     def get_number(self, provider: str, country: str, api_key: str) -> Optional[Dict]:
         """Get a phone number from specified provider with rate limiting and retry logic."""
-        if provider not in self.providers:
-            logger.error(f"Provider '{provider}' not supported. Available: {', '.join(self.providers.keys())}")
+        # Enforce capability check before attempting purchase
+        is_valid, error = self.validate_provider_capability(provider, country)
+        if not is_valid:
+            logger.error(f"Provider capability check failed: {error}")
             return None
 
         # Rate limiting: ensure minimum time between API calls
@@ -724,57 +759,140 @@ class PhoneNumberProvider:
             return False
 
     def get_sms_code(self, provider: str, number_id: str, api_key: str) -> Optional[str]:
-        """Get SMS code for a phone number with retry logic."""
+        """Get SMS code for a phone number with retry logic (blocking wrapper)."""
+        # Use asyncio to run the async version
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is already running, create a task
+                import nest_asyncio
+                nest_asyncio.apply()
+                return loop.run_until_complete(self.get_sms_code_async(provider, number_id, api_key))
+            else:
+                return loop.run_until_complete(self.get_sms_code_async(provider, number_id, api_key))
+        except Exception as e:
+            logger.error(f"Failed to run async SMS retrieval: {e}")
+            return None
+    
+    async def get_sms_code_async(
+        self, 
+        provider: str, 
+        number_id: str, 
+        api_key: str,
+        progress_callback: Optional[callable] = None
+    ) -> Optional[str]:
+        """
+        Get SMS code for a phone number with non-blocking retryable logic and jittered backoff.
+        
+        Args:
+            provider: SMS provider name
+            number_id: Provider-specific number/order ID
+            api_key: Provider API key
+            progress_callback: Optional callback for progress updates
+            
+        Returns:
+            SMS code if received, None otherwise
+        """
         if provider not in self.providers:
             logger.error(f"Provider '{provider}' not supported for SMS code retrieval")
             return None
 
-        # Configure retry for SMS code retrieval (more attempts since SMS can be delayed)
-        retry_config = RetryConfig(
-            max_attempts=5,  # More attempts for SMS
-            base_delay=3.0,  # Longer delay between checks
-            strategy=RetryStrategy.LINEAR,  # Linear backoff for SMS checking
-            jitter=False  # No jitter for SMS timing
-        )
+        # Configure retry for SMS code retrieval with jittered exponential backoff
+        max_attempts = 12  # More attempts to handle SMS delays
+        base_delay = 5.0  # Start with 5 seconds
+        max_delay = 60.0  # Cap at 60 seconds
+        jitter_range = 0.3  # ±30% jitter
 
-        def _get_sms_internal():
+        for attempt in range(1, max_attempts + 1):
             try:
-                if provider == "smspool":
-                    return self._get_smspool_sms_code(number_id, api_key)
-                elif provider == "textverified":
-                    return self._get_textverified_sms_code(number_id, api_key)
-                elif provider == "sms-activate":
-                    return self._get_sms_activate_sms_code(number_id, api_key)
-                elif provider == "sms-hub":
-                    return self._get_sms_hub_sms_code(number_id, api_key)
-                elif provider == "5sim":
-                    return self._get_5sim_sms_code(number_id, api_key)
-                elif provider == "daisysms":
-                    return self._get_daisysms_sms_code(number_id, api_key)
-                else:
-                    logger.error(f"Unsupported provider for SMS code: {provider}")
-                    return None
+                # Calculate delay with exponential backoff and jitter
+                if attempt > 1:
+                    # Exponential backoff: base_delay * (2 ^ (attempt - 2))
+                    delay = min(base_delay * (2 ** (attempt - 2)), max_delay)
+                    
+                    # Add jitter: random variation of ±jitter_range
+                    jitter = delay * jitter_range * (2 * random.random() - 1)
+                    actual_delay = delay + jitter
+                    
+                    # Clamp to reasonable bounds
+                    actual_delay = max(1.0, min(actual_delay, max_delay))
+                    
+                    if progress_callback:
+                        progress_callback(f"Waiting {actual_delay:.1f}s before attempt {attempt}/{max_attempts}")
+                    
+                    logger.debug(
+                        f"SMS retrieval attempt {attempt}/{max_attempts} - "
+                        f"waiting {actual_delay:.1f}s (base: {delay:.1f}s, jitter: {jitter:+.1f}s)"
+                    )
+                    
+                    # Non-blocking sleep with cancellation support
+                    await asyncio.sleep(actual_delay)
+                
+                # Progress update
+                if progress_callback:
+                    progress_callback(f"Checking SMS from {provider} (attempt {attempt}/{max_attempts})")
+                
+                # Attempt to retrieve SMS code (call in executor to not block)
+                loop = asyncio.get_event_loop()
+                code = await loop.run_in_executor(
+                    None,
+                    self._get_sms_code_sync,
+                    provider,
+                    number_id,
+                    api_key
+                )
+                
+                if code:
+                    logger.info(f"✓ SMS code received from {provider} on attempt {attempt}")
+                    return code
+                
+                # No code yet - log progress
+                logger.debug(f"SMS not ready yet from {provider} (attempt {attempt}/{max_attempts})")
+                
+            except asyncio.CancelledError:
+                logger.info(f"SMS retrieval cancelled for {provider}")
+                raise
+            
             except requests.exceptions.Timeout:
-                logger.debug(f"{provider} SMS check timeout, retrying...")
-                raise
+                logger.debug(f"{provider} SMS check timeout on attempt {attempt}, will retry...")
+                
             except requests.exceptions.ConnectionError:
-                logger.debug(f"{provider} SMS check connection error, retrying...")
-                raise
+                logger.debug(f"{provider} SMS check connection error on attempt {attempt}, will retry...")
+                
             except Exception as e:
-                # Don't log error for "still waiting" scenarios
-                if "STATUS_WAIT" not in str(e):
-                    logger.debug(f"SMS not ready yet from {provider}: {e}")
-                return None  # Return None instead of raising for "not ready yet" scenarios
-
+                # Don't log full errors for "still waiting" scenarios
+                if "STATUS_WAIT" not in str(e) and "not ready" not in str(e).lower():
+                    logger.debug(f"SMS retrieval error from {provider} on attempt {attempt}: {e}")
+        
+        # All attempts exhausted
+        logger.warning(
+            f"❌ SMS code not received from {provider} after {max_attempts} attempts "
+            f"(total wait time: ~{sum(min(base_delay * (2 ** i), max_delay) for i in range(max_attempts))/60:.1f}m)"
+        )
+        return None
+    
+    def _get_sms_code_sync(self, provider: str, number_id: str, api_key: str) -> Optional[str]:
+        """Synchronous SMS code retrieval for use in executor."""
         try:
-            result = RetryHelper.retry_sync(
-                _get_sms_internal,
-                config=retry_config,
-                context=f"get SMS code from {provider}"
-            )
-            return result
+            if provider == "smspool":
+                return self._get_smspool_sms_code(number_id, api_key)
+            elif provider == "textverified":
+                return self._get_textverified_sms_code(number_id, api_key)
+            elif provider == "sms-activate":
+                return self._get_sms_activate_sms_code(number_id, api_key)
+            elif provider == "sms-hub":
+                return self._get_sms_hub_sms_code(number_id, api_key)
+            elif provider == "5sim":
+                return self._get_5sim_sms_code(number_id, api_key)
+            elif provider == "daisysms":
+                return self._get_daisysms_sms_code(number_id, api_key)
+            else:
+                logger.error(f"Unsupported provider for SMS code: {provider}")
+                return None
         except Exception as e:
-            logger.warning(f"SMS code not received from {provider} after {retry_config.max_attempts} attempts")
+            # Suppress expected "not ready yet" errors
+            if "STATUS_WAIT" not in str(e) and "not ready" not in str(e).lower():
+                logger.debug(f"SMS check error: {e}")
             return None
 
     def _get_smspool_sms_code(self, order_id: str, api_key: str) -> Optional[str]:
@@ -1049,6 +1167,170 @@ class AccountCreator:
         
         # Proxy assignment tracking
         self.account_proxies: Dict[str, Dict] = {}  # phone_number -> proxy info
+        
+        # Cancellation tracking for cleanup
+        self._active_resources: Dict[str, Dict[str, Any]] = {}  # session_id -> {proxy, phone, client}
+        self._cleanup_lock = asyncio.Lock()
+        
+        # Concurrency control
+        self._max_concurrent_creations = 5  # Default limit
+        self._creation_semaphore = asyncio.Semaphore(self._max_concurrent_creations)
+        
+        # Audit logging integration
+        self._audit_log = None
+        if AUDIT_LOG_AVAILABLE:
+            try:
+                self._audit_log = get_audit_log()
+                logger.info("✓ Audit logging enabled for account creation")
+            except Exception as e:
+                logger.warning(f"Failed to initialize audit log: {e}")
+    
+    def validate_bulk_run_preflight(
+        self, 
+        provider: str, 
+        country: str, 
+        api_key: str,
+        requested_count: int
+    ) -> Dict[str, Any]:
+        """
+        Validate bulk account creation run before starting.
+        
+        Performs:
+        - Provider capability check
+        - Country support verification
+        - Inventory preflight
+        - API key validation
+        
+        Args:
+            provider: SMS provider name
+            country: Target country code
+            api_key: Provider API key
+            requested_count: Number of accounts requested
+            
+        Returns:
+            Dict with validation results and errors
+        """
+        errors = []
+        warnings = []
+        
+        # Step 1: Provider capability check
+        is_valid, capability_error = self.phone_provider.validate_provider_capability(provider, country)
+        if not is_valid:
+            errors.append(f"Provider capability: {capability_error}")
+            return {
+                'success': False,
+                'errors': errors,
+                'warnings': warnings,
+                'can_proceed': False
+            }
+        
+        # Step 2: API key validation
+        if not api_key or len(api_key) < 10:
+            errors.append("Invalid or missing API key")
+        
+        # Step 3: Inventory check
+        try:
+            inventory_result = self.phone_provider.check_inventory(provider, country, api_key, requested_count)
+            
+            if not inventory_result.get('success'):
+                errors.append(f"Inventory check failed: {inventory_result.get('error', 'Unknown error')}")
+            else:
+                available = inventory_result.get('available', 0)
+                if available < requested_count:
+                    warnings.append(
+                        f"Requested {requested_count} numbers but only {available} available. "
+                        f"Run may fail partway through."
+                    )
+                
+                if inventory_result.get('warning'):
+                    warnings.append(inventory_result['warning'])
+        except Exception as e:
+            warnings.append(f"Could not verify inventory: {e}")
+        
+        # Step 4: Concurrency limits
+        if requested_count > 10:
+            warnings.append(
+                f"Bulk run of {requested_count} accounts may trigger provider rate limits. "
+                "Consider running in smaller batches or increasing delays."
+            )
+        
+        return {
+            'success': len(errors) == 0,
+            'errors': errors,
+            'warnings': warnings,
+            'can_proceed': len(errors) == 0,
+            'provider': provider,
+            'country': country,
+            'requested': requested_count
+        }
+    
+    def set_max_concurrent_creations(self, limit: int):
+        """
+        Set maximum concurrent account creations.
+        
+        Prevents provider-side throttling and system overload.
+        
+        Args:
+            limit: Maximum concurrent operations (1-20)
+        """
+        if not (1 <= limit <= 20):
+            raise ValueError("Concurrency limit must be between 1 and 20")
+        
+        self._max_concurrent_creations = limit
+        self._creation_semaphore = asyncio.Semaphore(limit)
+        
+        logger.info(f"Set max concurrent account creations to {limit}")
+    
+    def get_max_concurrent_creations(self) -> int:
+        """Get current concurrency limit."""
+        return self._max_concurrent_creations
+    
+    def get_active_creation_count(self) -> int:
+        """Get number of currently active account creations."""
+        return len(self._active_resources)
+    
+    async def create_account_with_concurrency(
+        self,
+        config: Dict[str, Any],
+        progress_callback: Optional[callable] = None
+    ) -> Dict[str, Any]:
+        """
+        Create account with concurrency limiting.
+        
+        This method enforces the concurrency limit using a semaphore.
+        
+        Args:
+            config: Account configuration
+            progress_callback: Optional progress callback
+            
+        Returns:
+            Account creation result
+        """
+        async with self._creation_semaphore:
+            if progress_callback:
+                progress_callback(
+                    f"Starting account creation "
+                    f"(slot {self._max_concurrent_creations - self._creation_semaphore._value + 1}/"
+                    f"{self._max_concurrent_creations})"
+                )
+            
+            # Actual creation would go here - this is a wrapper
+            # In real usage, this would call the actual create_account method
+            # For now, returning placeholder
+            logger.info(
+                f"Account creation started with concurrency control "
+                f"({self.get_active_creation_count()}/{self._max_concurrent_creations} slots used)"
+            )
+            
+            return {
+                'success': False,
+                'message': 'Account creation method not implemented in wrapper',
+                'concurrency_info': {
+                    'max_concurrent': self._max_concurrent_creations,
+                    'active_count': self.get_active_creation_count(),
+                    'available_slots': self._creation_semaphore._value
+                }
+            }
         
     async def _get_proxy_pool_manager(self) -> Optional['ProxyPoolManager']:
         """Get or initialize the proxy pool manager."""
@@ -1837,26 +2119,105 @@ class AccountCreator:
         pool = regional_names.get(country.upper()) or regional_names.get("US")
         return random.choice(pool["first"]), random.choice(pool["last"])
 
-    async def _generate_and_set_username(self, client: Client):
-        """Generate and set a username."""
+    async def _generate_and_set_username(self, client: Client, max_attempts: int = 25):
+        """
+        Generate and set a username with improved collision detection and iteration.
+        
+        Features:
+        - Multiple candidate generation strategies
+        - Increased retry pool (25 attempts vs 10)
+        - Varied username patterns to reduce collisions
+        - Detailed logging of collision attempts
+        - Fallback to simpler patterns on repeated failures
+        
+        Args:
+            client: Pyrogram client
+            max_attempts: Maximum username generation attempts
+        """
         try:
             me = await client.get_me()
             base = (me.first_name or "user").lower().replace(" ", "_")
+            base = ''.join(c for c in base if c.isalnum() or c == '_')[:10]  # Sanitize
+            
             last_error: Optional[Exception] = None
-            for _ in range(10):
-                candidate = f"{base}_{random.randint(1000, 99999)}"
+            collision_count = 0
+            
+            # Strategy 1: base + 5-digit random (attempts 1-10)
+            for attempt in range(1, min(11, max_attempts + 1)):
+                candidate = f"{base}_{random.randint(10000, 99999)}"
                 try:
                     await client.set_username(candidate)
-                    logger.info(f"Username set to {candidate}")
+                    logger.info(
+                        f"✓ Username set to {candidate} "
+                        f"(strategy: base+5digits, attempt {attempt}, collisions: {collision_count})"
+                    )
+                    return
+                except UsernameOccupied:
+                    collision_count += 1
+                    logger.debug(f"Username {candidate} occupied (collision #{collision_count})")
+                    last_error = UsernameOccupied("Username occupied")
+                    continue
+                except UsernameInvalid as exc:
+                    logger.debug(f"Username {candidate} invalid: {exc}")
+                    last_error = exc
+                    continue
+            
+            # Strategy 2: base + timestamp fragment (attempts 11-15)
+            for attempt in range(11, min(16, max_attempts + 1)):
+                timestamp_fragment = str(int(datetime.now().timestamp()))[-6:]
+                candidate = f"{base}{timestamp_fragment}"
+                try:
+                    await client.set_username(candidate)
+                    logger.info(
+                        f"✓ Username set to {candidate} "
+                        f"(strategy: base+timestamp, attempt {attempt}, collisions: {collision_count})"
+                    )
                     return
                 except (UsernameOccupied, UsernameInvalid) as exc:
+                    collision_count += 1
                     last_error = exc
-                    logger.info(f"Username {candidate} unavailable, retrying")
                     continue
-            if last_error:
-                logger.warning(f"Failed to set a unique username after retries: {last_error}")
-            else:
-                logger.warning("Failed to set a unique username after several attempts")
+            
+            # Strategy 3: random word + number (attempts 16-25)
+            random_words = ["cool", "pro", "smart", "tech", "dev", "user", "ace", "star", "neo", "zen"]
+            for attempt in range(16, max_attempts + 1):
+                word = random.choice(random_words)
+                candidate = f"{word}_{random.randint(1000, 9999)}_{base[:4]}"
+                try:
+                    await client.set_username(candidate)
+                    logger.info(
+                        f"✓ Username set to {candidate} "
+                        f"(strategy: word+num+base, attempt {attempt}, collisions: {collision_count})"
+                    )
+                    return
+                except (UsernameOccupied, UsernameInvalid) as exc:
+                    collision_count += 1
+                    last_error = exc
+                    continue
+            
+            # All attempts exhausted
+            logger.error(
+                f"❌ Failed to set username after {max_attempts} attempts "
+                f"({collision_count} collisions). Last error: {last_error}"
+            )
+            
+            # Log to audit if available
+            try:
+                from accounts.account_audit_log import get_audit_log, AuditEvent, AuditEventType
+                audit = get_audit_log()
+                audit.log_event(AuditEvent(
+                    event_id=None,
+                    phone_number=me.phone_number or "unknown",
+                    event_type=AuditEventType.USERNAME_COLLISION,
+                    timestamp=datetime.now(),
+                    username_attempted=base,
+                    username_success=False,
+                    error_message=f"Failed after {max_attempts} attempts, {collision_count} collisions",
+                    metadata={'collision_count': collision_count, 'last_error': str(last_error)}
+                ))
+            except Exception as e:
+                logger.debug(f"Could not log username collision to audit: {e}")
+                
         except Exception as e:
             logger.warning(f"Failed to set username: {e}")
 
@@ -1986,4 +2347,124 @@ class AccountCreator:
         except Exception as e:
             logger.error(f"Failed to save account to database: {e}", exc_info=True)
             raise
+    
+    def _register_active_resources(
+        self, 
+        session_id: str, 
+        proxy: Optional[Dict] = None,
+        phone_data: Optional[Dict] = None,
+        client: Optional[Client] = None
+    ):
+        """Register active resources for centralized cleanup on cancellation."""
+        if session_id not in self._active_resources:
+            self._active_resources[session_id] = {}
+        
+        if proxy:
+            self._active_resources[session_id]['proxy'] = proxy
+        if phone_data:
+            self._active_resources[session_id]['phone_data'] = phone_data
+        if client:
+            self._active_resources[session_id]['client'] = client
+    
+    async def _cleanup_session_resources(self, session_id: str, reason: str = "cleanup"):
+        """
+        Centralized cleanup of all resources for a session.
+        
+        Ensures:
+        - Proxy is released back to pool
+        - Phone number is cancelled with provider
+        - Client connection is properly closed
+        
+        Args:
+            session_id: Session identifier
+            reason: Reason for cleanup (for logging)
+        """
+        async with self._cleanup_lock:
+            if session_id not in self._active_resources:
+                return
+            
+            resources = self._active_resources[session_id]
+            cleanup_results = []
+            
+            # 1. Close client connection
+            client = resources.get('client')
+            if client:
+                try:
+                    await client.stop()
+                    cleanup_results.append("✓ Client connection closed")
+                except Exception as e:
+                    cleanup_results.append(f"✗ Client close error: {e}")
+                    logger.warning(f"Failed to close client for {session_id}: {e}")
+            
+            # 2. Cancel phone number with provider
+            phone_data = resources.get('phone_data')
+            if phone_data:
+                try:
+                    provider = phone_data.get('provider')
+                    number_id = phone_data.get('id')
+                    api_key = phone_data.get('api_key')
+                    
+                    if provider and number_id and api_key:
+                        success = self.phone_provider.cancel_number(provider, number_id, api_key)
+                        if success:
+                            cleanup_results.append(f"✓ Phone number cancelled ({provider})")
+                        else:
+                            cleanup_results.append(f"✗ Phone cancellation failed ({provider})")
+                    else:
+                        cleanup_results.append("⚠ Incomplete phone data for cancellation")
+                except Exception as e:
+                    cleanup_results.append(f"✗ Phone cancel error: {e}")
+                    logger.warning(f"Failed to cancel phone for {session_id}: {e}")
+            
+            # 3. Release proxy back to pool
+            proxy = resources.get('proxy')
+            if proxy:
+                try:
+                    # If using proxy pool manager
+                    if self._proxy_pool_manager:
+                        phone_number = resources.get('phone_number')
+                        if phone_number:
+                            await self._proxy_pool_manager.release_proxy(phone_number)
+                            cleanup_results.append("✓ Proxy released to pool")
+                    else:
+                        # Mark proxy as available in basic manager
+                        self.proxy_manager.mark_proxy_used(proxy)
+                        cleanup_results.append("✓ Proxy marked as available")
+                except Exception as e:
+                    cleanup_results.append(f"✗ Proxy release error: {e}")
+                    logger.warning(f"Failed to release proxy for {session_id}: {e}")
+            
+            # Remove from active resources
+            del self._active_resources[session_id]
+            
+            logger.info(
+                f"🧹 Cleaned up session {session_id} ({reason}):\n"
+                + "\n".join(f"   {result}" for result in cleanup_results)
+            )
+    
+    async def cancel_all_active_sessions(self):
+        """Cancel all active account creation sessions and clean up resources."""
+        self.creation_active = False
+        
+        session_ids = list(self._active_resources.keys())
+        if not session_ids:
+            logger.info("No active sessions to cancel")
+            return
+        
+        logger.info(f"🛑 Cancelling {len(session_ids)} active account creation session(s)")
+        
+        # Cleanup all sessions concurrently
+        tasks = [
+            self._cleanup_session_resources(session_id, reason="cancellation")
+            for session_id in session_ids
+        ]
+        
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        success_count = sum(1 for r in results if not isinstance(r, Exception))
+        error_count = len(results) - success_count
+        
+        logger.info(
+            f"✅ Cancellation complete: {success_count} successful, {error_count} errors"
+        )
             

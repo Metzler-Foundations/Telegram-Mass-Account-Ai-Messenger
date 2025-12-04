@@ -30,6 +30,13 @@ from pyrogram.errors import (
     PhoneCodeExpired, BadRequest
 )
 
+# Import resumable scraping
+try:
+    from scraping.resumable_scraper import get_resumable_scraper_manager, ScrapingMethod, JobStatus
+    RESUMABLE_SCRAPING_AVAILABLE = True
+except ImportError:
+    RESUMABLE_SCRAPING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -4715,6 +4722,20 @@ class MemberScraper:
             admins_found = set()
             message_analysis = {}  # user_id -> {count, last_date}
             
+            # Initialize resumable scraping if available
+            resumable_manager = None
+            job_id = None
+            if RESUMABLE_SCRAPING_AVAILABLE:
+                try:
+                    import uuid
+                    resumable_manager = get_resumable_scraper_manager()
+                    job_id = f"scrape_{chat.id}_{uuid.uuid4().hex[:8]}"
+                    resumable_manager.create_job(job_id, channel_identifier)
+                    resumable_manager.update_job_status(job_id, JobStatus.IN_PROGRESS)
+                    logger.info(f"Created resumable scraping job: {job_id}")
+                except Exception as e:
+                    logger.debug(f"Could not initialize resumable scraping: {e}")
+            
             # METHOD 1: Get administrators (always filter these out)
             logger.info("🔍 Method 1: Scraping administrators...")
             try:
@@ -4725,6 +4746,19 @@ class MemberScraper:
                     await self._process_member(member, chat.id, is_admin=True, is_owner=(member.status == ChatMemberStatus.OWNER))
                     members_scraped += 1
                     await asyncio.sleep(0.1)
+                
+                # Save checkpoint
+                if resumable_manager and job_id:
+                    resumable_manager.save_checkpoint(
+                        job_id=job_id,
+                        method=ScrapingMethod.ADMINISTRATORS,
+                        members_scraped=len(admins_found),
+                        progress_percentage=10.0,
+                        channel_id=str(chat.id),
+                        channel_name=chat.title
+                    )
+                    resumable_manager.mark_method_completed(job_id, ScrapingMethod.ADMINISTRATORS)
+                    
             except Exception as e:
                 logger.warning(f"Could not get administrators: {e}")
 
@@ -4805,6 +4839,19 @@ class MemberScraper:
             safe_targets = self.db.get_safe_targets(str(chat.id))
             threats_filtered = stats['total_members'] - len(safe_targets)
 
+            # Mark scraping job as completed with final results
+            if resumable_manager and job_id:
+                try:
+                    resumable_manager.save_partial_results(job_id, list(self.scraped_user_ids))
+                    resumable_manager.update_job_status(
+                        job_id, 
+                        JobStatus.COMPLETED, 
+                        total_members=members_scraped
+                    )
+                    logger.info(f"✓ Scraping job {job_id} completed successfully")
+                except Exception as e:
+                    logger.warning(f"Could not finalize scraping job: {e}")
+
             return {
                 'success': True,
                 'channel_id': str(chat.id),
@@ -4812,17 +4859,34 @@ class MemberScraper:
                 'members_scraped': members_scraped,
                 'safe_targets': len(safe_targets),
                 'threats_filtered': threats_filtered,
-                'is_private': is_private
+                'is_private': is_private,
+                'job_id': job_id  # Return for resume capability
             }
 
         except Exception as e:
             logger.error(f"Error scraping channel {channel_identifier}: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            
+            # Save partial results on failure for resumable scraping
+            if resumable_manager and job_id:
+                try:
+                    # Save whatever we scraped before failure
+                    resumable_manager.save_partial_results(job_id, list(self.scraped_user_ids))
+                    resumable_manager.update_job_status(
+                        job_id,
+                        JobStatus.FAILED,
+                        error_message=str(e)
+                    )
+                    logger.info(f"✓ Saved partial results for failed job {job_id}")
+                except Exception as save_error:
+                    logger.warning(f"Could not save partial results: {save_error}")
+            
             partial = {
                 'success': False,
                 'error': str(e),
                 'members_scraped': locals().get('members_scraped', 0),
+                'job_id': job_id if 'job_id' in locals() else None,
                 'channel_id': str(chat.id) if 'chat' in locals() and chat else None,
                 'partial_results': {
                     'admins_found': list(locals().get('admins_found', [])),

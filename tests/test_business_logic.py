@@ -176,7 +176,7 @@ class TestCampaignService:
         errors = campaign_service.validate_campaign_data(campaign_data)
         assert 'Campaign cannot target more than 10,000 members' in errors
 
-    @patch('services.MessageTemplateEngine.validate_template')
+    @patch('campaigns.dm_campaign_manager.MessageTemplateEngine.validate_template')
     def test_create_campaign_success(self, mock_validate, campaign_service, campaign_repo_mock, member_service_mock):
         """Test successful campaign creation."""
         # Mock template validation
@@ -209,7 +209,7 @@ class TestCampaignService:
         assert 'metrics' in result
         campaign_repo_mock.create_campaign.assert_called_once()
 
-    @patch('services.MessageTemplateEngine.validate_template')
+    @patch('campaigns.dm_campaign_manager.MessageTemplateEngine.validate_template')
     def test_create_campaign_validation_failure(self, mock_validate, campaign_service):
         """Test campaign creation failure due to validation errors."""
         # Mock template validation
