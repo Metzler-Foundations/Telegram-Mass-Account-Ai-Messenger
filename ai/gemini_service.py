@@ -331,11 +331,18 @@ class GeminiService:
                 'max_output_tokens': RandomizationUtils.get_gemini_max_tokens(),
             }
 
-        # Generate response with anti-detection timeout
-        response = await asyncio.wait_for(
-            self.model.generate_content_async(context, generation_config=generation_config),
-            timeout=RandomizationUtils.get_api_timeout()
-        )
+        # Generate response with anti-detection timeout and error handling
+        try:
+            response = await asyncio.wait_for(
+                self.model.generate_content_async(context, generation_config=generation_config),
+                timeout=RandomizationUtils.get_api_timeout()
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Gemini API timeout for chat {chat_id}")
+            raise
+        except Exception as e:
+            logger.error(f"Gemini API error: {e}", exc_info=True)
+            raise
 
         # Record performance metrics
         response_time = time.time() - start_time
