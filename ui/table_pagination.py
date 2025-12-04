@@ -66,3 +66,4 @@ class TablePaginator(QWidget):
             self.current_page -= 1
             self.update_display()
 
+

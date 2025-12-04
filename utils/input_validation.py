@@ -517,3 +517,4 @@ def safe_sql_query(table: str, columns: List[str], where: Optional[Dict[str, Any
     return SQLQueryBuilder.build_select(table, columns, where)
 
 
+

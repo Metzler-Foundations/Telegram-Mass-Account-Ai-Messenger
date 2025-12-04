@@ -47,3 +47,4 @@ def validate_country(code: str) -> bool:
     """Validate country code."""
     return CountryValidator.validate(code)
 
+

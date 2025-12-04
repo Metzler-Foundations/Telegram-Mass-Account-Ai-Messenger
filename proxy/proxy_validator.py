@@ -49,3 +49,4 @@ def is_proxy_safe(response_text: str, headers: dict) -> bool:
     """Check if proxy response is safe."""
     return ProxyValidator.validate_response(response_text, headers)
 
+

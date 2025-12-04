@@ -32,3 +32,4 @@ class WebhookVerifier:
 def get_webhook_verifier(secret: str):
     return WebhookVerifier(secret.encode('utf-8'))
 
+

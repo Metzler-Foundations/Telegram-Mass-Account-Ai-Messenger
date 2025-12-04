@@ -70,3 +70,4 @@ def validate_session(session_path: str) -> bool:
     """Validate session file before use."""
     return SessionValidator.validate_session_file(session_path)
 
+

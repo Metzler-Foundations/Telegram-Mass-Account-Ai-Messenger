@@ -354,3 +354,4 @@ if __name__ == "__main__":
     data = SafeJSON.load_file('test.json', default={})
     print(f"File loaded: {data}")
 
+

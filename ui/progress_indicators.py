@@ -54,3 +54,4 @@ def run_with_progress(parent, title, message, func, *args, **kwargs):
     """Helper to run function with progress indicator."""
     return ProgressIndicator.show_progress(parent, title, message, func, *args, **kwargs)
 
+

@@ -451,3 +451,4 @@ if __name__ == "__main__":
     for m in manager.get_migration_history():
         print(f"  v{m['version']}: {m['name']} (applied: {m['applied_at']})")
 
+

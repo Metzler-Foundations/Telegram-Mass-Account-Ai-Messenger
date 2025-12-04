@@ -62,3 +62,4 @@ def get_csrf():
         _csrf = CSRFProtection()
     return _csrf
 
+

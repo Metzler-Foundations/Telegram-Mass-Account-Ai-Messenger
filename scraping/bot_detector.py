@@ -58,3 +58,4 @@ def filter_bot_accounts(members: list) -> list:
     """Remove bot accounts from member list."""
     return BotDetector.filter_bots(members)
 
+

@@ -45,3 +45,4 @@ async def resolve_dns(hostname: str) -> Optional[str]:
     """Resolve DNS without blocking."""
     return await AsyncDNSResolver.resolve_hostname(hostname)
 
+

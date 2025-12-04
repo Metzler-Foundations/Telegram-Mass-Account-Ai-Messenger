@@ -53,3 +53,4 @@ class LogRotationManager:
                 log_file.unlink()
                 logger.debug(f"Removed old log: {log_file}")
 
+

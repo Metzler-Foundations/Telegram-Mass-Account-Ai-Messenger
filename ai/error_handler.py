@@ -38,3 +38,4 @@ async def generate_with_fallback(client, prompt: str, fallback: str = None) -> s
     result = await GeminiErrorHandler.safe_generate(client, prompt)
     return result or fallback or "Hi there!"
 
+

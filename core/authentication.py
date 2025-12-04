@@ -498,3 +498,4 @@ if __name__ == "__main__":
     has_perm = auth.has_permission(session_id, Permission.CREATE_ACCOUNT)
     print(f"Has permission: {has_perm}")
 
+

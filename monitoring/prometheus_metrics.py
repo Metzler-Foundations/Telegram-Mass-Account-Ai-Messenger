@@ -45,3 +45,4 @@ def get_metrics():
         _metrics = MetricsCollector()
     return _metrics
 
+

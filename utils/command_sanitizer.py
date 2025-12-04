@@ -35,3 +35,4 @@ class CommandSanitizer:
         """Validate command is in whitelist."""
         return command in whitelist
 
+

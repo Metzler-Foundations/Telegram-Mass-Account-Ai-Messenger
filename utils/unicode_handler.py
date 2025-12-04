@@ -79,3 +79,4 @@ class UnicodeHandler:
                     continue
         return truncated
 
+

@@ -88,3 +88,4 @@ class TestPIIRedaction:
         assert "secret123" not in hashed
         assert "[HASH:" in hashed
 
+

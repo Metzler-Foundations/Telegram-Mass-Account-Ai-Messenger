@@ -91,3 +91,4 @@ class TestUsernameValidation:
         valid, result = UsernameValidator.validate("telegram")
         assert valid is False
 
+

@@ -88,3 +88,4 @@ class MediaValidator:
             logger.error(f"Failed to load image: {e}")
             return None
 
+

@@ -33,3 +33,4 @@ def add_search_to_table(table: QTableWidget, search_box: QLineEdit):
     """Add search capability to table."""
     return TableSearch(table, search_box)
 
+

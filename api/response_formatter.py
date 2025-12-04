@@ -61,3 +61,4 @@ def error_response(message, code="ERROR"):
     """Create error response."""
     return APIResponse.error(message, code)
 
+

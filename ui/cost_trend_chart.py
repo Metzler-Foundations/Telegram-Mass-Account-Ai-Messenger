@@ -276,3 +276,4 @@ class CostTrendChart(QWidget):
             logger.error(f"Failed to refresh cost chart: {e}", exc_info=True)
 
 
+

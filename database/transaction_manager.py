@@ -339,3 +339,4 @@ def atomic_transaction(connection, isolation_level: IsolationLevel = IsolationLe
     with tm.transaction(isolation_level):
         yield connection
 
+

@@ -46,3 +46,4 @@ class ConfirmationDialog:
         )
         return reply == QMessageBox.StandardButton.Yes
 
+

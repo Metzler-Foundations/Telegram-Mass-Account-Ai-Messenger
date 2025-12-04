@@ -47,3 +47,4 @@ def get_error_notifier():
         _error_notifier = ErrorNotifier()
     return _error_notifier
 
+

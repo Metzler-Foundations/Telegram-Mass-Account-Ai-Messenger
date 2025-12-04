@@ -70,3 +70,4 @@ def get_chart_renderer():
         _chart_renderer = ChartRenderer()
     return _chart_renderer
 
+

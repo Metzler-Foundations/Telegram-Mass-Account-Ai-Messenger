@@ -65,3 +65,4 @@ def safe_get_metric(data: Dict, key: str, default=0):
     """Get metric safely."""
     return SafeDashboard.get_metric(data, key, default)
 
+

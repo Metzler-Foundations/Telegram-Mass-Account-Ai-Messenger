@@ -71,3 +71,4 @@ def get_db_monitor(db_paths: list = None):
         _db_monitor = DatabaseMonitor(db_paths)
     return _db_monitor
 
+
