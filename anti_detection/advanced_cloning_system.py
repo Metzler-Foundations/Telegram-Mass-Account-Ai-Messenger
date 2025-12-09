@@ -793,7 +793,8 @@ class AdvancedCloningSystem:
             me = await client.get_me()
             current_bio = getattr(me, "bio", "") or ""
 
-            # Make a tiny, invisible change to bio (add/remove a space at end, or add invisible char)
+            # Make a tiny, invisible change to bio
+            # (add/remove a space at end, or add invisible char)
             # This resets the "last updated" timestamp without being noticeable
             if current_bio:
                 # Add a zero-width space at the end (invisible)

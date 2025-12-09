@@ -216,7 +216,8 @@ class IntelligentScheduler:
                 (cutoff_sent,),
             )
             cursor.execute(
-                "DELETE FROM scheduled_messages WHERE status IN ('pending','failed') AND scheduled_time < ?",
+                "DELETE FROM scheduled_messages WHERE status IN "
+                "('pending','failed') AND scheduled_time < ?",
                 (cutoff_pending,),
             )
             conn.commit()

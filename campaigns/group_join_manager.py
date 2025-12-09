@@ -44,7 +44,8 @@ class GroupJoinManager:
             hourly_count = len(self.hourly_joins.get(account_id, []))
             if hourly_count >= self.max_joins_per_hour:
                 logger.warning(
-                    f"Account {account_id} hit hourly limit: {hourly_count}/{self.max_joins_per_hour}"
+                    f"Account {account_id} hit hourly limit: "
+                    f"{hourly_count}/{self.max_joins_per_hour}"
                 )
                 # Calculate time until oldest join expires
                 if account_id in self.hourly_joins and self.hourly_joins[account_id]:
@@ -99,7 +100,10 @@ class GroupJoinManager:
             self.daily_joins[account_id].append(now)
 
             logger.debug(
-                f"Recorded group join for {account_id} (hourly: {len(self.hourly_joins[account_id])}/{self.max_joins_per_hour}, daily: {len(self.daily_joins[account_id])}/{self.max_joins_per_day})"
+                f"Recorded group join for {account_id} "
+                f"(hourly: {len(self.hourly_joins[account_id])}/"
+                f"{self.max_joins_per_hour}, daily: "
+                f"{len(self.daily_joins[account_id])}/{self.max_joins_per_day})"
             )
 
     async def wait_for_cooldown(self, account_id: str):

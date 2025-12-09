@@ -122,7 +122,11 @@ class TemplateTestDialog(QDialog):
             self.member_combo = QComboBox()
             self.member_combo.addItem("Custom test data", None)
             for _i, member in enumerate(self.members[:20]):  # Limit to first 20
-                display = f"{member.get('first_name', '')} {member.get('last_name', '')} (@{member.get('username', 'N/A')})"
+                display = (
+                    f"{member.get('first_name', '')} "
+                    f"{member.get('last_name', '')} "
+                    f"(@{member.get('username', 'N/A')})"
+                )
                 self.member_combo.addItem(display.strip(), member)
             self.member_combo.currentIndexChanged.connect(self.on_member_selected)
             test_layout.addRow("Use real member:", self.member_combo)

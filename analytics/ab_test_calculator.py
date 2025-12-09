@@ -141,7 +141,10 @@ class ABTestCalculator:
             if abs(improvement) < 5:
                 return "No significant difference. Both variants perform similarly."
             else:
-                return f"Trend suggests {abs(improvement):.1f}% difference but not statistically significant yet. Continue testing."
+                return (
+                    f"Trend suggests {abs(improvement):.1f}% difference but "
+                    f"not statistically significant yet. Continue testing."
+                )
 
         # Significant result
         if rate_b > rate_a:
@@ -149,7 +152,10 @@ class ABTestCalculator:
             return f"✅ Variant B wins! {improvement:.1f}% improvement (statistically significant)"
         elif rate_a > rate_b:
             decline = (rate_a - rate_b) / rate_a * 100
-            return f"✅ Variant A wins! Variant B performs {decline:.1f}% worse (statistically significant)"
+            return (
+                f"✅ Variant A wins! Variant B performs {decline:.1f}% worse "
+                f"(statistically significant)"
+            )
         else:
             return "Both variants perform identically."
 
