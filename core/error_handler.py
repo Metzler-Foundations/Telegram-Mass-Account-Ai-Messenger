@@ -3,19 +3,69 @@ Error Handler - User-friendly error messages with actionable guidance.
 """
 
 import logging
-from typing import Dict, Any, Optional
-from PyQt6.QtWidgets import (
-    QMessageBox,
-    QWidget,
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTextEdit,
-    QApplication,
-)
-from PyQt6.QtCore import Qt
+from typing import Dict, Any, Optional, TYPE_CHECKING
+
+# Make PyQt6 imports optional for headless environments (CI, testing)
+try:
+    from PyQt6.QtWidgets import (
+        QMessageBox,
+        QWidget,
+        QDialog,
+        QVBoxLayout,
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
+        QTextEdit,
+        QApplication,
+    )
+    from PyQt6.QtCore import Qt
+    PYQT6_AVAILABLE = True
+except ImportError:
+    # PyQt6 not available (headless environment)
+    PYQT6_AVAILABLE = False
+    # Create dummy types for type checking
+    if TYPE_CHECKING:
+        from PyQt6.QtWidgets import (
+            QMessageBox,
+            QWidget,
+            QDialog,
+            QVBoxLayout,
+            QHBoxLayout,
+            QLabel,
+            QPushButton,
+            QTextEdit,
+            QApplication,
+        )
+        from PyQt6.QtCore import Qt
+    else:
+        # Create minimal mock classes for runtime
+        class QWidget:
+            pass
+
+        class QDialog:
+            pass
+
+        class QMessageBox:
+            class Icon:
+                Information = 1
+                Warning = 2
+                Critical = 3
+                Question = 4
+
+            class StandardButton:
+                Ok = 1
+                Yes = 2
+                No = 4
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def exec(self):
+                return 0
+
+        class Qt:
+            class WindowModality:
+                ApplicationModal = 1
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +239,21 @@ class ErrorHandler:
     @staticmethod
     def show_error(parent: Optional[QWidget], error_type: str, details: str = ""):
         """Show a user-friendly error dialog with actionable guidance and copyable text."""
+        if not PYQT6_AVAILABLE:
+            # In headless environments, just log the error
+            error_info = ErrorHandler.ERROR_MESSAGES.get(
+                error_type,
+                {
+                    "title": "Error",
+                    "message": f"An unexpected error occurred: {details}",
+                    "solutions": ["Please check the logs for more details or contact support."],
+                },
+            )
+            logger.error(f"{error_info['title']}: {error_info['message']}")
+            if details:
+                logger.error(f"Technical details: {details}")
+            return
+
         if error_type not in ErrorHandler.ERROR_MESSAGES:
             error_info = {
                 "title": "Error",
@@ -258,6 +323,9 @@ class ErrorHandler:
     @staticmethod
     def _copy_to_clipboard(text: str):
         """Copy text to clipboard."""
+        if not PYQT6_AVAILABLE:
+            logger.debug(f"Clipboard copy requested (headless mode): {text[:50]}...")
+            return
         clipboard = QApplication.clipboard()
         if clipboard:
             clipboard.setText(text)
@@ -266,11 +334,17 @@ class ErrorHandler:
     @staticmethod
     def show_success(parent: Optional[QWidget], title: str, message: str):
         """Show a success message with positive reinforcement."""
+        if not PYQT6_AVAILABLE:
+            logger.info(f"{title}: {message}")
+            return
         ErrorHandler.safe_message_box(parent, QMessageBox.Icon.Information, title, message)
 
     @staticmethod
     def show_confirmation(parent: Optional[QWidget], title: str, message: str) -> bool:
         """Show a confirmation dialog and return user's choice."""
+        if not PYQT6_AVAILABLE:
+            logger.warning(f"{title}: {message} (headless mode, defaulting to False)")
+            return False
         # Create message box without auto-parent binding that can cause app closure
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Icon.Question)
@@ -296,6 +370,15 @@ class ErrorHandler:
         This method creates a standalone message box that won't trigger
         the closure of parent dialogs when dismissed.
         """
+        if not PYQT6_AVAILABLE:
+            log_level = logging.INFO
+            if icon == QMessageBox.Icon.Warning:
+                log_level = logging.WARNING
+            elif icon == QMessageBox.Icon.Critical:
+                log_level = logging.ERROR
+            logger.log(log_level, f"{title}: {message}")
+            return QMessageBox.StandardButton.Ok
+
         msg_box = QMessageBox()
         msg_box.setIcon(icon)
         msg_box.setWindowTitle(title)
