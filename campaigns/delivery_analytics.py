@@ -371,9 +371,12 @@ class DeliveryAnalytics:
                     """
                     SELECT
                         COUNT(*) as total_sent,
-                        SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) as total_delivered,
-                        SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) as total_read,
-                        SUM(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) as total_replied,
+                        SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) """
+                        """as total_delivered,
+                        SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) """
+                        """as total_read,
+                        SUM(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) """
+                        """as total_replied,
                         AVG(delivery_time_seconds) as avg_delivery,
                         AVG(read_time_seconds) as avg_read,
                         AVG(response_time_seconds) as avg_response
@@ -417,9 +420,21 @@ class DeliveryAnalytics:
                 conn.execute(
                     """
                     INSERT INTO campaign_response_stats
-                    (campaign_id, total_sent, total_delivered, total_read, total_replied,
-                     avg_delivery_time_seconds, avg_read_time_seconds, avg_response_time_seconds,
-                     median_response_time_seconds, delivery_rate, read_rate, response_rate, updated_at)
+                    (
+                        campaign_id,
+                        total_sent,
+                        total_delivered,
+                        total_read,
+                        total_replied,
+                        avg_delivery_time_seconds,
+                        avg_read_time_seconds,
+                        avg_response_time_seconds,
+                        median_response_time_seconds,
+                        delivery_rate,
+                        read_rate,
+                        response_rate,
+                        updated_at,
+                    )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(campaign_id) DO UPDATE SET
                         total_sent = excluded.total_sent,
@@ -493,9 +508,12 @@ class DeliveryAnalytics:
                     """
                     SELECT
                         COUNT(*) as total_sent,
-                        SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) as total_delivered,
-                        SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) as total_read,
-                        SUM(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) as total_replied,
+                        SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) """
+                        """as total_delivered,
+                        SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) """
+                        """as total_read,
+                        SUM(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) """
+                        """as total_replied,
                         AVG(delivery_time_seconds) as avg_delivery,
                         AVG(read_time_seconds) as avg_read,
                         AVG(response_time_seconds) as avg_response

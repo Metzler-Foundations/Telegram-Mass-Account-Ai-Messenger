@@ -625,7 +625,8 @@ class DMCampaignManager:
                 "CREATE INDEX IF NOT EXISTS idx_campaign_created_at ON campaigns(created_at DESC)"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_campaign_scheduled_start ON campaigns(scheduled_start)"
+                "CREATE INDEX IF NOT EXISTS idx_campaign_scheduled_start ON "
+                "campaigns(scheduled_start)"
             )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_campaign_account ON campaigns(account_ids)"
@@ -644,10 +645,12 @@ class DMCampaignManager:
                 "CREATE INDEX IF NOT EXISTS idx_messages_sent_at ON campaign_messages(sent_at DESC)"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_messages_account ON campaign_messages(account_phone)"
+                "CREATE INDEX IF NOT EXISTS idx_messages_account ON "
+                "campaign_messages(account_phone)"
             )
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_messages_variant ON campaign_messages(template_variant)"
+                "CREATE INDEX IF NOT EXISTS idx_messages_variant ON "
+                "campaign_messages(template_variant)"
             )
 
             self._ensure_message_schema(conn)
@@ -670,10 +673,12 @@ class DMCampaignManager:
 
         # Composite indexes for complex queries
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_messages_campaign_status ON campaign_messages(campaign_id, status)"
+            "CREATE INDEX IF NOT EXISTS idx_messages_campaign_status ON "
+            "campaign_messages(campaign_id, status)"
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_campaign_status_created ON campaigns(status, created_at DESC)"
+            "CREATE INDEX IF NOT EXISTS idx_campaign_status_created ON "
+            "campaigns(status, created_at DESC)"
         )
 
         conn.commit()
@@ -720,7 +725,8 @@ class DMCampaignManager:
                 raise ValueError("Campaign name must be between 3 and 100 characters")
             if not name.replace(" ", "").replace("-", "").replace("_", "").isalnum():
                 raise ValueError(
-                    "Campaign name can only contain letters, numbers, spaces, hyphens, and underscores"
+                    "Campaign name can only contain letters, numbers, spaces, "
+                    "hyphens, and underscores"
                 )
 
             # Validate template
@@ -844,9 +850,23 @@ class DMCampaignManager:
             cursor = conn.execute(
                 """
                 INSERT INTO campaigns
-                (name, template, status, target_channel_id, target_member_ids, account_ids,
-                 total_targets, rate_limit_delay, max_messages_per_hour, max_messages_per_account, config,
-                 scheduled_start, scheduled_end, active_hours_start, active_hours_end, active_days,
+                (
+                    name,
+                    template,
+                    status,
+                    target_channel_id,
+                    target_member_ids,
+                    account_ids,
+                    total_targets,
+                    rate_limit_delay,
+                    max_messages_per_hour,
+                    max_messages_per_account,
+                    config,
+                    scheduled_start,
+                    scheduled_end,
+                    active_hours_start,
+                    active_hours_end,
+                    active_days,
                  timezone, recurring, recurrence_interval)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -1132,7 +1152,8 @@ class DMCampaignManager:
                 conn.commit()
 
             logger.info(
-                f"Campaign {campaign_id}: Account-user mapping stored for {len(account_user_mapping)} users"
+                f"Campaign {campaign_id}: Account-user mapping stored for "
+                f"{len(account_user_mapping)} users"
             )
 
             # Mark campaign as completed
@@ -1212,7 +1233,8 @@ class DMCampaignManager:
                         if campaign_obj and campaign_obj.status == CampaignStatus.RUNNING:
                             campaign_obj.status = CampaignStatus.PAUSED
                             campaign_obj.config["auto_paused_reason"] = (
-                                f"Account {account_phone} quarantined (risk: {risk_score.overall_score})"
+                                f"Account {account_phone} quarantined "
+                                f"(risk: {risk_score.overall_score})"
                             )
                             campaign_obj.config["auto_paused_at"] = datetime.now().isoformat()
                             self._update_campaign_progress(campaign_id, campaign_obj)
@@ -1236,8 +1258,9 @@ class DMCampaignManager:
                 # Warn on high risk
                 if risk_score.overall_score > 60:
                     logger.warning(
-                        f"⚠️ Account {account_phone} risk score {risk_score.overall_score} - "
-                        f"HIGH RISK. Recommendations: {'; '.join(risk_score.recommended_actions[:2])}"
+                        f"⚠️ Account {account_phone} risk score "
+                        f"{risk_score.overall_score} - HIGH RISK. "
+                        f"Recommendations: {'; '.join(risk_score.recommended_actions[:2])}"
                     )
 
             except Exception as e:
@@ -1525,7 +1548,10 @@ class DMCampaignManager:
         if limiter["messages_this_hour"] >= limiter["max_per_hour"]:
             # Wait until next hour
             wait_time = 3600 - (now - limiter["hour_start"]).total_seconds()
-            logger.info(f"Hourly limit reached for {account_phone}, waiting {wait_time:.0f}s")
+            logger.info(
+                f"Hourly limit reached for {account_phone}, "
+                f"waiting {wait_time:.0f}s"
+            )
             await asyncio.sleep(wait_time)
             limiter["hour_start"] = datetime.now()
             limiter["messages_this_hour"] = 0
@@ -1572,7 +1598,16 @@ class DMCampaignManager:
                 conn.execute(
                     """
                     INSERT INTO campaign_messages
-                    (campaign_id, user_id, account_phone, message_text, status, sent_at, error_message, template_variant)
+                    (
+                        campaign_id,
+                        user_id,
+                        account_phone,
+                        message_text,
+                        status,
+                        sent_at,
+                        error_message,
+                        template_variant,
+                    )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(campaign_id, user_id) DO UPDATE SET
                         account_phone = excluded.account_phone,
