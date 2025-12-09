@@ -47,15 +47,29 @@ class ValidationThread(QThread):
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             
-            # Save key first
-            self.api_key_manager.add_api_key(self.service, self.api_key)
-            
-            # Validate
-            is_valid, message = loop.run_until_complete(
-                self.api_key_manager.validate_api_key(self.service, force=True)
-            )
-            
-            loop.close()
+            try:
+                # Save key first
+                self.api_key_manager.add_api_key(self.service, self.api_key)
+                
+                # Validate
+                is_valid, message = loop.run_until_complete(
+                    self.api_key_manager.validate_api_key(self.service, force=True)
+                )
+            finally:
+                # Fixed: Always close event loop and reset to prevent leaks
+                try:
+                    # Cancel any pending tasks
+                    pending = asyncio.all_tasks(loop)
+                    for task in pending:
+                        task.cancel()
+                    # Wait for cancellation (with timeout)
+                    if pending:
+                        loop.run_until_complete(asyncio.wait(pending, timeout=1.0))
+                except Exception:
+                    pass  # Ignore errors during cleanup
+                finally:
+                    loop.close()
+                    asyncio.set_event_loop(None)
             
             self.validation_complete.emit(is_valid, message)
             

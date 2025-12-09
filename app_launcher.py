@@ -31,15 +31,11 @@ def show_welcome_wizard(app):
         
         wizard = WelcomeWizard()
         
+        # Fixed: Don't show message box in signal handler - wizard already shows completion message
+        # The signal is emitted before wizard closes, so showing another dialog here is redundant
         def on_wizard_completed(config):
             logger.info("Welcome wizard completed successfully")
-            QMessageBox.information(
-                None,
-                "Setup Complete!",
-                "✅ Configuration saved successfully!\n\n"
-                "The main application will now start.\n\n"
-                "💡 Tip: Check the Dashboard for an overview of all features."
-            )
+            # Wizard already shows completion message, so we just log here
         
         wizard.config_completed.connect(on_wizard_completed)
         result = wizard.exec()

@@ -3352,7 +3352,20 @@ class SettingsWindow(QDialog):
                 logger.error(f"Bulk creation failed: {e}")
                 QTimer.singleShot(0, lambda: self._handle_creation_error(str(e)))
             finally:
-                loop.close()
+                # Fixed: Always close event loop and reset to prevent leaks
+                try:
+                    # Cancel any pending tasks
+                    pending = asyncio.all_tasks(loop)
+                    for task in pending:
+                        task.cancel()
+                    # Wait for cancellation (with timeout)
+                    if pending:
+                        loop.run_until_complete(asyncio.wait(pending, timeout=1.0))
+                except Exception:
+                    pass  # Ignore errors during cleanup
+                finally:
+                    loop.close()
+                    asyncio.set_event_loop(None)
 
         # Start background thread
         creation_thread = threading.Thread(target=run_creation, daemon=True)
