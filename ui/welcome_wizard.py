@@ -228,6 +228,20 @@ class WelcomeWizard(QWizard):
 
             logger.info("Credentials saved to secure secrets manager")
 
+            # ALSO save to APIKeyManager so MainWindow can find them
+            try:
+                api_key_manager = APIKeyManager()
+                # Telegram uses separate services for api_id and api_hash
+                api_key_manager.add_api_key('telegram_api_id', config["telegram"]["api_id"])
+                api_key_manager.add_api_key('telegram_api_hash', config["telegram"]["api_hash"])
+                api_key_manager.add_api_key('gemini', config["gemini"]["api_key"])
+                if config["sms_providers"]["api_key"]:
+                    provider_name = config["sms_providers"]["provider"].lower().replace(' ', '_')
+                    api_key_manager.add_api_key(provider_name, config["sms_providers"]["api_key"])
+                logger.info("Credentials also saved to APIKeyManager")
+            except Exception as api_mgr_error:
+                logger.warning(f"Failed to save to APIKeyManager: {api_mgr_error}")
+
         except Exception as secrets_error:
             logger.error(f"Failed to save to secrets manager: {secrets_error}")
             QMessageBox.warning(self, "Security Warning",
@@ -1038,26 +1052,27 @@ class CompletePage(QWizardPage):
 def should_show_wizard() -> bool:
     """Check if welcome wizard should be shown (first time use)."""
     setup_file = Path(".setup_complete")
-    config_file = Path("config.json")
     
+    # If setup file doesn't exist, show wizard
     if not setup_file.exists():
         return True
     
-    if not config_file.exists():
-        return True
-    
+    # Check if credentials exist in secrets_manager (where wizard saves them)
     try:
-        import json
-        with open(config_file, 'r') as f:
-            config = json.load(f)
+        from core.secrets_manager import get_secrets_manager
+        secrets = get_secrets_manager()
         
-        if not config.get("telegram", {}).get("api_id"):
-            return True
-        if not config.get("telegram", {}).get("api_hash"):
+        api_id = secrets.get_secret('telegram_api_id', required=False)
+        api_hash = secrets.get_secret('telegram_api_hash', required=False)
+        
+        # If either is missing, show wizard
+        if not api_id or not api_hash:
             return True
         
         return False
-    except Exception:
+    except Exception as e:
+        logger.warning(f"Error checking wizard status: {e}")
+        # On error, show wizard to be safe
         return True
 
 
