@@ -15,6 +15,7 @@ import weakref
 import sys
 import threading
 from typing import Any, Dict, Optional, List, Callable
+from functools import wraps
 from dataclasses import dataclass
 from datetime import datetime
 

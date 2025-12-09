@@ -3350,7 +3350,8 @@ class SettingsWindow(QDialog):
 
             except Exception as e:
                 logger.error(f"Bulk creation failed: {e}")
-                QTimer.singleShot(0, lambda: self._handle_creation_error(str(e)))
+                error_msg = str(e)
+                QTimer.singleShot(0, lambda: self._handle_creation_error(error_msg))
             finally:
                 # Fixed: Always close event loop and reset to prevent leaks
                 try:

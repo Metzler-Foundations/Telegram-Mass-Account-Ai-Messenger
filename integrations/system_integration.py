@@ -7,7 +7,7 @@ NO MOCK DATA - Everything is production-ready
 
 import logging
 import asyncio
-from typing import Dict, List, Optional, Callable
+from typing import Dict, List, Optional, Callable, Any
 from datetime import datetime
 
 # Import all REAL modules
@@ -135,6 +135,8 @@ class SystemIntegration:
         """Check for REAL incomplete operations."""
         return check_for_incomplete_operations()
     
+from typing import Any
+
     def save_checkpoint(self, operation_id: str, operation_type: str,
                        current: int, total: int, details: Any = None):
         """Save REAL operation checkpoint."""

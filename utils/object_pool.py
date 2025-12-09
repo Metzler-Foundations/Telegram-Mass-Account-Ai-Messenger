@@ -8,6 +8,7 @@ Reduces memory allocations and garbage collection pressure.
 
 import threading
 import logging
+import time
 from typing import Generic, TypeVar, Callable, Optional, List, Any
 from collections import deque
 from dataclasses import dataclass

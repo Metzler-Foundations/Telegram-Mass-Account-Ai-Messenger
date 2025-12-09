@@ -24,6 +24,8 @@ from enum import Enum
 from dataclasses import dataclass, asdict
 import json
 
+logger = logging.getLogger(__name__)
+
 # Import connection pool for database operations
 try:
     from database.connection_pool import get_pool

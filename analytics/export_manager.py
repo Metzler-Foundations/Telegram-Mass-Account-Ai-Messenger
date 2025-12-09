@@ -4,7 +4,7 @@
 import csv
 import logging
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,9 @@ class AnalyticsExporter:
             return False
     
     @staticmethod
-    def export_campaign_results(campaign_id: str, output_dir: str = "exports") -> Optional[str]:
+    from typing import Optional
+
+def export_campaign_results(campaign_id: str, output_dir: str = "exports") -> Optional[str]:
         """Export campaign results."""
         try:
             Path(output_dir).mkdir(exist_ok=True)

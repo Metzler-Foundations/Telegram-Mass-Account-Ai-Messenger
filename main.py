@@ -19,6 +19,7 @@ import base64
 import hashlib
 import secrets
 import string
+import functools
 from typing import Optional, Dict, Any, List, Protocol
 from collections.abc import Coroutine
 from abc import ABC, abstractmethod
@@ -1611,6 +1612,7 @@ class MainWindow(QMainWindow):
             'total_campaigns': total_campaigns,
             'active_campaigns': active_campaigns,
             'total_messages_sent': total_messages_sent,
+            'campaign_messages': campaign_messages,
             'uptime_seconds': uptime_seconds
         }
 
@@ -1618,9 +1620,76 @@ class MainWindow(QMainWindow):
         """Handle background task completion on main thread."""
         if task_id == "dashboard_metrics" and result and self.dashboard_widget:
             try:
+                # Extract metrics from result
+                total_accounts = result.get('total_accounts', 0)
+                active_accounts = result.get('active_accounts', 0)
+                total_campaigns = result.get('total_campaigns', 0)
+                active_campaigns = result.get('active_campaigns', 0)
+                total_messages_sent = result.get('total_messages_sent', 0)
+                campaign_messages = result.get('campaign_messages', 0)
+                uptime_seconds = result.get('uptime_seconds', 0)
+
+                # Prefer account metrics; if unavailable, fall back to campaign totals
+                if total_messages_sent == 0:
+                    total_messages_sent = campaign_messages
+
+                # System health calculation
+                health = 100
+                if self.error_count > 0:
+                    health -= min(50, self.error_count * 5)
+                if not self.gemini_service:
+                    health -= 20
+                if active_accounts == 0 and total_accounts > 0:
+                    health -= 20
+
+                empty_state = (total_accounts == 0 and total_campaigns == 0 and total_messages_sent == 0)
+
+                metrics = {
+                    "message_count": "—" if empty_state else f"{total_messages_sent:,}",
+                    "ai_responses": "—" if empty_state else f"{self.ai_responses:,}",
+                    "active_chats": "No accounts" if total_accounts == 0 else f"{active_accounts}/{total_accounts} Accounts",
+                    "system_health": "—" if empty_state else f"{max(0, health)}%",
+                    "uptime": "—" if empty_state else f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m",
+                    "errors": "—" if empty_state else str(self.error_count)
+                }
+
                 # Update dashboard with collected metrics
-                self.dashboard_widget.update_metrics(result)
+                self.dashboard_widget.update_metrics(metrics)
                 logger.debug("Dashboard metrics updated from background task")
+
+                # Update hero chips to reflect current state instead of hardcoded labels
+                try:
+                    if hasattr(self.dashboard_widget, "live_status_chip"):
+                        live_state = "ok" if active_accounts > 0 else "warn"
+                        self.dashboard_widget.live_status_chip.setText(
+                            "Live" if active_accounts > 0 else "Idle"
+                        )
+                        self.dashboard_widget.live_status_chip.setProperty("state", live_state)
+                        self.dashboard_widget.live_status_chip.style().unpolish(self.dashboard_widget.live_status_chip)
+                        self.dashboard_widget.live_status_chip.style().polish(self.dashboard_widget.live_status_chip)
+
+                    if hasattr(self.dashboard_widget, "sync_status_chip"):
+                        sync_state = "ok" if total_accounts > 0 else "warn"
+                        self.dashboard_widget.sync_status_chip.setText(
+                            "Synced" if total_accounts > 0 else "No accounts"
+                        )
+                        self.dashboard_widget.sync_status_chip.setProperty("state", sync_state)
+                        self.dashboard_widget.sync_status_chip.style().unpolish(self.dashboard_widget.sync_status_chip)
+                        self.dashboard_widget.sync_status_chip.style().polish(self.dashboard_widget.sync_status_chip)
+                except Exception as exc:
+                    logger.debug(f"Dashboard chip refresh issue: {exc}")
+
+                # Reflect health in header chip
+                if hasattr(self, "health_status_chip"):
+                    self.health_status_chip.setText(f"Health {max(0, health)}%")
+                    state = "ok" if health >= 80 else "warn" if health >= 50 else "bad"
+                    self._set_status_chip_state(self.health_status_chip, state)
+                if hasattr(self, "accounts_chip"):
+                    self.accounts_chip.setText(f"{active_accounts} Accounts")
+                    self._set_status_chip_state(self.accounts_chip, "ok" if active_accounts else "warn")
+                if hasattr(self, "campaigns_chip"):
+                    self.campaigns_chip.setText(f"{active_campaigns} Campaigns")
+                    self._set_status_chip_state(self.campaigns_chip, "ok" if active_campaigns else "warn")
 
                 # Update performance summary in status bar
                 if self.performance_monitor:
@@ -1637,74 +1706,6 @@ class MainWindow(QMainWindow):
         else:
             # Log completion of other background tasks
             logger.debug(f"Background task {task_id} completed")
-            total_campaigns = len(campaigns)
-            active_campaigns = len([
-                c for c in campaigns
-                if getattr(getattr(c, "status", None), "value", getattr(c, "status", "")) == 'running'
-            ])
-
-            campaign_messages = sum(getattr(c, "sent_count", 0) for c in campaigns)
-
-        # Prefer account metrics; if unavailable, fall back to campaign totals
-        if total_messages_sent == 0:
-            total_messages_sent = campaign_messages
-
-        # System health calculation
-        health = 100
-        if self.error_count > 0:
-            health -= min(50, self.error_count * 5)
-        if not self.gemini_service:
-            health -= 20
-        if active_accounts == 0 and total_accounts > 0:
-            health -= 20
-
-        empty_state = (total_accounts == 0 and total_campaigns == 0 and total_messages_sent == 0)
-
-        metrics = {
-            "message_count": "—" if empty_state else f"{total_messages_sent:,}",
-            "ai_responses": "—" if empty_state else f"{self.ai_responses:,}",
-            "active_chats": "No accounts" if total_accounts == 0 else f"{active_accounts}/{total_accounts} Accounts",
-            "system_health": "—" if empty_state else f"{max(0, health)}%",
-            "uptime": "—" if empty_state else f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m",
-            "errors": "—" if empty_state else str(self.error_count)
-        }
-
-        # Update the dashboard widget
-        self.dashboard_widget.update_metrics(metrics)
-
-        # Update hero chips to reflect current state instead of hardcoded labels
-        try:
-            if hasattr(self.dashboard_widget, "live_status_chip"):
-                live_state = "ok" if active_accounts > 0 else "warn"
-                self.dashboard_widget.live_status_chip.setText(
-                    "Live" if active_accounts > 0 else "Idle"
-                )
-                self.dashboard_widget.live_status_chip.setProperty("state", live_state)
-                self.dashboard_widget.live_status_chip.style().unpolish(self.dashboard_widget.live_status_chip)
-                self.dashboard_widget.live_status_chip.style().polish(self.dashboard_widget.live_status_chip)
-
-            if hasattr(self.dashboard_widget, "sync_status_chip"):
-                sync_state = "ok" if total_accounts > 0 else "warn"
-                self.dashboard_widget.sync_status_chip.setText(
-                    "Synced" if total_accounts > 0 else "No accounts"
-                )
-                self.dashboard_widget.sync_status_chip.setProperty("state", sync_state)
-                self.dashboard_widget.sync_status_chip.style().unpolish(self.dashboard_widget.sync_status_chip)
-                self.dashboard_widget.sync_status_chip.style().polish(self.dashboard_widget.sync_status_chip)
-        except Exception as exc:
-            logger.debug(f"Dashboard chip refresh issue: {exc}")
-
-        # Reflect health in header chip
-        if hasattr(self, "health_status_chip"):
-            self.health_status_chip.setText(f"Health {max(0, health)}%")
-            state = "ok" if health >= 80 else "warn" if health >= 50 else "bad"
-            self._set_status_chip_state(self.health_status_chip, state)
-        if hasattr(self, "accounts_chip"):
-            self.accounts_chip.setText(f"{active_accounts} Accounts")
-            self._set_status_chip_state(self.accounts_chip, "ok" if active_accounts else "warn")
-        if hasattr(self, "campaigns_chip"):
-            self.campaigns_chip.setText(f"{active_campaigns} Campaigns")
-            self._set_status_chip_state(self.campaigns_chip, "ok" if active_campaigns else "warn")
 
     def _on_page_changed(self, index: int):
         """Pause expensive timers when dashboard is hidden."""
@@ -3478,7 +3479,8 @@ class MainWindow(QMainWindow):
 
         except Exception as e:
             logger.error(f"Error during elite member scraping: {e}")
-            QTimer.singleShot(0, lambda: self._show_scraping_error(str(e)))
+            error_msg = str(e)
+            QTimer.singleShot(0, lambda: self._show_scraping_error(error_msg))
 
     def _update_elite_scraping_results(self, results):
         """Update UI with elite scraping results - comprehensive data."""

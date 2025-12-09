@@ -8,6 +8,7 @@ import logging
 import shutil
 import tarfile
 import zipfile
+import json
 from pathlib import Path
 from typing import List, Optional, Dict
 from datetime import datetime
@@ -69,7 +70,6 @@ class BackupCreator(QThread):
                     'includes_sessions': self.include_sessions
                 }
                 
-                import json
                 zipf.writestr('backup_metadata.json', json.dumps(metadata, indent=2))
                 
                 # Add each file
@@ -471,7 +471,6 @@ def create_auto_backup(include_sessions: bool = True) -> Optional[str]:
                 'version': '2.0'
             }
             
-            import json
             zipf.writestr('backup_metadata.json', json.dumps(metadata, indent=2))
             
             for file in files_to_backup:

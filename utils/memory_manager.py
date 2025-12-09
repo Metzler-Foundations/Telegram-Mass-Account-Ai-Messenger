@@ -14,7 +14,7 @@ import psutil
 import logging
 import threading
 import weakref
-from typing import Any, Optional, Dict, Callable
+from typing import Any, Optional, Dict, Callable, List
 from collections import OrderedDict
 from datetime import datetime
 import gc

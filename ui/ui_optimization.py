@@ -7,8 +7,9 @@ Prevents excessive UI updates that can cause lag and performance issues.
 
 import time
 import logging
-from typing import Callable, Any, Dict, Optional
+from typing import Callable, Any, Dict, Optional, List
 from functools import wraps
+from collections import defaultdict
 import threading
 from PyQt6.QtCore import QTimer
 

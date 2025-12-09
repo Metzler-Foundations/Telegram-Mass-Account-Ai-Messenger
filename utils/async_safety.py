@@ -14,7 +14,7 @@ import asyncio
 import logging
 import time
 import threading
-from typing import Optional, Callable, Any, Coroutine
+from typing import Optional, Callable, Any, Coroutine, Dict, List
 from datetime import datetime, timedelta
 from functools import wraps
 

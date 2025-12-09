@@ -12,6 +12,10 @@ try:
     import psutil
 except ImportError:
     psutil = None
+
+logger = logging.getLogger(__name__)
+
+if psutil is None:
     logger.warning("psutil not available - performance metrics and throttling degraded")
 
 from utils.utils import RandomizationUtils

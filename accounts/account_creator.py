@@ -279,6 +279,9 @@ class PhoneNumberProvider:
                 'error': f"Phone provider API key is required for {provider}"
             }
 
+        # Fixed: Get provider_config before using it
+        provider_config = self.providers.get(provider, {})
+
         try:
             if provider == "5sim":
                 available = self._check_5sim_inventory(country, api_key)
