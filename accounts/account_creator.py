@@ -1235,9 +1235,9 @@ class AccountCreator:
         self.account_proxies: Dict[str, Dict] = {}  # phone_number -> proxy info
 
         # Cancellation tracking for cleanup
-        self._active_resources: Dict[
-            str, Dict[str, Any]
-        ] = {}  # session_id -> {proxy, phone, client}
+        self._active_resources: Dict[str, Dict[str, Any]] = (
+            {}
+        )  # session_id -> {proxy, phone, client}
         self._cleanup_lock = asyncio.Lock()
 
         # Concurrency control

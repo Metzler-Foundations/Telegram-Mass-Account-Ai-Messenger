@@ -1167,9 +1167,7 @@ class CampaignManagerWidget(QWidget):
                     else (
                         "warn"
                         if campaign.status.value == "paused"
-                        else "bad"
-                        if campaign.status.value == "error"
-                        else "warn"
+                        else "bad" if campaign.status.value == "error" else "warn"
                     )
                 )
                 status_pill.setProperty("state", state)

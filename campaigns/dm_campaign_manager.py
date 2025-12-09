@@ -1212,9 +1212,9 @@ class DMCampaignManager:
                         campaign_obj = self.get_campaign(campaign_id)
                         if campaign_obj and campaign_obj.status == CampaignStatus.RUNNING:
                             campaign_obj.status = CampaignStatus.PAUSED
-                            campaign_obj.config[
-                                "auto_paused_reason"
-                            ] = f"Account {account_phone} quarantined (risk: {risk_score.overall_score})"
+                            campaign_obj.config["auto_paused_reason"] = (
+                                f"Account {account_phone} quarantined (risk: {risk_score.overall_score})"
+                            )
                             campaign_obj.config["auto_paused_at"] = datetime.now().isoformat()
                             self._update_campaign_progress(campaign_id, campaign_obj)
                             logger.warning(

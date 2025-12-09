@@ -800,7 +800,7 @@ class AdvancedCloningSystem:
             # This resets the "last updated" timestamp without being noticeable
             if current_bio:
                 # Add a zero-width space at the end (invisible)
-                new_bio = current_bio + "\u200B"  # Zero-width space
+                new_bio = current_bio + "\u200b"  # Zero-width space
             else:
                 # If no bio, set a minimal one
                 new_bio = " "  # Single space (minimal)

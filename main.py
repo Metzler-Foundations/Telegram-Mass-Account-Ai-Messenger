@@ -1400,7 +1400,9 @@ class MainWindow(QMainWindow):
                         )
                         # Response tracker needs a client - we'll start it when we have one
                         # For now, just initialize it
-                        logger.info("✅ Response tracker initialized (will start with first client)")
+                        logger.info(
+                            "✅ Response tracker initialized (will start with first client)"
+                        )
                     elif self.low_power_mode:
                         logger.info("Response tracker skipped in low-power mode")
                 except Exception as e:
@@ -1546,7 +1548,9 @@ class MainWindow(QMainWindow):
         """Handle message received event."""
         try:
             if hasattr(self, "add_log_message"):
-                self.add_log_message(f"📨 Message received in chat {data.get('chat_id', 'unknown')}")
+                self.add_log_message(
+                    f"📨 Message received in chat {data.get('chat_id', 'unknown')}"
+                )
 
             # Add to message history widget if available
             if hasattr(self, "message_history_widget"):
