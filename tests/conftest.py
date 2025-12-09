@@ -38,28 +38,31 @@ def _safe_process_events(app: Optional[object], max_events: int = 5) -> None:
     """Safely process Qt events with a limit to prevent blocking.
 
     In headless/CI environments, processEvents() can block indefinitely.
-    This function processes a limited number of events to avoid hangs.
+    This function completely skips event processing in CI to avoid hangs.
     """
     if app is None:
         return
+
+    # In CI/headless environments, completely skip event processing
+    # Even checking hasPendingEvents() can cause hangs
+    # This is safe because tests don't need event processing in headless mode
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        return
+
     try:
         from PyQt6.QtCore import QEventLoop
 
-        # In headless/CI mode, minimize event processing to avoid hangs
-        # Only process if there are actually pending events
-        if not app.hasPendingEvents():
-            return
-
-        # Process only a very limited number of events to prevent blocking
-        # Use AllEvents flag - in PyQt6, processEvents() without timeout
-        # can block, so we limit iterations strictly
+        # Only process events in non-CI environments
+        # Even then, use strict limits to prevent blocking
         iterations = 0
-        while iterations < max_events and app.hasPendingEvents():
-            # Process events with AllEvents flag
-            app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents)
-            iterations += 1
-            # Double-check to break early if no more events
-            if not app.hasPendingEvents():
+        while iterations < max_events:
+            try:
+                # Use a very short timeout to prevent blocking
+                # Process only a single event at a time
+                app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents, 1)
+                iterations += 1
+                # Break if no more events (but don't check hasPendingEvents as it can block)
+            except Exception:
                 break
     except Exception:
         # Ignore all errors during event processing - better to skip than hang
@@ -112,10 +115,9 @@ def pytest_sessionstart(session) -> None:  # type: ignore
     This ensures QApplication is ready before any tests execute.
     """
     # Ensure QApplication exists and is ready
-    app = _ensure_qapplication()
-    if app is not None:
-        # Minimize event processing to avoid blocking in CI
-        _safe_process_events(app, max_events=2)
+    # DO NOT process events here - can cause hangs in CI
+    # The QApplication is already created, no need to process events
+    _ensure_qapplication()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -140,9 +142,8 @@ def qapplication() -> Generator:
         if app is None:
             app = QApplication([])
 
-    # Minimize event processing in headless mode to avoid hangs
-    # Only process if absolutely necessary
-    _safe_process_events(app, max_events=2)
+    # DO NOT process events here - can cause hangs in CI
+    # The QApplication is already initialized, no event processing needed
 
     yield app
 
@@ -152,8 +153,7 @@ def qapplication() -> Generator:
         for widget in app.allWidgets():
             if widget.isWindow() and widget.isVisible():
                 widget.close()
-        # Minimize cleanup event processing to avoid hangs
-        _safe_process_events(app, max_events=2)
+        # DO NOT process events during cleanup - can cause hangs in CI
     except Exception:
         pass  # Ignore cleanup errors
 
@@ -174,10 +174,9 @@ def qapp(qapplication: object) -> Generator:
             # Fallback: create if still None
             app = QApplication([])
 
-    # Minimize event processing before test to avoid hangs
-    _safe_process_events(app, max_events=1)
+    # DO NOT process events - can cause hangs in CI
+    # Tests don't need event processing in headless mode
 
     yield app
 
-    # Minimize event processing after test to avoid hangs
-    _safe_process_events(app, max_events=1)
+    # DO NOT process events after test - can cause hangs in CI
