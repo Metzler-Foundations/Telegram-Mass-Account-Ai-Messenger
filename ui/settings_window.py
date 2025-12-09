@@ -540,7 +540,8 @@ class APISettingsWidget(QWidget):
         self.api_hash_edit = QLineEdit()
         self.api_hash_edit.setPlaceholderText("e.g., 0123456789abcdef...")
         self.api_hash_edit.setToolTip(
-            "Enter your 32-character API Hash from my.telegram.org/apps\nExample: 0123456789abcdef0123456789abcdef"
+            "Enter your 32-character API Hash from my.telegram.org/apps\n"
+            "Example: 0123456789abcdef0123456789abcdef"
         )
         self.api_hash_edit.setEchoMode(QLineEdit.EchoMode.Password)
         telegram_basic_layout.addRow("API Hash:", self.api_hash_edit)
@@ -548,7 +549,8 @@ class APISettingsWidget(QWidget):
         self.phone_edit = QLineEdit()
         self.phone_edit.setPlaceholderText("e.g., +1234567890")
         self.phone_edit.setToolTip(
-            "Enter your phone number with country code\nFormat: +[country code][number]\nExample: +1234567890"
+            "Enter your phone number with country code\n"
+            "Format: +[country code][number]\nExample: +1234567890"
         )
         telegram_basic_layout.addRow("Phone Number:", self.phone_edit)
 
@@ -562,7 +564,9 @@ class APISettingsWidget(QWidget):
         self.gemini_key_edit = QLineEdit()
         self.gemini_key_edit.setPlaceholderText("e.g., AIzaSyABC123...")
         self.gemini_key_edit.setToolTip(
-            "Enter your Gemini API key from aistudio.google.com/app/apikey\nFormat: Starts with 'AIza' and is 39+ characters\nExample: AIzaSyABC123XYZ..."
+            "Enter your Gemini API key from aistudio.google.com/app/apikey\n"
+            "Format: Starts with 'AIza' and is 39+ characters\n"
+            "Example: AIzaSyABC123XYZ..."
         )
         self.gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         ai_basic_layout.addRow("Gemini API Key:", self.gemini_key_edit)
@@ -695,7 +699,9 @@ class BrainSettingsWidget(QWidget):
         prompt_layout.addWidget(QLabel("Define the AI's personality and behavior:"))
         self.prompt_edit = QTextEdit()
         self.prompt_edit.setPlaceholderText(
-            "You are a helpful, professional assistant who responds naturally and engagingly to user messages. Be friendly but not overly casual. Focus on providing value and building genuine connections."
+            "You are a helpful, professional assistant who responds naturally "
+            "and engagingly to user messages. Be friendly but not overly "
+            "casual. Focus on providing value and building genuine connections."
         )
         prompt_layout.addWidget(self.prompt_edit)
 
@@ -960,7 +966,8 @@ class TelegramStepWidget(QWidget):
         help_text.setWordWrap(True)
         c = ThemeManager.get_colors()
         help_text.setStyleSheet(
-            f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;"
+            f"color: {c['TEXT_SECONDARY']}; padding: 8px; "
+            f"background-color: {c['BG_TERTIARY']}; border-radius: 4px;"
         )
         layout.addWidget(help_text)
 
@@ -1012,7 +1019,8 @@ class GeminiStepWidget(QWidget):
         help_text.setWordWrap(True)
         c = ThemeManager.get_colors()
         help_text.setStyleSheet(
-            f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;"
+            f"color: {c['TEXT_SECONDARY']}; padding: 8px; "
+            f"background-color: {c['BG_TERTIARY']}; border-radius: 4px;"
         )
         layout.addWidget(help_text)
 
@@ -1219,7 +1227,8 @@ class SMSProviderSetupWidget(QWidget):
 
         # Basic validation passed
         self.status_label.setText(
-            "Valid: API key format looks valid (actual connectivity will be tested during account creation)"
+            "Valid: API key format looks valid "
+            "(actual connectivity will be tested during account creation)"
         )
         self.status_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']};")
 
@@ -1526,13 +1535,15 @@ class SettingsWindow(QDialog):
         if self.wizard_mode:
             title_label = QLabel("Initial Setup Wizard")
             title_label.setStyleSheet(
-                f"font-size: 26px; font-weight: 700; color: {c['TEXT_BRIGHT']}; margin-bottom: 6px; letter-spacing: -0.2px;"
+                f"font-size: 26px; font-weight: 700; color: {c['TEXT_BRIGHT']}; "
+                f"margin-bottom: 6px; letter-spacing: -0.2px;"
             )
             layout.addWidget(title_label)
 
             subtitle_label = QLabel("Let's configure the essential settings to get you started.")
             subtitle_label.setStyleSheet(
-                f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.5em; margin-bottom: 18px;"
+                f"color: {c['TEXT_SECONDARY']}; font-size: 15px; "
+                f"line-height: 1.5em; margin-bottom: 18px;"
             )
             layout.addWidget(subtitle_label)
         else:
@@ -1802,7 +1813,8 @@ class SettingsWindow(QDialog):
                 <li>Create a new application</li>
                 <li>Copy your API ID and API Hash</li>
             </ol>
-            <p><b>Why this is needed:</b> These credentials allow the bot to connect to Telegram on your behalf.</p>
+            <p><b>Why this is needed:</b> These credentials allow the bot to """
+            """connect to Telegram on your behalf.</p>
             """,
             help_url="https://my.telegram.org/apps",
         )
@@ -1821,7 +1833,8 @@ class SettingsWindow(QDialog):
                 <li>Click "Create API Key"</li>
                 <li>Copy the generated key (starts with "AIza")</li>
             </ol>
-            <p><b>Why this is needed:</b> Gemini powers the AI responses for your Telegram accounts.</p>
+            <p><b>Why this is needed:</b> Gemini powers the AI responses for """
+            """your Telegram accounts.</p>
             <p><b>Free tier:</b> 60 requests/minute, 1,500 requests/day</p>
             """,
             help_url="https://aistudio.google.com/app/apikey",
@@ -1841,7 +1854,8 @@ class SettingsWindow(QDialog):
                 <li>Add funds to your account ($5-10 is usually enough to start)</li>
                 <li>Get your API key from the provider's dashboard</li>
             </ol>
-            <p><b>Why this is needed:</b> SMS providers supply phone numbers for creating new Telegram accounts.</p>
+            <p><b>Why this is needed:</b> SMS providers supply phone numbers """
+            """for creating new Telegram accounts.</p>
             <p><b>Cost:</b> Typically $0.10-0.20 per phone number</p>
             """,
             help_url=None,  # Provider-specific, handled by widget
@@ -1860,7 +1874,8 @@ class SettingsWindow(QDialog):
 
             <p><b>What you can configure here (optional):</b></p>
             <ul>
-                <li><b>Anti-Detection:</b> Rate limiting and behavior simulation (default: 50 msg/hour)</li>
+                <li><b>Anti-Detection:</b> Rate limiting and behavior """
+                """simulation (default: 50 msg/hour)</li>
                 <li><b>Timing:</b> Message delays and response patterns (default: 2-30 seconds)</li>
                 <li><b>Safety Features:</b> Auto-retry and session recovery (default: enabled)</li>
             </ul>

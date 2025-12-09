@@ -58,13 +58,15 @@ class ValidationHelper:
         if not api_id.isdigit():
             return (
                 False,
-                "API ID should be a number (e.g., 12345678). Get it from https://my.telegram.org/apps",
+                "API ID should be a number (e.g., 12345678). "
+                "Get it from https://my.telegram.org/apps",
             )
 
         if len(api_id) < 6:
             return (
                 False,
-                "API ID seems too short. It should be 7-8 digits. Check https://my.telegram.org/apps",
+                "API ID seems too short. It should be 7-8 digits. "
+                "Check https://my.telegram.org/apps",
             )
 
         return True, ""
@@ -84,7 +86,8 @@ class ValidationHelper:
         if not re.match(r"^[a-f0-9]{32}$", api_hash.lower()):
             return (
                 False,
-                "API Hash should contain only letters (a-f) and numbers (0-9). Check https://my.telegram.org/apps",
+                "API Hash should contain only letters (a-f) and numbers (0-9). "
+                "Check https://my.telegram.org/apps",
             )
 
         return True, ""
@@ -95,14 +98,16 @@ class ValidationHelper:
         if not api_key:
             return (
                 False,
-                "Gemini API key is required for AI features. Get it from https://makersuite.google.com/app/apikey",
+                "Gemini API key is required for AI features. "
+                "Get it from https://makersuite.google.com/app/apikey",
             )
 
         # Gemini keys typically start with "AI" and are ~39 characters
         if not api_key.startswith("AI"):
             return (
                 False,
-                "Gemini API key should start with 'AIza'. Get it from https://makersuite.google.com/app/apikey",
+                "Gemini API key should start with 'AIza'. "
+                "Get it from https://makersuite.google.com/app/apikey",
             )
 
         if len(api_key) < 30:
@@ -213,12 +218,18 @@ class ErrorTranslator:
         "SessionPasswordNeeded": {
             "title": "Two-Factor Authentication Required",
             "message": "This account has 2FA (two-factor authentication) enabled.",
-            "solution": "You'll need to enter your 2FA password. For new account creation, use a number without 2FA.",
+            "solution": (
+                "You'll need to enter your 2FA password. "
+                "For new account creation, use a number without 2FA."
+            ),
         },
         "FloodWait": {
             "title": "Rate Limit Reached",
             "message": "Telegram has temporarily rate-limited this action.",
-            "solution": "Please wait {wait_time} seconds before trying again. This is Telegram's anti-spam protection.",
+            "solution": (
+                "Please wait {wait_time} seconds before trying again. "
+                "This is Telegram's anti-spam protection."
+            ),
         },
         "UserDeactivated": {
             "title": "Account Deactivated",
@@ -239,12 +250,19 @@ class ErrorTranslator:
         "Failed to get phone number": {
             "title": "Phone Number Service Issue",
             "message": "Could not get a phone number from the provider.",
-            "solution": "Check: 1) Your API key is valid 2) You have credit in your account 3) The country you selected is available",
+            "solution": (
+                "Check: 1) Your API key is valid 2) You have credit in your account "
+                "3) The country you selected is available"
+            ),
         },
         "Failed to get SMS code": {
             "title": "SMS Code Not Received",
             "message": "The SMS verification code was not received within the timeout period.",
-            "solution": "This could mean: 1) The number is blacklisted by Telegram 2) SMS delivery is delayed 3) The provider has issues. Try with a different country or provider.",
+            "solution": (
+                "This could mean: 1) The number is blacklisted by Telegram "
+                "2) SMS delivery is delayed 3) The provider has issues. "
+                "Try with a different country or provider."
+            ),
         },
         # Network errors
         "Connection": {
@@ -255,7 +273,10 @@ class ErrorTranslator:
         "Timeout": {
             "title": "Connection Timeout",
             "message": "The connection timed out.",
-            "solution": "Your internet might be slow or Telegram servers might be busy. Try again in a moment.",
+            "solution": (
+                "Your internet might be slow or Telegram servers might be busy. "
+                "Try again in a moment."
+            ),
         },
         # Gemini errors
         "API_KEY_INVALID": {
@@ -266,7 +287,10 @@ class ErrorTranslator:
         "RESOURCE_EXHAUSTED": {
             "title": "Gemini API Quota Exceeded",
             "message": "You've exceeded your Gemini API quota.",
-            "solution": "Wait for quota to reset or upgrade your plan at https://makersuite.google.com/",
+            "solution": (
+                "Wait for quota to reset or upgrade your plan at "
+                "https://makersuite.google.com/"
+            ),
         },
         # Database errors
         "database is locked": {
@@ -327,7 +351,10 @@ class ErrorTranslator:
         """
         translated = ErrorTranslator.translate_error(error, context)
 
-        return f"❌ {translated['title']}\n\n{translated['message']}\n\n💡 Solution:\n{translated['solution']}"
+        return (
+            f"❌ {translated['title']}\n\n{translated['message']}\n\n"
+            f"💡 Solution:\n{translated['solution']}"
+        )
 
 
 class ProgressHelper:
@@ -393,17 +420,29 @@ class TooltipHelper:
     TOOLTIPS = {
         # API Settings
         "telegram_api_id": "Your Telegram API ID from https://my.telegram.org/apps\nExample: 12345678",
-        "telegram_api_hash": "Your Telegram API Hash from https://my.telegram.org/apps\nExample: 0123456789abcdef0123456789abcdef",
+        "telegram_api_hash": (
+            "Your Telegram API Hash from https://my.telegram.org/apps\n"
+            "Example: 0123456789abcdef0123456789abcdef"
+        ),
         "telegram_phone": "Your phone number with country code\nExample: +1234567890",
-        "gemini_api_key": "Your Gemini AI API key from https://makersuite.google.com/app/apikey\nRequired for AI responses and profile cloning",
+        "gemini_api_key": (
+            "Your Gemini AI API key from https://makersuite.google.com/app/apikey\n"
+            "Required for AI responses and profile cloning"
+        ),
         # Anti-Detection
         "min_delay": "Minimum seconds to wait between actions\nLower = faster but riskier\nRecommended: 2-5 seconds",
         "max_delay": "Maximum seconds to wait between actions\nHigher = safer but slower\nRecommended: 20-60 seconds",
-        "messages_per_hour": "How many messages to send per hour\nTelegram limit: ~200/hour\nSafe rate: 30-50/hour\nAggressive: 80-100/hour",
+        "messages_per_hour": (
+            "How many messages to send per hour\nTelegram limit: ~200/hour\n"
+            "Safe rate: 30-50/hour\nAggressive: 80-100/hour"
+        ),
         "burst_limit": "Max messages to send in quick succession\nRecommended: 2-3 messages\nLower is safer",
         "online_simulation": "Simulate realistic online/offline patterns\nMakes your bot appear more human",
         # Phone Provider
-        "phone_provider": "Service to get phone numbers for verification\nPopular: SMS-Activate, SMSPool\nCost: $0.08-0.15 per number",
+        "phone_provider": (
+            "Service to get phone numbers for verification\n"
+            "Popular: SMS-Activate, SMSPool\nCost: $0.08-0.15 per number"
+        ),
         "provider_api_key": "API key from your phone number provider\nGet it from your provider's dashboard",
         "country": "Country for phone numbers\nUS numbers are most stable\nOther countries may be cheaper",
         # Proxy

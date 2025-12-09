@@ -787,8 +787,10 @@ class MainWindow(QMainWindow):
         # Set up background task executor for non-blocking UI operations
         self._setup_background_task_executor()
 
-        # Initialize member database and account manager early (needed for warmup service and UI)
-        # CRITICAL FIX: Initialize databases directly during startup, not in background task callback
+        # Initialize member database and account manager early
+        # (needed for warmup service and UI)
+        # CRITICAL FIX: Initialize databases directly during startup,
+        # not in background task callback
         self.member_db = None
         self.account_manager = None
         try:
@@ -811,7 +813,8 @@ class MainWindow(QMainWindow):
                 self,
                 "Database Initialization Error",
                 f"Failed to initialize databases:\n\n{e}\n\n"
-                "The application may not function correctly. Please check file permissions and disk space.",
+                "The application may not function correctly. "
+                "Please check file permissions and disk space.",
             )
 
         # Load any existing validated profile details early
@@ -1004,7 +1007,8 @@ class MainWindow(QMainWindow):
             logger.error(f"Unexpected error in background task {task_id}: {e}")
             QTimer.singleShot(0, lambda: self._on_background_task_completed(task_id, None))
 
-    # NOTE: _on_background_task_completed is defined later in the file (line ~1821) with the actual implementation
+    # NOTE: _on_background_task_completed is defined later in the file
+    # (line ~1821) with the actual implementation
     # This first definition would be overwritten, so it's removed to avoid confusion
 
     def _initialize_services(self):
@@ -1282,7 +1286,10 @@ class MainWindow(QMainWindow):
         """Handle cost alert notification."""
         try:
             # Emit signal for thread-safe UI update
-            alert_msg = f"{alert.message}\n\nCurrent: ${alert.current_cost:.2f}\nThreshold: ${alert.threshold:.2f}"
+            alert_msg = (
+                f"{alert.message}\n\nCurrent: ${alert.current_cost:.2f}\n"
+                f"Threshold: ${alert.threshold:.2f}"
+            )
             self.show_error_signal.emit(
                 f"Cost Alert - {alert.alert_level.value.upper()}", alert_msg
             )
@@ -2478,7 +2485,9 @@ class MainWindow(QMainWindow):
             c = ThemeManager.get_colors()
             banner.setObjectName("hero_card")
             banner.setStyleSheet(
-                f"background-color: {c['BG_SECONDARY']}; border: 1px solid {c['BORDER_DEFAULT']}; border-radius: 8px;"
+                f"background-color: {c['BG_SECONDARY']}; "
+                f"border: 1px solid {c['BORDER_DEFAULT']}; "
+                f"border-radius: 8px;"
             )
             b_layout = QHBoxLayout(banner)
             b_layout.setContentsMargins(12, 10, 12, 10)
@@ -3387,7 +3396,9 @@ class MainWindow(QMainWindow):
                 self.gemini_service = GeminiService(gemini_key)
                 logger.info("Fallback Gemini service initialized")
             else:
-                logger.warning("Gemini API key not available for fallback initialization")
+                logger.warning(
+                    "Gemini API key not available for fallback initialization"
+                )
                 self.gemini_service = None
 
             logger.info("Fallback service initialization completed")
@@ -3727,7 +3738,8 @@ class MainWindow(QMainWindow):
                 c = ThemeManager.get_colors()
                 summary_item.setForeground(QColor(c["ACCENT_PRIMARY"]))
                 self.members_table.setItem(row, 0, summary_item)
-                self.members_table.setSpan(row, 0, 1, 4)  # Span across all columns
+                # Span across all columns
+                self.members_table.setSpan(row, 0, 1, 4)
 
             # Re-enable UI
             self.current_channel_input.setEnabled(True)
