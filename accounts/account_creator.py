@@ -1723,12 +1723,30 @@ class AccountCreator:
         self.creation_active = True
 
         try:
-            # Validate configuration first
-            if not config.get('api_id') or not config.get('api_hash'):
+            # Validate configuration first - try multiple sources for credentials
+            import os
+            api_id = config.get('api_id') or os.getenv("TELEGRAM_API_ID", "")
+            api_hash = config.get('api_hash') or os.getenv("TELEGRAM_API_HASH", "")
+            
+            # Also try secrets_manager as fallback
+            if not api_id or not api_hash:
+                try:
+                    from core.secrets_manager import get_secrets_manager
+                    secrets = get_secrets_manager()
+                    api_id = api_id or secrets.get_secret('telegram_api_id', required=False)
+                    api_hash = api_hash or secrets.get_secret('telegram_api_hash', required=False)
+                except Exception:
+                    pass  # Fallback failed, continue with what we have
+            
+            if not api_id or not api_hash:
                 return {
                     'success': False,
                     'error': 'Telegram API credentials (api_id and api_hash) are required. Get them from https://my.telegram.org/apps'
                 }
+            
+            # Update config with found credentials
+            config['api_id'] = api_id
+            config['api_hash'] = api_hash
 
             # Apply anti-detection settings to account creator
             anti_detection_config = config.get('anti_detection', {})

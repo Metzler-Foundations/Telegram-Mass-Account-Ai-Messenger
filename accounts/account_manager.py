@@ -1616,7 +1616,19 @@ class AccountManager:
     async def create_account(self, config: Dict) -> Dict[str, Any]:
         """Create a new Telegram account using the account creator."""
         try:
-            creator = AccountCreator(self.db)
+            # Fixed: Pass gemini_service and account_manager references
+            # Try to get gemini_service from various possible locations
+            gemini_service = None
+            if hasattr(self, 'gemini_service'):
+                gemini_service = self.gemini_service
+            elif hasattr(self, '_gemini_service'):
+                gemini_service = self._gemini_service
+            
+            creator = AccountCreator(
+                self.db,
+                gemini_service=gemini_service,
+                account_manager=self
+            )
 
             # Get proxy from pool for new account
             proxy_pool = await self.get_proxy_pool_manager()
@@ -1641,9 +1653,19 @@ class AccountManager:
                 phone_number = account_data['phone_number']
                 
                 # Transfer proxy assignment
+                # Fixed: Check if proxy was already transferred by AccountCreator before releasing
                 if proxy_pool and config.get('proxy_key'):
-                    await proxy_pool.release_proxy(temp_phone)
-                    await proxy_pool.get_proxy_for_account(phone_number)
+                    try:
+                        # AccountCreator should have already transferred the proxy
+                        # Only release temp_phone if it still exists (wasn't transferred)
+                        await proxy_pool.release_proxy(temp_phone)
+                    except Exception as e:
+                        logger.debug(f"Proxy already released/transferred by AccountCreator: {e}")
+                    # Ensure proxy is assigned to the new phone number
+                    try:
+                        await proxy_pool.get_proxy_for_account(phone_number)
+                    except Exception as e:
+                        logger.debug(f"Proxy already assigned to {phone_number}: {e}")
                 
                 # Add to managed accounts
                 self.add_account(phone_number, account_data)

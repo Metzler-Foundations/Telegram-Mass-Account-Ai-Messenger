@@ -195,8 +195,10 @@ class WelcomeWizard(QWizard):
             return
 
         # Validate SMS provider API key if provided
+        # Fixed: Only validate if API key is actually provided
         sms_config = config.get("sms_providers", {})
-        if sms_config.get("api_key"):
+        sms_api_key = sms_config.get("api_key", "").strip()
+        if sms_api_key:
             sms_ok, sms_error = self._run_async_task(
                 self._validate_sms_provider(sms_config)
             )
@@ -210,6 +212,7 @@ class WelcomeWizard(QWizard):
                     "You can still continue with setup, but account creation may not work.")
         else:
             progress.setValue(3)
+            # SMS provider is optional, so no validation needed if not provided
 
         # Stamp validation metadata
         now_ts = datetime.now().isoformat()
@@ -231,8 +234,10 @@ class WelcomeWizard(QWizard):
             secrets_manager.set_secret('telegram_api_id', config["telegram"]["api_id"])
             secrets_manager.set_secret('telegram_api_hash', config["telegram"]["api_hash"])
             secrets_manager.set_secret('gemini_api_key', config["gemini"]["api_key"])
-            if config["sms_providers"]["api_key"]:
-                secrets_manager.set_secret('sms_provider_api_key', config["sms_providers"]["api_key"])
+            # Fixed: Use .get() to safely access optional SMS provider API key
+            sms_api_key = config.get("sms_providers", {}).get("api_key")
+            if sms_api_key:
+                secrets_manager.set_secret('sms_provider_api_key', sms_api_key)
 
             # Audit the credential setup
             audit_credential_modification('telegram_api_id', 'setup_wizard', success=True)
@@ -250,18 +255,29 @@ class WelcomeWizard(QWizard):
                 api_key_manager.add_api_key('telegram_api_id', config["telegram"]["api_id"])
                 api_key_manager.add_api_key('telegram_api_hash', config["telegram"]["api_hash"])
                 api_key_manager.add_api_key('gemini', config["gemini"]["api_key"])
-                if config["sms_providers"]["api_key"]:
-                    provider_name = config["sms_providers"]["provider"].lower().replace(' ', '_')
-                    api_key_manager.add_api_key(provider_name, config["sms_providers"]["api_key"])
+                # Fixed: Use .get() to safely access optional SMS provider settings
+                sms_config = config.get("sms_providers", {})
+                sms_api_key = sms_config.get("api_key")
+                if sms_api_key:
+                    provider_name = sms_config.get("provider", "unknown").lower().replace(' ', '_')
+                    api_key_manager.add_api_key(provider_name, sms_api_key)
                 logger.info("Credentials also saved to APIKeyManager")
             except Exception as api_mgr_error:
                 logger.warning(f"Failed to save to APIKeyManager: {api_mgr_error}")
 
         except Exception as secrets_error:
             logger.error(f"Failed to save to secrets manager: {secrets_error}")
-            QMessageBox.warning(self, "Security Warning",
-                "Failed to save credentials securely. They will be stored in config file only.\n\n"
-                f"Error: {secrets_error}")
+            # Fixed: Ask user if they want to continue without secure storage
+            reply = QMessageBox.warning(
+                self, "Security Warning",
+                "Failed to save credentials securely to secrets manager.\n\n"
+                f"Error: {secrets_error}\n\n"
+                "Credentials will NOT be saved securely. Continue anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.No:
+                return  # User chose not to continue
             # Continue anyway - better to have working config than nothing
 
         # Save to config.json (ONLY non-sensitive configuration)
@@ -698,17 +714,9 @@ class TelegramSetupPage(QWizardPage):
         hash_layout.addWidget(self.api_hash_edit)
         form_layout.addLayout(hash_layout)
         
-        # Phone
-        phone_layout = QVBoxLayout()
-        phone_layout.setSpacing(6)
-        c = ThemeManager.get_colors()
-        phone_label = QLabel("Phone Number")
-        phone_label.setStyleSheet(f"font-weight: 600; color: {c['TEXT_BRIGHT']};")
-        self.phone_edit = QLineEdit()
-        self.phone_edit.setPlaceholderText("e.g. +1234567890")
-        phone_layout.addWidget(phone_label)
-        phone_layout.addWidget(self.phone_edit)
-        form_layout.addLayout(phone_layout)
+        # Phone - Removed from page 1 to avoid confusion
+        # Phone number is collected on page 2 (PhoneSetupPage) for account creation setup
+        # This page is for Telegram API credentials only
         
         layout.addLayout(form_layout)
         layout.addStretch()
@@ -716,7 +724,7 @@ class TelegramSetupPage(QWizardPage):
         # Register fields
         self.registerField("api_id*", self.api_id_edit)
         self.registerField("api_hash*", self.api_hash_edit)
-        self.registerField("telegram_phone", self.phone_edit)
+        # Phone field removed - collected on page 2 instead
     
     def validatePage(self):
         """Validate inputs."""

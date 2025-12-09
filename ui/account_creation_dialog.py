@@ -216,16 +216,33 @@ class AccountCreationDialog(QDialog):
         try:
             # Get main window
             main_window = self.parent()
-            if not main_window or not hasattr(main_window, 'account_creator'):
-                raise Exception("Account creator not available")
+            if not main_window:
+                raise Exception("Main window not available")
+            
+            # Check for account_manager (preferred) or account_creator (fallback)
+            if not hasattr(main_window, 'account_manager') and not hasattr(main_window, 'account_creator'):
+                raise Exception("Account manager/creator not available")
 
-            # Prepare config
+            # Load API credentials from secrets_manager
+            try:
+                from core.secrets_manager import get_secrets_manager
+                secrets = get_secrets_manager()
+                api_id = secrets.get_secret('telegram_api_id', required=True)
+                api_hash = secrets.get_secret('telegram_api_hash', required=True)
+            except Exception as e:
+                logger.error(f"Failed to load API credentials: {e}")
+                self._show_error(f"Failed to load Telegram API credentials. Please configure them in Settings.")
+                return
+
+            # Prepare config with correct key names and API credentials
             config = {
                 'account_name': self.name_edit.text().strip(),
                 'phone_number': self.phone_edit.text().strip() or None,
                 'country': self.country_combo.currentText().split(" - ")[0],
-                'sms_provider': self.provider_combo.currentText(),
-                'api_key': self.api_key_edit.text().strip(),
+                'phone_provider': self.provider_combo.currentText(),  # Fixed: was 'sms_provider'
+                'provider_api_key': self.api_key_edit.text().strip(),  # Fixed: was 'api_key'
+                'api_id': api_id,  # Fixed: Added missing API credentials
+                'api_hash': api_hash,  # Fixed: Added missing API credentials
                 'use_proxy': self.use_proxy_checkbox.isChecked(),
                 'start_warmup': self.warmup_checkbox.isChecked()
             }
@@ -240,25 +257,48 @@ class AccountCreationDialog(QDialog):
 
     def _do_async_creation(self, config: Dict[str, Any]):
         """Perform the actual account creation asynchronously."""
-        try:
-            # Get main window and account creator
-            main_window = self.parent()
-            account_creator = main_window.account_creator
-
-            # This is a simplified version - in reality you'd want to use
-            # the proper async account creation flow
-            self.status_label.setText("Account creation in progress...")
-
-            # Simulate progress (replace with real async calls)
-            QTimer.singleShot(2000, lambda: self._complete_creation({
-                'phone_number': '+1234567890',
-                'account_name': config['account_name'],
-                'status': 'created'
-            }))
-
-        except Exception as e:
-            logger.error(f"Async creation failed: {e}")
-            self._show_error(f"Account creation failed: {e}")
+        import asyncio
+        import threading
+        
+        def run_async_creation():
+            """Run account creation in background thread with event loop."""
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                main_window = self.parent()
+                if not main_window:
+                    raise Exception("Main window not available")
+                
+                # Use account_manager if available (preferred), otherwise account_creator
+                if hasattr(main_window, 'account_manager') and main_window.account_manager:
+                    # Use account_manager.create_account (handles everything)
+                    result = loop.run_until_complete(main_window.account_manager.create_account(config))
+                elif hasattr(main_window, 'account_creator') and main_window.account_creator:
+                    # Fallback to direct account_creator
+                    result = loop.run_until_complete(main_window.account_creator.create_new_account(config))
+                else:
+                    raise Exception("Account manager/creator not available")
+                
+                # Update UI on main thread
+                if result.get('success'):
+                    account_data = result.get('account', {})
+                    account_data['account_name'] = config.get('account_name', 'Unknown')
+                    QTimer.singleShot(0, lambda: self._complete_creation(account_data))
+                else:
+                    error_msg = result.get('error', 'Account creation failed')
+                    QTimer.singleShot(0, lambda: self._show_error(error_msg))
+                    
+            except Exception as e:
+                logger.error(f"Async creation failed: {e}", exc_info=True)
+                QTimer.singleShot(0, lambda: self._show_error(f"Account creation failed: {e}"))
+            finally:
+                loop.close()
+        
+        # Start background thread
+        self.status_label.setText("Account creation in progress...")
+        creation_thread = threading.Thread(target=run_async_creation, daemon=True)
+        creation_thread.start()
 
     def _complete_creation(self, account_data: Dict[str, Any]):
         """Handle successful account creation."""
