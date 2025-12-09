@@ -10,41 +10,35 @@ import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
-from core.security_audit import audit_credential_modification
+from PyQt6.QtCore import Q_ARG, QCoreApplication, QMetaObject, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
-    QDialog,
-    QWidget,
-    QVBoxLayout,
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QGroupBox,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
-    QPushButton,
     QLineEdit,
-    QTextEdit,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
     QWizard,
     QWizardPage,
-    QCheckBox,
-    QMessageBox,
-    QFrame,
-    QGroupBox,
-    QSizePolicy,
-    QProgressDialog,
-    QInputDialog,
-    QComboBox,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread, QMetaObject, Q_ARG
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QCoreApplication
-from PyQt6.QtGui import QFont, QPixmap
 from pyrogram import Client
-from pyrogram.raw.functions.help import GetNearestDc
 from pyrogram.errors import SessionPasswordNeeded
+from pyrogram.raw.functions.help import GetNearestDc
 
+from core.security_audit import audit_credential_modification
 from integrations.api_key_manager import APIKeyManager
-
-from utils.user_helpers import ValidationHelper, get_tooltip
 from ui.theme_manager import ThemeManager
+from utils.user_helpers import ValidationHelper
 
 logger = logging.getLogger(__name__)
 
@@ -1233,6 +1227,7 @@ def should_show_wizard() -> bool:
 
 if __name__ == "__main__":
     import sys
+
     from PyQt6.QtWidgets import QApplication
 
     try:

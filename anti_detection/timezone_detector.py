@@ -8,9 +8,8 @@ Features:
 """
 
 import logging
-from typing import List, Tuple, Optional
-from collections import defaultdict
 import statistics
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +34,7 @@ class TimezoneDetector:
             return None, 0.0
 
         # Typical active hours are 9-23 (9 AM to 11 PM)
-        typical_waking_hours = list(range(9, 24))
+        list(range(9, 24))
 
         # Calculate average activity hour
         avg_hour = statistics.mean(activity_hours)

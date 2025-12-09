@@ -5,11 +5,11 @@ Now supports premium light/dark themes and runtime toggling.
 
 from pathlib import Path
 from typing import Optional
-from PyQt6.QtWidgets import QWidget, QApplication, QStyleFactory, QGraphicsDropShadowEffect
-from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt
 
-from ui.ui_redesign import DARK_THEME, LIGHT_THEME, HIGH_CONTRAST_THEME
+from PyQt6.QtGui import QColor, QPalette
+from PyQt6.QtWidgets import QApplication, QGraphicsDropShadowEffect, QStyleFactory, QWidget
+
+from ui.ui_redesign import DARK_THEME, HIGH_CONTRAST_THEME, LIGHT_THEME
 
 
 class ThemeManager:

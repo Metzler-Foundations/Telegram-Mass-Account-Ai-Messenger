@@ -14,27 +14,26 @@ Features:
 """
 
 import asyncio
-import aiohttp
-import logging
-import json
-import re
-from utils.http_connection_pool import get_http_connection_pool
-from utils.rate_limiter import get_rate_limit_manager
-import socket
-import time
-import hashlib
-import random
-import sqlite3
 import base64
+import hashlib
+import json
+import logging
+import re
 import shutil
-from typing import Dict, List, Optional, Set, Tuple, Any
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from pathlib import Path
+import sqlite3
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-import threading
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+import aiohttp
+
+from utils.http_connection_pool import get_http_connection_pool
+from utils.rate_limiter import get_rate_limit_manager
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +82,8 @@ class ProxyCredentialManager:
                 backend = keyring.get_keyring()
                 if getattr(backend, "priority", 0) <= 0:
                     raise NoKeyringError("No usable keyring backend")
-            except NoKeyringError:
-                raise ImportError("No keyring backend available")
+            except NoKeyringError as e:
+                raise ImportError("No keyring backend available") from e
 
             keyring_service = "telegram_bot_proxy_credentials"
             stored_key = keyring.get_password(keyring_service, "encryption_key")
@@ -252,10 +251,10 @@ class Proxy:
     def _validate_proxy_data(self):
         """Validate proxy data and raise exceptions for invalid data."""
         try:
-            from user_helpers import ValidationHelper
-
             # Validate and normalize IP address (remove leading zeros from octets)
             import ipaddress
+
+            from user_helpers import ValidationHelper  # noqa: F401
 
             try:
                 # Normalize IP by removing leading zeros (e.g., 192.168.001.01 -> 192.168.1.1)
@@ -263,8 +262,8 @@ class Proxy:
                     normalized_ip = ".".join(str(int(octet)) for octet in self.ip.split("."))
                     self.ip = normalized_ip
                 ipaddress.ip_address(self.ip)
-            except (ValueError, AttributeError):
-                raise ValueError(f"Invalid IP address: {self.ip}")
+            except (ValueError, AttributeError) as e:
+                raise ValueError(f"Invalid IP address: {self.ip}") from e
 
             # Validate port
             if not isinstance(self.port, int) or not (1 <= self.port <= 65535):
@@ -647,7 +646,7 @@ class ProxyPoolManager:
 
             config_file = Path(self.config_path)
             if config_file.exists():
-                with open(config_file, "r") as f:
+                with open(config_file) as f:
                     file_config = json.load(f)
 
                 # Update config from proxy_pool section
@@ -924,11 +923,11 @@ class ProxyPoolManager:
                 # Only load proxies that meet minimum criteria
                 # Load top proxies by score, limit to prevent memory issues
                 query = """
-                    SELECT * FROM proxies 
-                    WHERE status != ? 
+                    SELECT * FROM proxies
+                    WHERE status != ?
                     AND (score >= ? OR assigned_account IS NOT NULL)
                     AND fraud_score < ?
-                    ORDER BY 
+                    ORDER BY
                         CASE WHEN assigned_account IS NOT NULL THEN 0 ELSE 1 END,
                         score DESC
                     LIMIT ?
@@ -1145,7 +1144,7 @@ class ProxyPoolManager:
         self.is_running = False
 
         # Cancel all tasks
-        for name, task in self.poll_tasks.items():
+        for _name, task in self.poll_tasks.items():
             task.cancel()
             try:
                 await task
@@ -1484,7 +1483,7 @@ class ProxyPoolManager:
             # Limit concurrent checks within batch
             semaphore = asyncio.Semaphore(5)  # Max 5 concurrent per batch
 
-            async def check_proxy(proxy: Proxy):
+            async def check_proxy(proxy: Proxy, semaphore=semaphore):
                 async with semaphore:
                     await self._check_proxy_health(proxy)
 
@@ -1651,7 +1650,7 @@ class ProxyPoolManager:
             with self._get_connection() as conn:
                 conn.execute(
                     """
-                    DELETE FROM proxy_health_log 
+                    DELETE FROM proxy_health_log
                     WHERE timestamp < datetime('now', '-7 days')
                 """
                 )
@@ -1698,8 +1697,8 @@ class ProxyPoolManager:
 
                 # If we still need to remove more, take lowest scoring unassigned proxies
                 if len(proxies_to_remove) < to_remove_count:
-                    remaining_to_remove = to_remove_count - len(proxies_to_remove)
-                    already_marked = set(p.proxy_key for p in proxies_to_remove)
+                    to_remove_count - len(proxies_to_remove)
+                    already_marked = {p.proxy_key for p in proxies_to_remove}
 
                     for proxy in unassigned_proxies:
                         if len(proxies_to_remove) >= to_remove_count:
@@ -2161,9 +2160,9 @@ class ProxyPoolManager:
                 # Get paginated results
                 offset = (page - 1) * page_size
                 data_query = f"""
-                    SELECT * FROM proxies 
+                    SELECT * FROM proxies
                     WHERE {where_sql}
-                    ORDER BY 
+                    ORDER BY
                         CASE WHEN assigned_account IS NOT NULL THEN 0 ELSE 1 END,
                         score DESC
                     LIMIT ? OFFSET ?

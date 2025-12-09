@@ -10,24 +10,19 @@ Features:
 """
 
 import asyncio
+import json
 import logging
 import random
 import sqlite3
-import json
-import time
-from typing import List, Dict, Optional, Set, Tuple, Any
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict, field
-from enum import Enum
-from collections import defaultdict, deque
 from contextlib import contextmanager
-import statistics
-import hashlib
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 from pyrogram import Client
-from pyrogram.types import User, Chat, Message
-from pyrogram.errors import FloodWait, UserPrivacyRestricted, PeerIdInvalid
 from pyrogram.enums import UserStatus
+from pyrogram.errors import FloodWait, PeerIdInvalid, UserPrivacyRestricted
 
 logger = logging.getLogger(__name__)
 

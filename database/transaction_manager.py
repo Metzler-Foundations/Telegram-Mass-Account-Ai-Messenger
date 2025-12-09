@@ -11,14 +11,11 @@ Features:
 - Isolation level configuration
 """
 
-import sqlite3
 import logging
-import time
 import threading
-from typing import Optional, List, Callable, Any
 from contextlib import contextmanager
-from datetime import datetime
 from enum import Enum
+from typing import Any, Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 

@@ -9,13 +9,13 @@ Supports:
 - Risk data export
 """
 
-import logging
-import json
 import csv
-from typing import List, Dict, Any, Optional
+import json
+import logging
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-import sqlite3
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,7 @@ class ExportManager:
                         try:
                             account_data = json.loads(row["account_data"])
                             row.update(account_data)
-                        except:
+                        except Exception:
                             pass
                     export_data.append(row)
 

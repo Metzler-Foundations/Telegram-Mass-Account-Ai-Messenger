@@ -12,11 +12,10 @@ Features:
 
 import logging
 import sqlite3
-from typing import Dict, List, Optional, Tuple, Any
-from datetime import datetime, timedelta
-from enum import Enum
 from dataclasses import dataclass
-import statistics
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +87,7 @@ class AccountRiskMonitor:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(self.db_path)
-        except:
+        except Exception:
             pass
         self._init_database()
 
@@ -116,20 +115,20 @@ class AccountRiskMonitor:
                     phone_number TEXT PRIMARY KEY,
                     overall_score REAL NOT NULL,
                     risk_level TEXT NOT NULL,
-                    
+
                     floodwait_score REAL DEFAULT 0,
                     error_rate_score REAL DEFAULT 0,
                     activity_score REAL DEFAULT 0,
                     shadowban_score REAL DEFAULT 0,
-                    
+
                     total_floodwaits_24h INTEGER DEFAULT 0,
                     total_errors_24h INTEGER DEFAULT 0,
                     messages_sent_1h INTEGER DEFAULT 0,
                     last_floodwait TIMESTAMP,
-                    
+
                     recommended_actions TEXT,
                     should_quarantine INTEGER DEFAULT 0,
-                    
+
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -146,7 +145,7 @@ class AccountRiskMonitor:
                     severity REAL NOT NULL,
                     description TEXT,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
+
                     FOREIGN KEY(phone_number) REFERENCES account_risk_scores(phone_number)
                 )
             """
@@ -155,21 +154,21 @@ class AccountRiskMonitor:
             # Indexes
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_risk_level 
+                CREATE INDEX IF NOT EXISTS idx_risk_level
                 ON account_risk_scores(risk_level, overall_score DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_risk_quarantine 
+                CREATE INDEX IF NOT EXISTS idx_risk_quarantine
                 ON account_risk_scores(should_quarantine, updated_at DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_risk_events_phone 
+                CREATE INDEX IF NOT EXISTS idx_risk_events_phone
                 ON risk_events(phone_number, timestamp DESC)
             """
             )

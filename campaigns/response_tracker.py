@@ -10,9 +10,9 @@ Features:
 """
 
 import logging
-import asyncio
-from typing import Dict, Optional, Set
 from datetime import datetime, timedelta
+from typing import Optional
+
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
@@ -116,7 +116,7 @@ class ResponseTracker:
                     """
                     SELECT DISTINCT campaign_id, account_phone
                     FROM campaign_messages
-                    WHERE user_id = ? 
+                    WHERE user_id = ?
                     AND status = 'sent'
                     AND sent_at >= ?
                     AND sent_at IS NOT NULL

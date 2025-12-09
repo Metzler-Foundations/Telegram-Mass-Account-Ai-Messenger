@@ -6,24 +6,23 @@ Tracks actual warmup activities with database persistence
 
 import logging
 import sqlite3
-from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Dict
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QAbstractItemView,
+    QFrame,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QProgressBar,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QPushButton,
-    QFrame,
-    QGroupBox,
-    QAbstractItemView,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QColor
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +105,7 @@ class WarmupProgressWidget(QWidget):
                 return
 
             # Load REAL warmup jobs
-            with open(warmup_file, "r") as f:
+            with open(warmup_file) as f:
                 warmup_jobs = json.load(f)
 
             # Count statuses
@@ -206,7 +205,7 @@ def get_warmup_stats() -> Dict:
         if not warmup_file.exists():
             return {"total": 0, "running": 0, "completed": 0, "paused": 0, "error": 0}
 
-        with open(warmup_file, "r") as f:
+        with open(warmup_file) as f:
             warmup_jobs = json.load(f)
 
         stats = {"total": len(warmup_jobs), "running": 0, "completed": 0, "paused": 0, "error": 0}
@@ -239,7 +238,7 @@ def update_warmup_progress(
 
         # Load existing jobs
         if warmup_file.exists():
-            with open(warmup_file, "r") as f:
+            with open(warmup_file) as f:
                 warmup_jobs = json.load(f)
         else:
             warmup_jobs = {}
@@ -289,7 +288,7 @@ def complete_warmup(phone_number: str):
         warmup_file = Path("warmup_jobs.json")
 
         if warmup_file.exists():
-            with open(warmup_file, "r") as f:
+            with open(warmup_file) as f:
                 warmup_jobs = json.load(f)
 
             if phone_number in warmup_jobs:
@@ -306,7 +305,7 @@ def complete_warmup(phone_number: str):
 
         cursor.execute(
             """
-            UPDATE accounts 
+            UPDATE accounts
             SET is_warmed_up = 1, warmup_stage = 'completed', status = 'ready'
             WHERE phone_number = ?
         """,

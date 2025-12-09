@@ -2,9 +2,8 @@
 """
 Test runner script for the Telegram Bot application.
 """
-import sys
 import subprocess
-import os
+import sys
 from pathlib import Path
 
 # Get the project root directory (parent of tests/)

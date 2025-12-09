@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """AI content sandboxing - Validate and sanitize AI-generated content."""
 
-import re
 import logging
-from typing import Optional, List
+import re
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 

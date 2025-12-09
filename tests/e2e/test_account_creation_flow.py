@@ -10,11 +10,11 @@ Tests the complete account creation workflow:
 6. Verify warmup queued
 """
 
-import pytest
-import asyncio
 import sqlite3
-from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
+
 from tests.fixtures import MockTelegramClient, create_test_account
 
 
@@ -126,7 +126,7 @@ async def test_account_creation_failure_handling():
         result = await creator.create_account_with_concurrency(config)
 
         # Verify error is reported
-        assert result["success"] == False
+        assert not result["success"]
         assert "error" in result or "message" in result
 
 

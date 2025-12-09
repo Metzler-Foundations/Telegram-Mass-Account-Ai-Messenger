@@ -4,22 +4,21 @@ UX Helpers - Enhanced user experience utilities
 Provides better feedback, empty states, help dialogs, and user guidance.
 """
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QDialog,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QFrame,
     QMessageBox,
-    QDialog,
-    QTextEdit,
+    QPushButton,
     QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QIcon
-from ui.toast_notifications import show_toast
+
 from ui.theme_manager import ThemeManager
+from ui.toast_notifications import show_toast
 
 
 def show_success_toast(parent, message: str, duration: int = 3000):
@@ -114,7 +113,7 @@ def create_empty_state(
         action_btn.setObjectName("primary_button")
         action_btn.clicked.connect(action_callback)
         action_btn.setStyleSheet(
-            f"""
+            """
             margin-top: 20px;
             min-width: 160px;
         """

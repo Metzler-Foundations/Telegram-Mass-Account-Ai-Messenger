@@ -10,22 +10,20 @@ Features:
 """
 
 import asyncio
-import logging
-import sqlite3
-import random
 import json
-import re
-from typing import List, Dict, Optional, Set, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict, field
-from enum import Enum
+import logging
+import random
+import sqlite3
 from collections import defaultdict
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Dict, List, Optional
 
-from pyrogram import Client, filters
-from pyrogram.types import Message, Chat
-from pyrogram.errors import FloodWait, ReactionInvalid, ChatAdminRequired
-from pyrogram.enums import ChatType
+from pyrogram import Client
+from pyrogram.errors import ChatAdminRequired, FloodWait, ReactionInvalid
+from pyrogram.types import Message
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +120,7 @@ class EngagementAutomation:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(db_path)
-        except:
+        except Exception:
             pass
 
         self._init_database()

@@ -6,8 +6,7 @@ Fills gaps and completes partial implementations
 
 import logging
 import sqlite3
-from typing import Dict, List, Any
-from datetime import datetime
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -142,19 +141,19 @@ def ensure_database_schema_complete():
             )
             """,
             """
-            CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign 
+            CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign
             ON campaign_messages(campaign_id)
             """,
             """
-            CREATE INDEX IF NOT EXISTS idx_campaign_messages_sent_at 
+            CREATE INDEX IF NOT EXISTS idx_campaign_messages_sent_at
             ON campaign_messages(sent_at)
             """,
             """
-            CREATE INDEX IF NOT EXISTS idx_campaign_messages_status 
+            CREATE INDEX IF NOT EXISTS idx_campaign_messages_status
             ON campaign_messages(status)
             """,
             """
-            CREATE INDEX IF NOT EXISTS idx_campaigns_status 
+            CREATE INDEX IF NOT EXISTS idx_campaigns_status
             ON campaigns(status)
             """,
         ],
@@ -186,7 +185,7 @@ def add_missing_config_fields():
         config_file = Path("config.json")
 
         if config_file.exists():
-            with open(config_file, "r") as f:
+            with open(config_file) as f:
                 config = json.load(f)
         else:
             config = {}

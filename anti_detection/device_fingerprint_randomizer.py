@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Device fingerprint randomization to prevent collision."""
 
+import hashlib
 import logging
 import random
-import hashlib
 from typing import Dict
 
 logger = logging.getLogger(__name__)

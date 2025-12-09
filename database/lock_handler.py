@@ -10,13 +10,13 @@ Features:
 - Lock monitoring and diagnostics
 """
 
-import sqlite3
 import logging
-import time
 import random
-from typing import Optional, Callable, Any, TypeVar
-from functools import wraps
+import sqlite3
+import time
 from contextlib import contextmanager
+from functools import wraps
+from typing import Any, Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -275,7 +275,10 @@ def with_lock_retry(max_attempts: int = DatabaseLockHandler.DEFAULT_RETRY_ATTEMP
             # This is a simplified implementation - may need adjustment based on usage
             if args and isinstance(args[0], str):
                 db_path = args[0]
-                operation = lambda conn: func(conn, *args[1:], **kwargs)
+
+                def operation(conn):
+                    return func(conn, *args[1:], **kwargs)
+
                 return handler.execute_with_retry(db_path, operation)
             else:
                 # If db_path not in args, just call the function normally

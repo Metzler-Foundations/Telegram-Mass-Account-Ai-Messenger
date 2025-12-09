@@ -9,25 +9,26 @@ Features:
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, Optional
+
+from PyQt6.QtCore import QTime, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QCheckBox,
+    QComboBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QSpinBox,
-    QDoubleSpinBox,
-    QCheckBox,
-    QGroupBox,
-    QGridLayout,
     QTimeEdit,
-    QComboBox,
-    QMessageBox,
-    QFormLayout,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTime, pyqtSignal
-from PyQt6.QtGui import QFont
 
 from ui.theme_manager import ThemeManager
 
@@ -35,7 +36,11 @@ logger = logging.getLogger(__name__)
 
 # Try to import warmup service
 try:
-    from accounts.account_warmup_service import AccountWarmupService, WarmupConfig, WarmupPriority
+    from accounts.account_warmup_service import (  # noqa: F401
+        AccountWarmupService,
+        WarmupConfig,
+        WarmupPriority,
+    )
 
     WARMUP_AVAILABLE = True
 except ImportError:

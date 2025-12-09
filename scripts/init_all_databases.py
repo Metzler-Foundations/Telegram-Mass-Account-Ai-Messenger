@@ -6,8 +6,8 @@ This script initializes all database tables needed for the application to run.
 It's idempotent - safe to run multiple times.
 """
 
-import sys
 import sqlite3
+import sys
 from pathlib import Path
 
 # Add parent directory to path
@@ -54,7 +54,7 @@ def main():
         db_path = project_root / "members.db"
         member_db = MemberDatabase(str(db_path))
         member_db.init_database()
-        print(f"✅ Members database initialized")
+        print("✅ Members database initialized")
         success_count += 1
     except Exception as e:
         print(f"❌ Members database failed: {e}")
@@ -68,8 +68,8 @@ def main():
         member_db = MemberDatabase(str(project_root / "members.db"))
 
         # Create account manager which initializes the DB
-        acc_manager = AccountManager(member_db)
-        print(f"✅ Accounts database initialized")
+        AccountManager(member_db)
+        print("✅ Accounts database initialized")
         success_count += 1
     except Exception as e:
         print(f"❌ Accounts database failed: {e}")
@@ -80,7 +80,7 @@ def main():
         from campaigns.campaign_tracker import initialize_campaign_database
 
         initialize_campaign_database()
-        print(f"✅ Campaigns database initialized")
+        print("✅ Campaigns database initialized")
         success_count += 1
     except Exception as e:
         print(f"❌ Campaigns database failed: {e}")
@@ -90,8 +90,8 @@ def main():
     try:
         from proxy.proxy_pool_manager import ProxyPoolManager
 
-        proxy_manager = ProxyPoolManager()
-        print(f"✅ Proxy pool database initialized")
+        ProxyPoolManager()
+        print("✅ Proxy pool database initialized")
         success_count += 1
     except Exception as e:
         print(f"❌ Proxy pool database failed: {e}")
@@ -101,8 +101,8 @@ def main():
     try:
         from scraping.member_scraper import EliteAntiDetectionSystem
 
-        anti_detection = EliteAntiDetectionSystem()
-        print(f"✅ Anti-detection database initialized")
+        EliteAntiDetectionSystem()
+        print("✅ Anti-detection database initialized")
         success_count += 1
     except Exception as e:
         print(f"❌ Anti-detection database failed: {e}")
@@ -118,8 +118,8 @@ def main():
     try:
         from monitoring.account_risk_monitor import AccountRiskMonitor
 
-        risk_monitor = AccountRiskMonitor()
-        print(f"✅ Account risk monitor database initialized")
+        AccountRiskMonitor()
+        print("✅ Account risk monitor database initialized")
         success_count += 1
     except Exception as e:
         print(f"❌ Account risk monitor database failed: {e}")
@@ -144,7 +144,7 @@ def main():
         )
         conn.commit()
         conn.close()
-        print(f"✅ FloodWait events table created")
+        print("✅ FloodWait events table created")
         success_count += 1
     except Exception as e:
         print(f"❌ FloodWait events table failed: {e}")

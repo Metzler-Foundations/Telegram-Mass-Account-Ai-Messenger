@@ -12,7 +12,7 @@ DARK_THEME = """
    GLOBAL RESET & TYPOGRAPHY SYSTEM
    ============================================================================ */
 * {
-    font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 
+    font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue',
                  'Segoe UI', 'Roboto', 'Inter', Arial, sans-serif;
     outline: none;
     border: none;
@@ -363,11 +363,11 @@ QPushButton[class="success"], QPushButton#success {
     font-weight: 600;
 }
 
-QPushButton[class="success"]:hover { 
+QPushButton[class="success"]:hover {
     background-color: #28a745;
 }
 
-QPushButton[class="success"]:pressed { 
+QPushButton[class="success"]:pressed {
     background-color: #1e7e34;
 }
 
@@ -378,11 +378,11 @@ QPushButton[class="danger"], QPushButton#danger, QPushButton#stop_button {
     font-weight: 600;
 }
 
-QPushButton[class="danger"]:hover { 
+QPushButton[class="danger"]:hover {
     background-color: #d70015;
 }
 
-QPushButton[class="danger"]:pressed { 
+QPushButton[class="danger"]:pressed {
     background-color: #b80012;
 }
 
@@ -1765,7 +1765,7 @@ LIGHT_THEME = """
    GLOBAL RESET & TYPOGRAPHY SYSTEM
    ============================================================================ */
 * {
-    font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 
+    font-family: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue',
                  'Segoe UI', 'Roboto', 'Inter', Arial, sans-serif;
     outline: none;
     border: none;
@@ -2110,11 +2110,11 @@ QPushButton[class="success"], QPushButton#success {
     font-weight: 600;
 }
 
-QPushButton[class="success"]:hover { 
+QPushButton[class="success"]:hover {
     background-color: #28a745;
 }
 
-QPushButton[class="success"]:pressed { 
+QPushButton[class="success"]:pressed {
     background-color: #1e7e34;
 }
 
@@ -2125,11 +2125,11 @@ QPushButton[class="danger"], QPushButton#danger, QPushButton#stop_button {
     font-weight: 600;
 }
 
-QPushButton[class="danger"]:hover { 
+QPushButton[class="danger"]:hover {
     background-color: #d70015;
 }
 
-QPushButton[class="danger"]:pressed { 
+QPushButton[class="danger"]:pressed {
     background-color: #b80012;
 }
 

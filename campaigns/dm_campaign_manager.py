@@ -13,16 +13,15 @@ Features:
 """
 
 import asyncio
+import json
 import logging
-import sqlite3
 import random
 import re
-from typing import List, Dict, Optional, Tuple, Set, Any
+import sqlite3
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
 from enum import Enum
-from dataclasses import dataclass, asdict
-import json
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -39,17 +38,16 @@ except ImportError:
 try:
     from zoneinfo import ZoneInfo
 except ImportError:
-    from backports.zoneinfo import ZoneInfo  # Python < 3.9
+    from backports.zoneinfo import ZoneInfo  # Python < 3.9  # noqa: E402
 
-from pyrogram import Client
-from pyrogram.errors import (
+from pyrogram import Client  # noqa: E402
+from pyrogram.errors import (  # noqa: E402
     FloodWait,
-    UserPrivacyRestricted,
-    UserBlocked,
     PeerIdInvalid,
-    UserDeactivated,
     UserBannedInChannel,
-    ChatWriteForbidden,
+    UserBlocked,
+    UserDeactivated,
+    UserPrivacyRestricted,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,8 +56,6 @@ logger = logging.getLogger(__name__)
 try:
     from anti_detection.anti_detection_system import (
         EnhancedAntiDetectionSystem,
-        BanRiskLevel,
-        QuarantineReason,
     )
 
     ENHANCED_ANTI_DETECTION_AVAILABLE = True
@@ -185,12 +181,15 @@ class MessageTemplateEngine:
         try:
             from utils.utils import InputValidator
 
-            sanitize = lambda text: InputValidator.sanitize_text(str(text), max_length=100)
+            def sanitize(text):
+                return InputValidator.sanitize_text(str(text), max_length=100)
+
         except (ImportError, AttributeError):
             # Fallback sanitization that preserves apostrophes
             import re
 
-            sanitize = lambda text: re.sub(r"[^\w\s@._\'-]", "", str(text))[:100]
+            def sanitize(text):
+                return re.sub(r"[^\w\s@._\'-]", "", str(text))[:100]
 
         message = template
 
@@ -770,13 +769,13 @@ class DMCampaignManager:
 
             # Basic validation fallback
             if not name or not isinstance(name, str):
-                raise ValueError("Campaign name is required and must be a string")
+                raise ValueError("Campaign name is required and must be a string") from None
             if not template or not isinstance(template, str):
-                raise ValueError("Message template is required and must be a string")
+                raise ValueError("Message template is required and must be a string") from None
             if not target_member_ids or not isinstance(target_member_ids, list):
-                raise ValueError("Target member IDs must be a non-empty list")
+                raise ValueError("Target member IDs must be a non-empty list") from None
             if not account_ids or not isinstance(account_ids, list):
-                raise ValueError("Account IDs must be a non-empty list")
+                raise ValueError("Account IDs must be a non-empty list") from None
 
         if not account_ids:
             raise ValueError("At least one account must be specified")
@@ -844,7 +843,7 @@ class DMCampaignManager:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO campaigns 
+                INSERT INTO campaigns
                 (name, template, status, target_channel_id, target_member_ids, account_ids,
                  total_targets, rate_limit_delay, max_messages_per_hour, max_messages_per_account, config,
                  scheduled_start, scheduled_end, active_hours_start, active_hours_end, active_days,
@@ -951,7 +950,7 @@ class DMCampaignManager:
         with self._get_connection() as conn:
             conn.execute(
                 """
-                UPDATE campaigns 
+                UPDATE campaigns
                 SET status = ?, started_at = ?
                 WHERE id = ?
             """,
@@ -1190,7 +1189,7 @@ class DMCampaignManager:
                         else 0
                     ),
                     messages_1h=(
-                        len([m for m in self.messages_sent_today.get(account_phone, [])])
+                        len(list(self.messages_sent_today.get(account_phone, [])))
                         if account_phone in self.messages_sent_today
                         else 0
                     ),
@@ -1793,8 +1792,8 @@ class DMCampaignManager:
             # Get message status counts
             cursor = conn.execute(
                 """
-                SELECT status, COUNT(*) 
-                FROM campaign_messages 
+                SELECT status, COUNT(*)
+                FROM campaign_messages
                 WHERE campaign_id = ?
                 GROUP BY status
             """,
@@ -2018,14 +2017,14 @@ class DMCampaignManager:
                 # Create index for fast lookups
                 conn.execute(
                     """
-                    CREATE INDEX IF NOT EXISTS idx_floodwait_account 
+                    CREATE INDEX IF NOT EXISTS idx_floodwait_account
                     ON floodwait_events(account_phone, timestamp DESC)
                 """
                 )
 
                 conn.execute(
                     """
-                    CREATE INDEX IF NOT EXISTS idx_floodwait_campaign 
+                    CREATE INDEX IF NOT EXISTS idx_floodwait_campaign
                     ON floodwait_events(campaign_id, timestamp DESC)
                 """
                 )
@@ -2045,7 +2044,7 @@ class DMCampaignManager:
                 # Insert event
                 conn.execute(
                     """
-                    INSERT INTO floodwait_events 
+                    INSERT INTO floodwait_events
                     (campaign_id, account_phone, wait_time_seconds, severity, guidance)
                     VALUES (?, ?, ?, ?, ?)
                 """,

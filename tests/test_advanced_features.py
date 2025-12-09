@@ -124,7 +124,7 @@ def test_dependencies():
     for module, purpose in deps.items():
         try:
             if module == "PIL":
-                import PIL
+                import PIL  # noqa: F401
             else:
                 __import__(module)
             print(f"✅ {module} - {purpose}")

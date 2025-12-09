@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """SSL/TLS configuration and hardening."""
 
-import ssl
 import logging
+import ssl
 
 logger = logging.getLogger(__name__)
 

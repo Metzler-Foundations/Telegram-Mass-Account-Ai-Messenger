@@ -9,14 +9,14 @@ Features:
 - Path sanitization
 """
 
-import os
 import hashlib
-import tempfile
-import shutil
-import logging
-from pathlib import Path
-from typing import Optional, Dict
 import json
+import logging
+import os
+import shutil
+import tempfile
+from pathlib import Path
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ class FileSecurityManager:
         """Load integrity database."""
         if self.integrity_file.exists():
             try:
-                with open(self.integrity_file, "r") as f:
+                with open(self.integrity_file) as f:
                     self.integrity_hashes = json.load(f)
             except Exception as e:
                 logger.warning(f"Failed to load integrity db: {e}")

@@ -5,29 +5,29 @@ Actually tests proxy connections, not simulated
 """
 
 import logging
-import time
 import socket
-import requests
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from typing import Dict, List
+
+import requests
+from PyQt6.QtCore import QThread, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QAbstractItemView,
+    QCheckBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
+    QMessageBox,
+    QProgressBar,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QProgressBar,
-    QMessageBox,
-    QGroupBox,
-    QAbstractItemView,
-    QCheckBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
-from PyQt6.QtGui import QColor, QFont
 
 logger = logging.getLogger(__name__)
 
@@ -245,11 +245,12 @@ class ProxyMonitorWidget(QWidget):
         try:
             import json
             from pathlib import Path
+
             from PyQt6.QtWidgets import QMessageBox
 
             config_file = Path("config.json")
             if config_file.exists():
-                with open(config_file, "r") as f:
+                with open(config_file) as f:
                     config = json.load(f)
 
                 # Get proxy list from config
@@ -520,7 +521,7 @@ class ProxyMonitorWidget(QWidget):
 
             # Load existing config
             if config_file.exists():
-                with open(config_file, "r") as f:
+                with open(config_file) as f:
                     config = json.load(f)
             else:
                 config = {}

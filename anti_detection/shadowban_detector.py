@@ -10,11 +10,10 @@ Features:
 
 import asyncio
 import logging
-import sqlite3
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from typing import Dict, List, Optional
 
 from pyrogram import Client
 from pyrogram.errors import FloodWait
@@ -55,7 +54,7 @@ class ShadowBanDetector:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(self.db_path)
-        except:
+        except Exception:
             pass
         self._init_database()
 
@@ -129,7 +128,7 @@ class ShadowBanDetector:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO canary_accounts 
+            INSERT OR REPLACE INTO canary_accounts
             (canary_id, user_id, phone_number, is_active, added_at)
             VALUES (?, ?, ?, 1, ?)
         """,
@@ -201,8 +200,8 @@ class ShadowBanDetector:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO delivery_tests 
-            (test_id, account_id, canary_id, message_sent, message_received, 
+            INSERT INTO delivery_tests
+            (test_id, account_id, canary_id, message_sent, message_received,
              delay_seconds, timestamp)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
@@ -227,7 +226,7 @@ class ShadowBanDetector:
         # Get current stats
         cursor.execute(
             """
-            SELECT total_tests, failed_tests FROM account_status 
+            SELECT total_tests, failed_tests FROM account_status
             WHERE account_id = ?
         """,
             (account_id,),
@@ -256,7 +255,7 @@ class ShadowBanDetector:
         # Update status
         cursor.execute(
             """
-            INSERT OR REPLACE INTO account_status 
+            INSERT OR REPLACE INTO account_status
             (account_id, shadowban_status, delivery_rate, last_successful_delivery,
              total_tests, failed_tests, last_updated)
             VALUES (?, ?, ?, ?, ?, ?, ?)

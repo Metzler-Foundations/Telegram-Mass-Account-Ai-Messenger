@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Username validator - Ensure valid Telegram usernames."""
 
-import re
 import logging
+import re
 from typing import Optional
 
 logger = logging.getLogger(__name__)

@@ -5,14 +5,14 @@ Service Container - Dependency injection and service management.
 import asyncio
 import logging
 import os
-from typing import Dict, Any, Optional, List
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
 
-from core.config_manager import ConfigurationManager
 from ai.gemini_service import GeminiService
-from scraping.database import MemberDatabase
 from anti_detection.anti_detection_system import AntiDetectionSystem
+from core.config_manager import ConfigurationManager
 from integrations.api_key_manager import APIKeyManager
+from scraping.database import MemberDatabase
 
 # TelegramClient will be imported lazily in the factory method
 

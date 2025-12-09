@@ -4,14 +4,14 @@ Crash Recovery - REAL crash detection and recovery system
 Detects abnormal shutdowns and recovers state
 """
 
-import logging
-import json
 import atexit
+import json
+import logging
 import signal
 import sys
-from pathlib import Path
-from typing import Dict, Optional
 from datetime import datetime
+from pathlib import Path
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class CrashRecovery:
         """Load REAL application state from file."""
         try:
             if self.state_file.exists():
-                with open(self.state_file, "r") as f:
+                with open(self.state_file) as f:
                     state = json.load(f)
                 logger.info("Application state loaded")
                 return state
@@ -155,8 +155,7 @@ class CrashRecovery:
 
 
 # Import os for getpid
-import os
-
+import os  # noqa: E402
 
 # Global instance
 crash_recovery = CrashRecovery()

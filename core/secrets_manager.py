@@ -10,14 +10,13 @@ Features:
 - No plaintext secrets in config files
 """
 
-import os
+import base64
 import json
 import logging
+import os
 from pathlib import Path
-from typing import Dict, Any, Optional
-from datetime import datetime
-import base64
-import hashlib
+from typing import Any, Dict, Optional
+
 from cryptography.fernet import Fernet
 
 from core.security_audit import audit_credential_access, audit_credential_modification
@@ -252,7 +251,7 @@ class SecretsManager:
             logger.warning(f"Config file not found: {config_path}")
             return 0
 
-        with open(config_file, "r") as f:
+        with open(config_file) as f:
             config = json.load(f)
 
         secrets_migrated = 0
@@ -309,7 +308,7 @@ class SecretsManager:
         if not config_file.exists():
             return
 
-        with open(config_file, "r") as f:
+        with open(config_file) as f:
             config = json.load(f)
 
         # Replace secrets with placeholders

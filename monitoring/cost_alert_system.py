@@ -12,10 +12,10 @@ Features:
 
 import logging
 import sqlite3
-from typing import Dict, List, Optional, Callable, Any
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -108,14 +108,14 @@ class CostAlertSystem:
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_alerts_level 
+                CREATE INDEX IF NOT EXISTS idx_alerts_level
                 ON cost_alerts(alert_level, timestamp DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_alerts_acknowledged 
+                CREATE INDEX IF NOT EXISTS idx_alerts_acknowledged
                 ON cost_alerts(acknowledged, timestamp DESC)
             """
             )

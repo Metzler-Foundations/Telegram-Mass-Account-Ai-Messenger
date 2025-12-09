@@ -2,8 +2,8 @@
 """Handle missing data gracefully in analytics dashboard."""
 
 import logging
-from typing import Optional, Any, Dict, List
 from datetime import datetime, timedelta
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

@@ -10,8 +10,8 @@ Features:
 
 import logging
 import math
-from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -272,7 +272,7 @@ class VariantStatistics:
 
                 cursor = conn.execute(
                     """
-                    SELECT 
+                    SELECT
                         template_variant,
                         COUNT(*) as total_sent,
                         SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as success_count

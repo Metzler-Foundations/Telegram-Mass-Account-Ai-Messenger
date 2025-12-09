@@ -2,7 +2,7 @@
 """Chart rendering with fallback."""
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class ChartRenderer:
     def _check_matplotlib(self) -> bool:
         """Check if matplotlib is available."""
         try:
-            import matplotlib
+            import matplotlib  # noqa: F401
 
             return True
         except ImportError:
@@ -49,7 +49,7 @@ class ChartRenderer:
             from PIL import Image, ImageDraw
 
             img = Image.new("RGB", (800, 600), "white")
-            draw = ImageDraw.Draw(img)
+            ImageDraw.Draw(img)
 
             # Draw simple bar chart
             if output_path:

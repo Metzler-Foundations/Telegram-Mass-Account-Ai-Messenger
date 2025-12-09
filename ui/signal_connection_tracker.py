@@ -12,9 +12,8 @@ Features:
 
 import logging
 import weakref
-from typing import Dict, List, Optional, Callable, Any, Set
 from contextlib import contextmanager
-from functools import wraps
+from typing import Any, Callable, Dict, List, Optional
 
 try:
     from PyQt6.QtCore import QObject, pyqtSignal
@@ -22,7 +21,8 @@ try:
     PYQT_AVAILABLE = True
 except ImportError:
     try:
-        from PySide6.QtCore import QObject, Signal as pyqtSignal
+        from PySide6.QtCore import QObject
+        from PySide6.QtCore import Signal as pyqtSignal  # noqa: F401
 
         PYQT_AVAILABLE = True
     except ImportError:
@@ -141,7 +141,7 @@ class SignalConnectionTracker:
         active_connections = 0
         dead_references = 0
 
-        for obj_id, connections in self._connections.items():
+        for _obj_id, connections in self._connections.items():
             for conn in connections:
                 sender = conn["sender"]()
                 if sender is not None:
@@ -242,7 +242,7 @@ class SignalConnectionTracker:
                 return signal.__name__
             else:
                 return str(signal)
-        except:
+        except Exception:
             return "unknown"
 
 
@@ -445,8 +445,9 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
 
     if PYQT_AVAILABLE:
-        from PyQt6.QtWidgets import QApplication, QPushButton, QWidget
         import sys
+
+        from PyQt6.QtWidgets import QApplication, QPushButton, QWidget
 
         try:
             from ui.theme_manager import ThemeManager

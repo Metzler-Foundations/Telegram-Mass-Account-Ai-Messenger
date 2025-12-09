@@ -1,51 +1,31 @@
 import asyncio
-import logging
-import re
-import random
-import hashlib
 import json
-import secrets
+import logging
+import random
+import re
 import sqlite3
-from typing import List, Dict, Optional, Tuple, Set, Any, Union
-from datetime import datetime, timedelta
-from collections import defaultdict, deque
+import statistics
 import threading
 import time
-import psutil
-import statistics
-import math
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from pyrogram import Client
-from pyrogram.types import ChatMember, Chat, Message, User, Reaction, Poll
-from pyrogram.enums import ChatMemberStatus, ChatMembersFilter, ChatType
-from pyrogram.errors import (
-    FloodWait,
-    UserPrivacyRestricted,
-    UserBlocked,
-    PeerIdInvalid,
-    UserDeactivated,
-    UserBannedInChannel,
-    ChatWriteForbidden,
-    AuthKeyInvalid,
-    SessionPasswordNeeded,
-    PhoneCodeInvalid,
-    PhoneCodeExpired,
-    BadRequest,
-)
+from pyrogram.enums import ChatMembersFilter, ChatMemberStatus, ChatType
+from pyrogram.types import ChatMember, User
+
+from .database import MemberDatabase
 
 # Import refactored modules
 from .models import (
-    ScrapingRisk,
     AccountHealth,
-    SessionMetrics,
     GeographicProfile,
-    ScrapingMethod,
     JobStatus,
-    ScrapingJob,
-    ScrapingConfig,
-    calculate_risk_score,
+    ScrapingMethod,
+    ScrapingRisk,
+    SessionMetrics,
 )
-from .database import MemberDatabase
 
 # Import resumable scraping
 try:
@@ -206,7 +186,6 @@ class EliteAntiDetectionSystem:
 
     def _start_health_monitoring(self):
         """Start real-time health monitoring."""
-        import threading
 
         self.monitoring_active = True
         self.monitor_thread = threading.Thread(target=self._health_monitor_loop, daemon=True)
@@ -654,7 +633,7 @@ class DistributedScrapingCoordinator:
                 task = task_data["task"]
 
                 # Execute task
-                result = await self._execute_task(account_id, task)
+                await self._execute_task(account_id, task)
 
                 # Mark task as done
                 self.task_queue.task_done()
@@ -932,10 +911,10 @@ class ComprehensiveDataExtractor:
         """Initialize all data analysis modules."""
         # Profile photo analysis
         try:
-            import cv2
-            import pytesseract
-            from PIL import Image
-            import numpy as np
+            import cv2  # noqa: F401
+            import numpy as np  # noqa: F401
+            import pytesseract  # noqa: F401
+            from PIL import Image  # noqa: F401
 
             self.profile_analyzers["ocr"] = self._analyze_profile_photo_ocr
             self.profile_analyzers["metadata"] = self._analyze_profile_photo_metadata
@@ -946,8 +925,8 @@ class ComprehensiveDataExtractor:
 
         # Bio analysis
         try:
-            import nltk
-            from textblob import TextBlob
+            import nltk  # noqa: F401
+            from textblob import TextBlob  # noqa: F401
 
             self.profile_analyzers["sentiment"] = self._analyze_bio_sentiment
             self.profile_analyzers["keywords"] = self._analyze_bio_keywords
@@ -1123,7 +1102,6 @@ class ComprehensiveDataExtractor:
         try:
             import cv2
             import pytesseract
-            from PIL import Image
 
             # Load image
             image = cv2.imread(photo_path)
@@ -1152,8 +1130,9 @@ class ComprehensiveDataExtractor:
         metadata = {}
 
         try:
-            from PIL import Image
             import os
+
+            from PIL import Image
 
             # Get file size
             metadata["file_size"] = os.path.getsize(photo_path)
@@ -2827,7 +2806,7 @@ class EliteMemberScraper:
 
         # Validate inputs
         try:
-            from user_helpers import ValidationHelper
+            from user_helpers import ValidationHelper  # noqa: F401
 
             # Validate channel identifier
             if not channel_identifier or not isinstance(channel_identifier, str):
@@ -3356,7 +3335,7 @@ class EliteMemberScraper:
                     import re
 
                     mentions = re.findall(r"@(\w+)", message.text)
-                    for username in mentions:
+                    for _username in mentions:
                         # Note: This doesn't give us user IDs directly
                         # Would need additional API calls to resolve usernames
                         pass
@@ -3505,7 +3484,7 @@ class EliteMemberScraper:
             all_members.extend(members)
 
         # Calculate unique members
-        unique_ids = set(member["user_id"] for member in all_members)
+        unique_ids = {member["user_id"] for member in all_members}
         stats["unique_members"] = len(unique_ids)
 
         # Calculate average data completeness

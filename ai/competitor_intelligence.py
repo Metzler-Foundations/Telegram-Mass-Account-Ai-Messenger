@@ -8,17 +8,13 @@ Features:
 - Identify overlapping target audiences
 """
 
-import asyncio
-import logging
-import sqlite3
 import json
-from typing import List, Dict, Optional, Set
-from datetime import datetime, timedelta
+import logging
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, List, Optional, Set
 
-from pyrogram import Client
-from pyrogram.types import Message, User
-from pyrogram.errors import FloodWait
+from pyrogram.types import Message
 
 logger = logging.getLogger(__name__)
 
@@ -235,8 +231,8 @@ class CompetitorIntelligence:
         # Count messages
         cursor.execute(
             """
-            SELECT COUNT(*), COUNT(DISTINCT group_id) 
-            FROM competitor_messages 
+            SELECT COUNT(*), COUNT(DISTINCT group_id)
+            FROM competitor_messages
             WHERE competitor_id = ?
         """,
             (competitor_id,),
@@ -246,8 +242,8 @@ class CompetitorIntelligence:
         # Calculate messages per day
         cursor.execute(
             """
-            SELECT MIN(timestamp), MAX(timestamp) 
-            FROM competitor_messages 
+            SELECT MIN(timestamp), MAX(timestamp)
+            FROM competitor_messages
             WHERE competitor_id = ?
         """,
             (competitor_id,),
@@ -263,7 +259,7 @@ class CompetitorIntelligence:
         # Get active groups
         cursor.execute(
             """
-            SELECT DISTINCT group_id FROM competitor_messages 
+            SELECT DISTINCT group_id FROM competitor_messages
             WHERE competitor_id = ?
         """,
             (competitor_id,),
@@ -336,7 +332,7 @@ class CompetitorIntelligence:
         for user_id in our_targets:
             cursor.execute(
                 """
-                SELECT 1 FROM target_overlap 
+                SELECT 1 FROM target_overlap
                 WHERE user_id = ? AND competitor_id = ?
             """,
                 (user_id, competitor_id),

@@ -4,10 +4,9 @@ User-Friendly Helpers - Validation, Error Messages, and Guidance
 Translates technical errors into actionable user guidance
 """
 
-import re
 import logging
-from typing import Dict, Any, Tuple, Optional, List
-from pathlib import Path
+import re
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 

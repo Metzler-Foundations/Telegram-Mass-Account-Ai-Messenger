@@ -4,10 +4,8 @@ Test script to verify that all application components can be imported and initia
 This runs without the GUI for testing in headless environments.
 """
 
-import sys
 import os
-import asyncio
-from pathlib import Path
+import sys
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -37,7 +35,6 @@ def test_imports():
             return False
 
     try:
-        from telegram.telegram_client import TelegramClient
 
         print("✅ telegram.telegram_client imports successful")
     except Exception as e:
@@ -45,7 +42,6 @@ def test_imports():
         return False
 
     try:
-        from ai.gemini_service import GeminiService
 
         print("✅ ai.gemini_service imports successful")
     except Exception as e:
@@ -53,7 +49,6 @@ def test_imports():
         return False
 
     try:
-        from accounts.account_creator import AccountCreator
 
         print("✅ accounts.account_creator imports successful")
     except Exception as e:
@@ -61,7 +56,6 @@ def test_imports():
         return False
 
     try:
-        from scraping.member_scraper import MemberDatabase
 
         print("✅ scraping.member_scraper imports successful")
     except Exception as e:
@@ -69,7 +63,6 @@ def test_imports():
         return False
 
     try:
-        from anti_detection.anti_detection_system import AntiDetectionSystem
 
         print("✅ anti_detection.anti_detection_system imports successful")
     except Exception as e:
@@ -94,7 +87,7 @@ def test_initialization():
         # Test MemberDatabase
         from scraping.member_scraper import MemberDatabase
 
-        db = MemberDatabase()
+        MemberDatabase()
         print("✅ MemberDatabase initialized")
 
         return True

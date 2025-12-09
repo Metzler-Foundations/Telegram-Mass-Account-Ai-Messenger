@@ -8,11 +8,10 @@ Features:
 - Slight variations to avoid detection
 """
 
-import logging
 import hashlib
+import logging
 import random
 from pathlib import Path
-from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

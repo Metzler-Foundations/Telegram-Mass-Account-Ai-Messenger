@@ -8,10 +8,10 @@ Features:
 - Realistic location paths
 """
 
-import random
 import math
-from typing import Tuple, List
+import random
 from dataclasses import dataclass
+from typing import List, Tuple
 
 
 @dataclass

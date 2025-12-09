@@ -4,15 +4,13 @@ Config Security - REAL encryption for sensitive configuration data
 Encrypts API keys and credentials using industry-standard AES-256
 """
 
-import logging
-import json
 import base64
+import json
+import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict
+
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
-from cryptography.hazmat.backends import default_backend
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +121,7 @@ class ConfigEncryption:
 
     def load_encrypted_config(self, file_path: str = "config.json") -> Dict:
         """Load and decrypt config with REAL decryption."""
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             encrypted = json.load(f)
 
         decrypted = self.decrypt_config(encrypted)
@@ -137,7 +135,7 @@ def encrypt_existing_config():
         encryptor = ConfigEncryption()
 
         # Load plaintext config
-        with open("config.json", "r") as f:
+        with open("config.json") as f:
             config = json.load(f)
 
         # Check if already encrypted

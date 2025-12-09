@@ -12,12 +12,12 @@ Features:
 
 import asyncio
 import logging
-import time
 import socket
 import threading
-from typing import Optional, Callable, TypeVar, Any
-from functools import wraps
+import time
 from contextlib import contextmanager
+from functools import wraps
+from typing import Any, Callable, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 

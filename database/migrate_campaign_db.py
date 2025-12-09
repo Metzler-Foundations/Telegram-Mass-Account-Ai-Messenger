@@ -5,8 +5,8 @@ Database migration script for campaigns database.
 Adds indexes for campaign message queries to improve performance.
 """
 
-import sqlite3
 import logging
+import sqlite3
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")

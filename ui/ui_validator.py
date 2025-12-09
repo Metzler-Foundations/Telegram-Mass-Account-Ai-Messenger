@@ -2,8 +2,9 @@
 """UI input validation before backend submission."""
 
 import logging
-from typing import Optional, Callable
-from PyQt6.QtWidgets import QPushButton, QLineEdit, QTextEdit
+from typing import Callable, Optional
+
+from PyQt6.QtWidgets import QLineEdit, QPushButton
 
 logger = logging.getLogger(__name__)
 

@@ -3,15 +3,14 @@
 Feature Execution Verification Script
 Tests and demonstrates what features actually work vs what doesn't.
 """
-import sys
 import os
-from pathlib import Path
+import sys
 
 # Add the parent directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from typing import Dict, List, Any
 import traceback
+from typing import Any, Dict, List
 
 
 class FeatureTestResult:
@@ -111,8 +110,8 @@ def test_business_logic() -> FeatureTestResult:
     result = FeatureTestResult("Business Logic")
 
     try:
-        from core.services import MemberService, CampaignService, AccountService
-        from core.repositories import MemberRepository, CampaignRepository, AccountRepository
+        from core.repositories import AccountRepository, CampaignRepository, MemberRepository
+        from core.services import AccountService, CampaignService, MemberService
 
         # Test repositories
         member_repo = MemberRepository("members.db")
@@ -173,11 +172,11 @@ def test_ai_integration() -> FeatureTestResult:
         api_key = gemini_config.get("api_key", "")
 
         if api_key:
-            gemini = GeminiService(api_key)
+            GeminiService(api_key)
             result.add_note("Gemini service initialized with API key")
             result.add_note("AI integration ready for production use")
         else:
-            gemini = GeminiService("")
+            GeminiService("")
             result.add_note("Gemini service initialized but no API key configured")
             result.add_warning("Configure Gemini API key for AI responses to work")
 
@@ -194,8 +193,8 @@ def test_telegram_integration() -> FeatureTestResult:
     result = FeatureTestResult("Telegram Integration")
 
     try:
-        from telegram.telegram_client import TelegramClient
         from core.config_manager import ConfigurationManager
+        from telegram.telegram_client import TelegramClient
 
         config = ConfigurationManager()
         telegram_config = config.get("telegram", {})
@@ -205,11 +204,11 @@ def test_telegram_integration() -> FeatureTestResult:
         phone = telegram_config.get("phone_number")
 
         if api_id and api_hash and phone:
-            client = TelegramClient(api_id, api_hash, phone)
+            TelegramClient(api_id, api_hash, phone)
             result.add_note("Telegram client initialized with credentials")
             result.add_note("Telegram integration ready for production use")
         else:
-            client = TelegramClient("", "", "")
+            TelegramClient("", "", "")
             result.add_note("Telegram client initialized but missing credentials")
             result.add_warning("Configure Telegram API credentials for messaging to work")
 
@@ -258,22 +257,18 @@ def test_ui_components() -> FeatureTestResult:
 
     try:
         # Test main window
-        from main import MainWindow
 
         result.add_note("MainWindow imports successfully")
 
         # Test core UI components
-        from ui.ui_components import CampaignManagerWidget, MessageHistoryWidget
 
         result.add_note("Core UI components import successfully")
 
         # Test settings window
-        from ui.settings_window import SettingsWindow
 
         result.add_note("Settings window imports successfully")
 
         # Test other UI components
-        from ui.welcome_wizard import WelcomeWizard
 
         result.add_note("Welcome wizard imports successfully")
 

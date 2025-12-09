@@ -3,19 +3,20 @@ Retry Dialog - Enhanced error dialogs with retry functionality.
 """
 
 import logging
-from typing import Callable, Optional, Any
-from PyQt6.QtWidgets import (
-    QDialog,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTextEdit,
-    QFrame,
-    QProgressBar,
-)
+from typing import Callable, Optional
+
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 from ui.theme_manager import ThemeManager
 
@@ -168,7 +169,7 @@ class RetryDialog(QDialog):
         buttons_layout.addWidget(cancel_btn)
 
         if self.retry_callback:
-            self.retry_btn = QPushButton(f"Retry")
+            self.retry_btn = QPushButton("Retry")
             self.retry_btn.setMinimumWidth(120)
             self.retry_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
             self.retry_btn.clicked.connect(self.do_retry)

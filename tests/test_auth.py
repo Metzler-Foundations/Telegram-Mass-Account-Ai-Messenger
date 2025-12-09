@@ -4,8 +4,8 @@ Test script to verify Telegram authentication works
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

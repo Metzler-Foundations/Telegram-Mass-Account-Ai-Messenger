@@ -6,8 +6,8 @@ This script imports every Python module in the project to identify any issues
 that don't require API keys.
 """
 
-import sys
 import importlib
+import sys
 from pathlib import Path
 
 # Add parent directory to path
@@ -135,14 +135,14 @@ def test_imports():
 
     if warnings:
         print("\nModules with Warnings:")
-        for module_name, description, warning_msgs in warnings:
+        for _module_name, description, warning_msgs in warnings:
             print(f"  ⚠️  {description}")
             for msg in warning_msgs[:2]:  # Show first 2 warnings
                 print(f"     {msg[:80]}")
 
     if failed:
         print("\nFailed Modules:")
-        for module_name, description, error in failed:
+        for _module_name, description, error in failed:
             print(f"  ❌ {description}")
             print(f"     {error[:80]}")
 

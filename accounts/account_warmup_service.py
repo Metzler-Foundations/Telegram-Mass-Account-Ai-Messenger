@@ -1,15 +1,13 @@
 import asyncio
+import json
 import logging
 import random
-import json
-import os
 import time
-from typing import Dict, List, Optional, Any, Tuple, Callable
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass, asdict
 from pathlib import Path
-import psutil
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 try:
     from ai.gemini_service import GeminiService
@@ -1121,8 +1119,8 @@ class AccountWarmupService:
             await self._respect_rate_limits()
 
             # Import contact method
-            from pyrogram.types import InputPhoneContact
             from pyrogram import raw
+            from pyrogram.types import InputPhoneContact
 
             contact = InputPhoneContact(
                 phone=phone_number, first_name=first_name, last_name=last_name
@@ -1232,7 +1230,7 @@ class AccountWarmupService:
         """View recent chats."""
         try:
             if client and client.client:
-                async for dialog in client.client.get_dialogs(limit=10):
+                async for _dialog in client.client.get_dialogs(limit=10):
                     # Just accessing the dialog is enough to "view" it
                     pass
         except Exception as e:
@@ -1771,7 +1769,7 @@ class AccountWarmupService:
             return
 
         try:
-            with open(self.jobs_file, "r") as f:
+            with open(self.jobs_file) as f:
                 data = json.load(f)
 
             # Load queued jobs
@@ -1808,7 +1806,7 @@ class AccountWarmupService:
             return
 
         try:
-            with open(self.activity_file, "r") as f:
+            with open(self.activity_file) as f:
                 data = json.load(f)
 
             for key, entries in data.items():
@@ -1945,7 +1943,6 @@ class WarmupIntelligence:
             response = await self.gemini_service.generate_reply(
                 prompt, chat_id=f"photo_suggest_{phone_number}"
             )
-            import json
 
             return json.loads(response)
         except Exception as e:
@@ -2022,14 +2019,14 @@ class WarmupIntelligence:
         try:
             prompt = f"""
             For a Telegram account {phone_number}, suggest a realistic contact to add.
-            
+
             Return in JSON format:
             {{
                 "phone_number": "+1234567890",
                 "first_name": "Name",
                 "last_name": "Last"
             }}
-            
+
             Make it look natural and region-appropriate.
             """
 
@@ -2065,14 +2062,14 @@ class WarmupIntelligence:
         try:
             prompt = f"""
             For a Telegram account {phone_number}, suggest a safe, public group to join.
-            
+
             Return in JSON format:
             {{
                 "username": "groupname",
                 "chat_id": null,
                 "reason": "why this group is appropriate"
             }}
-            
+
             Suggest groups that are:
             - Public and easily joinable
             - Active but not spammy

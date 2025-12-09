@@ -2,10 +2,10 @@
 Shared utilities and constants to avoid circular imports.
 """
 
-import re
 import random
+import re
 import string
-from typing import Dict, Any, Tuple
+from typing import Tuple
 
 # Event types for decoupled communication
 EVENT_MESSAGE_RECEIVED = "message.received"
@@ -74,7 +74,7 @@ class ApplicationContext:
         if self._event_system:
             try:
                 self._event_system.publish(event_type, data)
-            except Exception as e:
+            except Exception:
                 # Don't let event publishing break the main flow
                 pass
 
@@ -259,7 +259,7 @@ class InputValidator:
         phone = phone.strip()
 
         # Check against common patterns
-        for pattern_name, pattern in InputValidator.PHONE_PATTERNS.items():
+        for _pattern_name, pattern in InputValidator.PHONE_PATTERNS.items():
             if pattern.match(phone):
                 return True, "Valid phone number"
 
@@ -274,7 +274,7 @@ class InputValidator:
         url = url.strip()
 
         # Check different formats
-        for pattern_name, pattern in InputValidator.CHANNEL_PATTERNS.items():
+        for _pattern_name, pattern in InputValidator.CHANNEL_PATTERNS.items():
             if pattern.match(url):
                 return True, "Valid channel identifier"
 

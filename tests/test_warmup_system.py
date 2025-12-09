@@ -5,8 +5,8 @@ This avoids import issues with main.py.
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,7 +21,7 @@ async def test_warmup_system():
         print("Testing API Key Manager...")
         from integrations.api_key_manager import APIKeyManager
 
-        api_manager = APIKeyManager()
+        APIKeyManager()
         print("✅ API Key Manager initialized")
 
         # Test Advanced Cloning System (skip due to import dependencies)
@@ -48,7 +48,6 @@ async def test_warmup_system():
         # Test the warmup service structure (without Gemini for now)
         from accounts.account_warmup_service import (
             AccountWarmupService,
-            WarmupStage,
             WarmupPriority,
         )
 

@@ -12,11 +12,10 @@ Features:
 
 import logging
 import sqlite3
-import json
-from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +75,7 @@ class DeliveryAnalytics:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(self.db_path)
-        except:
+        except Exception:
             pass
         self._init_database()
 
@@ -97,21 +96,21 @@ class DeliveryAnalytics:
                     campaign_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
                     account_phone TEXT NOT NULL,
-                    
+
                     sent_at TIMESTAMP NOT NULL,
                     delivered_at TIMESTAMP,
                     read_at TIMESTAMP,
                     replied_at TIMESTAMP,
-                    
+
                     delivery_time_seconds REAL,
                     read_time_seconds REAL,
                     response_time_seconds REAL,
-                    
+
                     status TEXT NOT NULL,
-                    
+
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
+
                     UNIQUE(campaign_id, user_id)
                 )
             """
@@ -120,28 +119,28 @@ class DeliveryAnalytics:
             # Indexes for performance
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_delivery_campaign 
+                CREATE INDEX IF NOT EXISTS idx_delivery_campaign
                 ON delivery_events(campaign_id, status)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_delivery_account 
+                CREATE INDEX IF NOT EXISTS idx_delivery_account
                 ON delivery_events(account_phone, sent_at DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_delivery_status 
+                CREATE INDEX IF NOT EXISTS idx_delivery_status
                 ON delivery_events(status, sent_at DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_delivery_user 
+                CREATE INDEX IF NOT EXISTS idx_delivery_user
                 ON delivery_events(user_id, campaign_id)
             """
             )
@@ -155,19 +154,19 @@ class DeliveryAnalytics:
                     total_delivered INTEGER DEFAULT 0,
                     total_read INTEGER DEFAULT 0,
                     total_replied INTEGER DEFAULT 0,
-                    
+
                     avg_delivery_time_seconds REAL,
                     avg_read_time_seconds REAL,
                     avg_response_time_seconds REAL,
-                    
+
                     median_response_time_seconds REAL,
-                    
+
                     delivery_rate REAL,
                     read_rate REAL,
                     response_rate REAL,
-                    
+
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
+
                     FOREIGN KEY(campaign_id) REFERENCES campaigns(id)
                 )
             """
@@ -191,7 +190,7 @@ class DeliveryAnalytics:
             with self._get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT INTO delivery_events 
+                    INSERT INTO delivery_events
                     (message_id, campaign_id, user_id, account_phone, sent_at, status)
                     VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(campaign_id, user_id) DO UPDATE SET
@@ -247,7 +246,7 @@ class DeliveryAnalytics:
                 conn.execute(
                     """
                     UPDATE delivery_events
-                    SET delivered_at = ?, 
+                    SET delivered_at = ?,
                         delivery_time_seconds = ?,
                         status = ?,
                         updated_at = CURRENT_TIMESTAMP
@@ -299,7 +298,7 @@ class DeliveryAnalytics:
                 conn.execute(
                     """
                     UPDATE delivery_events
-                    SET read_at = ?, 
+                    SET read_at = ?,
                         read_time_seconds = ?,
                         status = ?,
                         updated_at = CURRENT_TIMESTAMP
@@ -345,7 +344,7 @@ class DeliveryAnalytics:
                 conn.execute(
                     """
                     UPDATE delivery_events
-                    SET replied_at = ?, 
+                    SET replied_at = ?,
                         response_time_seconds = ?,
                         status = ?,
                         updated_at = CURRENT_TIMESTAMP
@@ -370,7 +369,7 @@ class DeliveryAnalytics:
                 # Calculate statistics
                 cursor = conn.execute(
                     """
-                    SELECT 
+                    SELECT
                         COUNT(*) as total_sent,
                         SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) as total_delivered,
                         SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) as total_read,
@@ -400,7 +399,7 @@ class DeliveryAnalytics:
                 # Calculate median response time
                 cursor = conn.execute(
                     """
-                    SELECT response_time_seconds 
+                    SELECT response_time_seconds
                     FROM delivery_events
                     WHERE campaign_id = ? AND response_time_seconds IS NOT NULL
                     ORDER BY response_time_seconds
@@ -492,7 +491,7 @@ class DeliveryAnalytics:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
                     """
-                    SELECT 
+                    SELECT
                         COUNT(*) as total_sent,
                         SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) as total_delivered,
                         SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) as total_read,
@@ -543,7 +542,7 @@ class DeliveryAnalytics:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
                     """
-                    SELECT 
+                    SELECT
                         COUNT(*) as total_sent,
                         SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as total_delivered,
                         SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as total_read,
@@ -589,7 +588,7 @@ class DeliveryAnalytics:
                 if campaign_id:
                     cursor = conn.execute(
                         """
-                        SELECT response_time_seconds 
+                        SELECT response_time_seconds
                         FROM delivery_events
                         WHERE campaign_id = ? AND response_time_seconds IS NOT NULL
                         ORDER BY response_time_seconds
@@ -599,7 +598,7 @@ class DeliveryAnalytics:
                 else:
                     cursor = conn.execute(
                         """
-                        SELECT response_time_seconds 
+                        SELECT response_time_seconds
                         FROM delivery_events
                         WHERE response_time_seconds IS NOT NULL
                         ORDER BY response_time_seconds

@@ -2,8 +2,8 @@
 """Account banned status detection."""
 
 import logging
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 

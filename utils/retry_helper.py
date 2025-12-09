@@ -6,11 +6,11 @@ Provides user-friendly retry mechanisms for failed operations
 
 import asyncio
 import logging
-import time
 import random
-from typing import Callable, Any, Optional, List, Dict
+import time
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +286,7 @@ class OperationRecovery:
             from pathlib import Path
 
             if Path(self.state_file).exists():
-                with open(self.state_file, "r") as f:
+                with open(self.state_file) as f:
                     self.state = json.load(f)
                 logger.info(f"Loaded operation state: {len(self.state)} operations")
         except Exception as e:

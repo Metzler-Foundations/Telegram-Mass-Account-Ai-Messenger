@@ -6,7 +6,6 @@ without modifying existing code extensively.
 """
 
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime
 from functools import wraps
 
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 # Import audit logging
 try:
-    from accounts.account_audit_log import get_audit_log, AuditEvent, AuditEventType
+    from accounts.account_audit_log import AuditEvent, AuditEventType, get_audit_log
 
     AUDIT_AVAILABLE = True
 except ImportError:

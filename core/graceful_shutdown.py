@@ -12,13 +12,12 @@ Features:
 """
 
 import asyncio
-import signal
 import logging
-import time
-from typing import List, Callable, Optional, Any, Coroutine
-from datetime import datetime
+import signal
 import threading
+import time
 from enum import Enum
+from typing import Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +242,7 @@ class GracefulShutdownManager:
                 await asyncio.wait_for(
                     asyncio.gather(*tasks, return_exceptions=True), timeout=self.task_timeout
                 )
-                logger.info(f"✓ All tasks completed")
+                logger.info("✓ All tasks completed")
         except asyncio.TimeoutError:
             with self.task_lock:
                 remaining = len(self.active_tasks)
@@ -268,8 +267,8 @@ class GracefulShutdownManager:
 
         # Clean up temporary files
         try:
-            import tempfile
             import shutil
+            import tempfile
             from pathlib import Path
 
             temp_dirs = [Path(tempfile.gettempdir()) / "telegram_bot", Path(".") / "temp"]

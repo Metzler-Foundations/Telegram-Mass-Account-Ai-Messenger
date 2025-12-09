@@ -10,22 +10,21 @@ Features:
 """
 
 import logging
-from typing import Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Optional
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QComboBox,
+    QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QGroupBox,
-    QGridLayout,
     QPushButton,
-    QComboBox,
-    QTableWidget,
-    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
 
 from ui.theme_manager import ThemeManager
 
@@ -323,7 +322,7 @@ class DeliveryAnalyticsWidget(QWidget):
                 """
                 )
 
-                current_index = self.campaign_selector.currentIndex()
+                self.campaign_selector.currentIndex()
                 current_data = self.campaign_selector.currentData()
 
                 self.campaign_selector.clear()
@@ -385,9 +384,11 @@ class DeliveryAnalyticsWidget(QWidget):
     def export_data(self):
         """Export delivery analytics data."""
         try:
-            from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
-            from utils.export_manager import get_export_manager
             from datetime import datetime
+
+            from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
+
+            from utils.export_manager import get_export_manager
 
             # Ask for time period
             period_options = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "All Time"]

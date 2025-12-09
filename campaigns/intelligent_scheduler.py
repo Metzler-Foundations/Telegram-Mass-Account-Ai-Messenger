@@ -8,17 +8,17 @@ Features:
 - Follow-up automation
 """
 
-import logging
-import sqlite3
 import json
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
+import logging
 import random
+import sqlite3
+from datetime import datetime, timedelta
+from typing import Dict, List, Tuple
 
 try:
-    from zoneinfo import ZoneInfo
+    from zoneinfo import ZoneInfo  # noqa: F401
 except ImportError:
-    from backports.zoneinfo import ZoneInfo
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ class IntelligentScheduler:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO scheduled_messages 
+            INSERT INTO scheduled_messages
             (user_id, message_text, scheduled_time, timezone, created_at)
             VALUES (?, ?, ?, ?, ?)
         """,

@@ -2,9 +2,10 @@
 """Query result caching layer."""
 
 import hashlib
-import time
 import logging
-from typing import Any, Optional, Callable
+import time
+from typing import Any, Optional
+
 from utils.memory_manager import LRUCache
 
 logger = logging.getLogger(__name__)

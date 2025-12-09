@@ -10,14 +10,13 @@ Features:
 - Enable forensic analysis and cost reporting
 """
 
+import json
 import logging
 import sqlite3
-import json
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
-from pathlib import Path
+from dataclasses import asdict, dataclass
+from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -109,14 +108,15 @@ class AccountAuditLog:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(self.db_path)
-        except:
-            pass
+        except Exception as exc:
+            logger.warning("Connection pool unavailable; falling back to direct sqlite3 (%s)", exc)
+            self._connection_pool = None
         self._init_database()
 
     def _get_connection(self):
         if self._connection_pool:
             return self._connection_pool.get_connection()
-        return self._get_connection()
+        return sqlite3.connect(self.db_path)
 
     def _init_database(self):
         """Initialize audit log database."""
@@ -129,24 +129,19 @@ class AccountAuditLog:
                     phone_number TEXT NOT NULL,
                     event_type TEXT NOT NULL,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    
                     proxy_used TEXT,
                     proxy_country TEXT,
                     device_fingerprint TEXT,
-                    
                     sms_provider TEXT,
                     sms_transaction_id TEXT,
                     sms_operator TEXT,
                     sms_cost REAL,
                     sms_currency TEXT DEFAULT 'USD',
-                    
                     username_attempted TEXT,
                     username_success INTEGER,
-                    
                     success INTEGER DEFAULT 1,
                     error_message TEXT,
                     metadata TEXT,
-                    
                     total_cost REAL
                 )
             """
@@ -155,35 +150,35 @@ class AccountAuditLog:
             # Indexes for fast queries
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_audit_phone 
+                CREATE INDEX IF NOT EXISTS idx_audit_phone
                 ON audit_events(phone_number, timestamp DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_audit_event_type 
+                CREATE INDEX IF NOT EXISTS idx_audit_event_type
                 ON audit_events(event_type, timestamp DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_audit_proxy 
+                CREATE INDEX IF NOT EXISTS idx_audit_proxy
                 ON audit_events(proxy_used, timestamp DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_audit_sms_provider 
+                CREATE INDEX IF NOT EXISTS idx_audit_sms_provider
                 ON audit_events(sms_provider, timestamp DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_audit_timestamp 
+                CREATE INDEX IF NOT EXISTS idx_audit_timestamp
                 ON audit_events(timestamp DESC)
             """
             )
@@ -282,7 +277,7 @@ class AccountAuditLog:
             conn.execute(
                 """
                 INSERT INTO account_summary (
-                    phone_number, created_at, total_cost_usd, proxy_used, 
+                    phone_number, created_at, total_cost_usd, proxy_used,
                     device_fingerprint, sms_provider, username, status, last_updated
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -348,7 +343,7 @@ class AccountAuditLog:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
                     """
-                    SELECT * FROM audit_events 
+                    SELECT * FROM audit_events
                     WHERE phone_number = ?
                     ORDER BY timestamp DESC
                     LIMIT ?
@@ -363,8 +358,12 @@ class AccountAuditLog:
                     if event_dict.get("metadata"):
                         try:
                             event_dict["metadata"] = json.loads(event_dict["metadata"])
-                        except:
-                            pass
+                        except Exception as exc:
+                            logger.debug(
+                                "Failed to parse metadata JSON for event %s: %s",
+                                event_dict.get("event_id"),
+                                exc,
+                            )
                     events.append(event_dict)
 
                 return events
@@ -454,7 +453,7 @@ class AccountAuditLog:
                     # Stats for specific proxy
                     cursor = conn.execute(
                         """
-                        SELECT 
+                        SELECT
                             COUNT(*) as total_uses,
                             SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successes,
                             SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failures,
@@ -472,7 +471,7 @@ class AccountAuditLog:
                     # Top proxies by usage
                     cursor = conn.execute(
                         """
-                        SELECT 
+                        SELECT
                             proxy_used,
                             COUNT(*) as total_uses,
                             SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successes

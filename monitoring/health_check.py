@@ -11,12 +11,12 @@ Features:
 """
 
 import logging
-import time
 import threading
-from typing import Dict, List, Callable, Optional, Any
+import time
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass, asdict
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +121,9 @@ class HealthCheckManager:
     def check_disk_space(self) -> tuple:
         """Check available disk space."""
         try:
-            import psutil
             from pathlib import Path
+
+            import psutil
 
             # Check disk for database directory
             db_path = Path(".")
@@ -291,8 +292,8 @@ def create_health_endpoint():
 
     Returns a simple HTTP server for /health endpoint.
     """
-    from http.server import HTTPServer, BaseHTTPRequestHandler
     import json
+    from http.server import BaseHTTPRequestHandler, HTTPServer
 
     class HealthHandler(BaseHTTPRequestHandler):
         def do_GET(self):

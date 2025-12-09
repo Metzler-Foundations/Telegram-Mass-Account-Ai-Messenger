@@ -9,10 +9,6 @@ Features:
 """
 
 import logging
-import sqlite3
-import json
-from typing import List, Dict, Optional
-from datetime import datetime
 import random
 
 logger = logging.getLogger(__name__)

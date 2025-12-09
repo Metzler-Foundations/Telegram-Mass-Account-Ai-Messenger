@@ -9,16 +9,15 @@ Features:
 """
 
 import hashlib
-import logging
-import sqlite3
 import json
+import logging
 import re
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
-from collections import defaultdict
-from contextlib import contextmanager
+import sqlite3
 import statistics
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -554,7 +553,7 @@ class ConversationAnalyzer:
 
             cursor.execute(
                 """
-                UPDATE message_patterns 
+                UPDATE message_patterns
                 SET times_used = ?, success_count = ?, conversion_rate = ?, last_used = ?
                 WHERE pattern_id = ?
             """,

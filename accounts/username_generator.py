@@ -3,12 +3,10 @@ Advanced Username Generator for creating visually similar usernames.
 Uses Unicode lookalike characters, strategic replacements, and intelligent variations.
 """
 
-import random
-import string
-import re
 import logging
-from typing import Optional, List, Tuple
-import unicodedata
+import random
+import re
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +91,7 @@ class UsernameGenerator:
         # Clean source username
         source_username = source_username.strip().lstrip("@")
 
-        for attempt in range(max_attempts):
+        for _attempt in range(max_attempts):
             # Strategy 1: Unicode lookalike replacement (most effective)
             username = self._apply_lookalike_replacements(source_username)
 

@@ -8,13 +8,12 @@ Features:
 - Metadata analysis
 """
 
-import logging
-import sqlite3
 import hashlib
-from typing import Dict, Optional, Tuple
-from datetime import datetime
+import logging
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -238,7 +237,7 @@ class MediaIntelligence:
         # Calculate averages
         cursor.execute(
             """
-            SELECT COUNT(*), AVG(reactions_count), 
+            SELECT COUNT(*), AVG(reactions_count),
                    SUM(CASE WHEN got_response = 1 THEN 1 ELSE 0 END) * 1.0 / COUNT(*)
             FROM media_performance
             WHERE media_hash = ?

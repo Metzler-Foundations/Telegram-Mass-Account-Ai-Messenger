@@ -9,12 +9,12 @@ Features:
 - Validation caching
 """
 
-import logging
 import asyncio
+import logging
 from typing import Optional
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QPushButton, QLabel
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QColor
+
+from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
 
 logger = logging.getLogger(__name__)
 

@@ -6,28 +6,22 @@ Provides help dialogs, tutorials, and enhanced widgets
 
 import logging
 import webbrowser
-from typing import Optional, List, Dict, Any, Callable
+from typing import Dict, List, Optional
 
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
-    QWidget,
-    QVBoxLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QTextEdit,
-    QMessageBox,
     QProgressDialog,
-    QFrame,
+    QPushButton,
     QScrollArea,
-    QGroupBox,
-    QGridLayout,
-    QSizePolicy,
-    QCheckBox,
-    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont, QColor, QPalette
 
 from ui.theme_manager import ThemeManager
 

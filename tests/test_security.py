@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Security module tests."""
 
-import pytest
-from core.authentication import AuthenticationManager, UserRole, Permission
+from core.authentication import AuthenticationManager, Permission, UserRole
 from utils.csrf_protection import CSRFProtection
 from utils.security_logger import PIIRedactor
 
@@ -42,7 +41,7 @@ class TestAuthentication:
     def test_account_lockout(self):
         auth = AuthenticationManager(max_failed_attempts=3)
 
-        for i in range(5):
+        for _i in range(5):
             auth.record_login_attempt("user123", False)
 
         assert auth.is_account_locked("user123") is True

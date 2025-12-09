@@ -10,8 +10,7 @@ This module wraps existing campaign functionality to automatically:
 """
 
 import logging
-import asyncio
-from typing import List, Dict, Optional
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,8 @@ Database migration script for proxy pool.
 This script adds missing indexes and updates the database schema to improve performance.
 """
 
-import sqlite3
 import logging
+import sqlite3
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")

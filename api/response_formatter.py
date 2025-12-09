@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Standardized API response formatting."""
 
-from typing import Any, Optional
 from datetime import datetime
+from typing import Any
 
 
 class APIResponse:

@@ -1,38 +1,34 @@
 import logging
-from typing import Dict, List, Optional
-from datetime import datetime
 from pathlib import Path
+from typing import Dict, Optional
 
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QAbstractItemView,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGroupBox,
     QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
     QLabel,
+    QLineEdit,
+    QListWidget,
+    QMessageBox,
+    QProgressBar,
     QPushButton,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
-    QProgressBar,
-    QHeaderView,
-    QFrame,
-    QMessageBox,
-    QDialog,
-    QFormLayout,
-    QLineEdit,
-    QTextEdit,
-    QComboBox,
-    QListWidget,
-    QAbstractItemView,
-    QSplitter,
-    QGroupBox,
     QTabWidget,
-    QScrollArea,
-    QGroupBox as QGroupBoxWidget,
-    QInputDialog,
-    QFileDialog,
-    QGraphicsOpacityEffect,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurve
-from PyQt6.QtGui import QColor, QIcon, QMovie, QPixmap
 
 from core.error_handler import ErrorHandler
 from ui.theme_manager import ThemeManager
@@ -52,7 +48,6 @@ class LoadingOverlay(QWidget):
     def setup_ui(self):
         """Set up the loading overlay UI."""
         c = ThemeManager.get_colors()
-        is_dark = ThemeManager.current_theme == "dark"
 
         # Convert hex to rgba for overlay background
         bg_hex = c["BG_PRIMARY"].lstrip("#")

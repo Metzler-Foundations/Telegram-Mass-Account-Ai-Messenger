@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Member deduplication system."""
 
-import logging
 import hashlib
-from typing import Set, Optional
+import logging
+from typing import Optional, Set
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """Command sanitization - Prevent command injection."""
 
-import shlex
-import re
 import logging
-from typing import List, Optional
+import shlex
+from typing import List
 
 logger = logging.getLogger(__name__)
 

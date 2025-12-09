@@ -1,17 +1,18 @@
 import asyncio
-import logging
-import json
-import os
 import base64
-import hashlib
+import json
+import logging
+import os
 import secrets
-from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import aiohttp
 import google.generativeai as genai
+
+from core.security_audit import audit_api_validation
 from monitoring.performance_monitor import get_resilience_manager
-from core.security_audit import audit_api_validation, audit_security_violation
 
 logger = logging.getLogger(__name__)
 
@@ -173,8 +174,8 @@ class APIKeyManager:
                 backend = keyring.get_keyring()
                 if getattr(backend, "priority", 0) <= 0:
                     raise NoKeyringError("No usable keyring backend")
-            except NoKeyringError:
-                raise ImportError("No keyring backend available")
+            except NoKeyringError as e:
+                raise ImportError("No keyring backend available") from e
 
             # Try to get existing key from keyring
             stored_key = keyring.get_password(keyring_service_name, "encryption_key")
@@ -204,7 +205,6 @@ class APIKeyManager:
 
             # Try to set restrictive permissions on the directory
             try:
-                import os
                 import stat
 
                 config_dir.chmod(stat.S_IRWXU)  # Owner read/write/execute only
@@ -355,7 +355,7 @@ class APIKeyManager:
         try:
             # Check circuit breaker
             if not self.api_key_circuit_breaker.can_execute():
-                logger.warning(f"API key operations circuit breaker is OPEN, rejecting request")
+                logger.warning("API key operations circuit breaker is OPEN, rejecting request")
                 return False
 
             # Validate inputs
@@ -414,7 +414,7 @@ class APIKeyManager:
             # Validate the key immediately (schedule for async execution)
             # Note: This is called from sync context, so we need to handle it properly
             try:
-                loop = asyncio.get_running_loop()
+                asyncio.get_running_loop()
                 asyncio.create_task(self.validate_api_key(service))
             except RuntimeError:
                 # No running loop, validation will happen on next access
@@ -831,7 +831,7 @@ class APIKeyManager:
             return
 
         try:
-            with open(self.keys_file, "r", encoding="utf-8") as f:
+            with open(self.keys_file, encoding="utf-8") as f:
                 loaded_keys = json.load(f)
 
             # Validate loaded data is a dictionary

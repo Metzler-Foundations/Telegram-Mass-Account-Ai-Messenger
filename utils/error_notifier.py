@@ -2,7 +2,7 @@
 """Error notification system - Alert users of errors."""
 
 import logging
-from typing import Optional, Callable
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 

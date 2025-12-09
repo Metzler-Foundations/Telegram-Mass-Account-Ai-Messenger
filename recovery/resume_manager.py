@@ -5,25 +5,23 @@ Allows users to resume interrupted operations from where they left off
 """
 
 import logging
-import json
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime
+from typing import Any, Optional
+
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QDialog,
-    QWidget,
-    QVBoxLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QMessageBox,
-    QHeaderView,
-    QAbstractItemView,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont
 
 from utils.retry_helper import OperationRecovery
 

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Button debouncer to prevent double-clicks and duplicate submissions."""
 
-import time
 import logging
-from typing import Dict, Callable, Any
+import time
 from functools import wraps
-from PyQt6.QtWidgets import QPushButton
+from typing import Callable, Dict
+
 from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QPushButton
 
 logger = logging.getLogger(__name__)
 

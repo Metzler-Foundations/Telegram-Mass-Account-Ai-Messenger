@@ -8,13 +8,12 @@ Features:
 - Timezone-aware scheduling
 """
 
+import json
 import logging
 import sqlite3
-import json
-from typing import Dict, List, Tuple, Optional
-from datetime import datetime, timedelta, time
 from collections import defaultdict
-import statistics
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -136,4 +135,4 @@ class TimingOptimizer:
         return results
 
 
-import random
+import random  # noqa: E402

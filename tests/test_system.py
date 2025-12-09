@@ -4,12 +4,12 @@ Comprehensive system test script for Telegram AI Assistant
 Tests all imports, dependencies, and basic functionality before running main app
 """
 
-import sys
-import os
 import importlib
+import os
 import subprocess
+import sys
 import traceback
-from typing import List, Dict, Tuple
+from typing import Dict
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -117,7 +117,7 @@ class SystemTester:
         """Test AI service imports and basic functionality"""
         try:
             # Test google.generativeai import
-            import google.generativeai as genai
+            import google.generativeai as genai  # noqa: F401
 
             self.log_success("Google Generative AI module available")
             return True
@@ -209,12 +209,13 @@ class SystemTester:
     def test_database_creation(self) -> bool:
         """Test database creation and basic operations"""
         try:
-            from member_scraper import MemberDatabase
-            from datetime import datetime
+            import os
 
             # Test database creation
             import tempfile
-            import os
+            from datetime import datetime
+
+            from member_scraper import MemberDatabase
 
             temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
             temp_db.close()
@@ -242,7 +243,7 @@ class SystemTester:
                 # Clean up temp file
                 try:
                     os.unlink(temp_db.name)
-                except:
+                except Exception:
                     pass
                 return True
             else:
@@ -250,7 +251,7 @@ class SystemTester:
                 # Clean up temp file
                 try:
                     os.unlink(temp_db.name)
-                except:
+                except Exception:
                     pass
                 return False
 
@@ -258,7 +259,7 @@ class SystemTester:
             # Clean up temp file on error
             try:
                 os.unlink(temp_db.name)
-            except:
+            except Exception:
                 pass
             self.log_error(f"Database test failed: {e}")
             return False
@@ -309,7 +310,7 @@ class SystemTester:
             missing_packages = []
 
             try:
-                import psutil
+                import psutil  # noqa: F401
             except ImportError:
                 missing_packages.append("psutil")
 
@@ -354,8 +355,6 @@ class SystemTester:
         try:
             # Test that all GUI classes can be imported without instantiation
             try:
-                from main import MainWindow
-                from settings_window import SettingsWindow
 
                 self.log_success("GUI classes imported successfully")
             except Exception as e:
@@ -365,20 +364,20 @@ class SystemTester:
             # Test that all required PyQt6 widgets are available as classes
             try:
                 from PyQt6.QtWidgets import (
-                    QComboBox,
-                    QProgressBar,
-                    QListWidget,
-                    QTextEdit,
-                    QLineEdit,
                     QCheckBox,
-                    QSpinBox,
-                    QPushButton,
-                    QLabel,
-                    QGroupBox,
-                    QTabWidget,
+                    QComboBox,
                     QDialog,
-                    QVBoxLayout,
+                    QGroupBox,
                     QHBoxLayout,
+                    QLabel,
+                    QLineEdit,
+                    QListWidget,
+                    QProgressBar,
+                    QPushButton,
+                    QSpinBox,
+                    QTabWidget,
+                    QTextEdit,
+                    QVBoxLayout,
                 )
 
                 # Just check that these are classes, don't instantiate
@@ -492,7 +491,7 @@ def main():
 
     try:
         success = tester.run_all_tests()
-        summary = tester.get_summary()
+        tester.get_summary()
 
         if success:
             print("\n🚀 All systems go! Ready to launch Telegram AI Assistant.")

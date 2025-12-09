@@ -8,11 +8,10 @@ without blocking the UI or consuming too many resources.
 
 import asyncio
 import logging
-import time
-from datetime import datetime, timedelta
-from typing import Optional, Set
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Optional, Set
 
 logger = logging.getLogger(__name__)
 

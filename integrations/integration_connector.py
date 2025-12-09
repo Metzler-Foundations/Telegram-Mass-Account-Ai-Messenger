@@ -5,7 +5,7 @@ Ensures REAL data flows between all components
 """
 
 import logging
-from typing import Dict, List, Optional, Callable, Any
+from typing import Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class AccountCreatorIntegration:
 
     async def create_account_with_tracking(self, config: Dict) -> Dict:
         """Create account with REAL progress tracking and checkpointing."""
-        from resume_manager import save_operation_checkpoint, clear_operation_checkpoint
+        from resume_manager import clear_operation_checkpoint, save_operation_checkpoint
         from user_helpers import translate_error
 
         operation_id = f"account_creation_{config.get('phone_provider', 'unknown')}_{int(datetime.now().timestamp())}"
@@ -43,7 +43,7 @@ class AccountCreatorIntegration:
                 logger.info("✅ Account creation completed, checkpoint cleared")
             else:
                 # Keep checkpoint for retry
-                logger.warning(f"Account creation failed, checkpoint saved for resume")
+                logger.warning("Account creation failed, checkpoint saved for resume")
 
             return result
 
@@ -63,8 +63,8 @@ class CampaignIntegration:
         self, campaign_id: int, progress_callback: Optional[Callable] = None
     ) -> Dict:
         """Run campaign with REAL progress tracking and database updates."""
-        from campaign_tracker import save_campaign_message, update_campaign_status
-        from database_queries import campaign_queries, member_queries
+        from campaign_tracker import update_campaign_status
+        from database_queries import campaign_queries
 
         try:
             # Get REAL campaign data
@@ -101,8 +101,8 @@ class MemberScraperIntegration:
         self, channel_url: str, progress_callback: Optional[Callable] = None
     ) -> Dict:
         """Scrape members with REAL progress and database saving."""
-        from resume_manager import save_operation_checkpoint, clear_operation_checkpoint
-        import re
+
+        from resume_manager import clear_operation_checkpoint, save_operation_checkpoint
 
         operation_id = f"member_scrape_{channel_url}_{int(datetime.now().timestamp())}"
 
@@ -273,7 +273,7 @@ class AnalyticsIntegration:
     @staticmethod
     def get_dashboard_metrics() -> Dict:
         """Get ALL dashboard metrics from REAL database."""
-        from database_queries import member_queries, campaign_queries, account_queries
+        from database_queries import account_queries, campaign_queries, member_queries
         from warmup_tracker import get_warmup_stats
 
         try:
@@ -320,7 +320,7 @@ class AnalyticsIntegration:
 
 
 # Import datetime at module level
-from datetime import datetime
+from datetime import datetime  # noqa: E402
 
 
 def integrate_all_systems(main_window):

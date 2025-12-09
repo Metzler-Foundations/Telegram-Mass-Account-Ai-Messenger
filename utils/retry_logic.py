@@ -11,14 +11,14 @@ Features:
 """
 
 import asyncio
-import time
-import random
 import logging
+import random
 import threading
-from typing import Callable, Optional, Any, Type, List
-from functools import wraps
-from datetime import datetime, timedelta
+import time
+from datetime import datetime
 from enum import Enum
+from functools import wraps
+from typing import Any, Callable, Optional, Type
 
 logger = logging.getLogger(__name__)
 
@@ -261,7 +261,7 @@ class CircuitBreaker:
             self._on_success()
             return result
 
-        except self.expected_exception as e:
+        except self.expected_exception:
             self._on_failure()
             raise
 

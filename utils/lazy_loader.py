@@ -6,9 +6,9 @@ Defers expensive operations until actually needed.
 """
 
 import logging
-from typing import Callable, TypeVar, Generic, Optional, Any
-from functools import wraps
 import threading
+from functools import wraps
+from typing import Any, Callable, Generic, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 

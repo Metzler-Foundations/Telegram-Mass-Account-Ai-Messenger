@@ -2,9 +2,9 @@
 Mock Telegram client for testing.
 """
 
-from typing import Optional, List, Dict, Any
-from datetime import datetime
 import asyncio
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 class MockUser:

@@ -1,9 +1,8 @@
 """Tests for Gemini AI service."""
 
 import pytest
-import asyncio
-from unittest.mock import Mock, patch, AsyncMock
-from tests.fixtures import MockGeminiService, MockGenerativeModel
+
+from tests.fixtures import MockGeminiService
 
 
 class TestGeminiService:

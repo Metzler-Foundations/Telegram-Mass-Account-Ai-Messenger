@@ -9,36 +9,27 @@ Features:
 - Connection status tracking
 """
 
-import asyncio
 import logging
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, List
+
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
-    QGroupBox,
-    QProgressBar,
-    QComboBox,
-    QSpinBox,
     QCheckBox,
-    QTabWidget,
+    QComboBox,
     QFrame,
     QGridLayout,
-    QMessageBox,
-    QSplitter,
-    QTextEdit,
-    QScrollArea,
+    QHBoxLayout,
+    QLabel,
     QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
     QSizePolicy,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush
 
 from core.error_handler import ErrorHandler
 from ui.theme_manager import ThemeManager
@@ -52,13 +43,13 @@ logger = logging.getLogger(__name__)
 
 # Try to import chart components (optional)
 try:
-    from PyQt6.QtCharts import (
+    from PyQt6.QtCharts import (  # noqa: F401
+        QBarCategoryAxis,
+        QBarSeries,
+        QBarSet,
         QChart,
         QChartView,
         QPieSeries,
-        QBarSeries,
-        QBarSet,
-        QBarCategoryAxis,
         QValueAxis,
     )
 
@@ -70,10 +61,10 @@ except ImportError:
 # Try to import enhanced anti-detection
 try:
     from anti_detection.anti_detection_system import (
+        AccountRiskMetrics,  # noqa: F401
+        BanRiskLevel,  # noqa: F401
         EnhancedAntiDetectionSystem,
-        BanRiskLevel,
-        AccountRiskMetrics,
-        QuarantineReason,
+        QuarantineReason,  # noqa: F401
     )
 
     ANTI_DETECTION_AVAILABLE = True

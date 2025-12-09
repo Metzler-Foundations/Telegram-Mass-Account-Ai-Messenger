@@ -3,17 +3,15 @@ Business Logic Layer - Service classes containing business rules and workflows.
 """
 
 import logging
-from typing import List, Dict, Any, Optional
-from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Any, Dict, List
 
-from core.repositories import MemberRepository, CampaignRepository, AccountRepository
-from core.error_handler import ErrorHandler
+from core.repositories import AccountRepository, CampaignRepository, MemberRepository
 
 logger = logging.getLogger(__name__)
 
 
-class BaseService(ABC):
+class BaseService:
     """Base service class with common functionality."""
 
     def __init__(self, repository):

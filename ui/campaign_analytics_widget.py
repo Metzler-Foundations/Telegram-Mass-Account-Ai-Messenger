@@ -10,46 +10,44 @@ Features:
 """
 
 import logging
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Dict, List
+
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
+    QMessageBox,
+    QProgressBar,
     QPushButton,
+    QScrollArea,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QGroupBox,
-    QProgressBar,
-    QComboBox,
-    QSpinBox,
-    QCheckBox,
     QTabWidget,
-    QFrame,
-    QGridLayout,
-    QMessageBox,
-    QSplitter,
-    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
 
 logger = logging.getLogger(__name__)
 
 # Try to import chart components
 try:
-    from PyQt6.QtCharts import (
-        QChart,
-        QChartView,
-        QPieSeries,
-        QLineSeries,
+    from PyQt6.QtCharts import (  # noqa: F401
+        QBarCategoryAxis,
         QBarSeries,
         QBarSet,
-        QBarCategoryAxis,
-        QValueAxis,
+        QChart,
+        QChartView,
         QDateTimeAxis,
+        QLineSeries,
+        QPieSeries,
+        QValueAxis,
     )
 
     CHARTS_AVAILABLE = True
@@ -123,7 +121,7 @@ class DeliveryRateChart(QWidget):
         from ui.theme_manager import ThemeManager
 
         chart_colors = ThemeManager.get_chart_colors()
-        c = ThemeManager.get_colors()
+        ThemeManager.get_colors()
 
         if not CHARTS_AVAILABLE:
             label = QLabel("Charts require PyQt6-Charts package")
@@ -888,6 +886,7 @@ class CampaignAnalyticsWidget(QWidget):
 
         try:
             from PyQt6.QtWidgets import QFileDialog, QInputDialog
+
             from utils.export_manager import get_export_manager
 
             # Ask for format

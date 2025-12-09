@@ -4,31 +4,29 @@ Backup & Restore - REAL backup system for all data
 Creates actual compressed backups with complete data
 """
 
-import logging
-import shutil
-import tarfile
-import zipfile
 import json
-from pathlib import Path
-from typing import List, Optional, Dict
+import logging
+import zipfile
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
-    QWidget,
-    QVBoxLayout,
+    QFileDialog,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
-    QFileDialog,
     QProgressBar,
-    QCheckBox,
-    QGroupBox,
+    QPushButton,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
-from PyQt6.QtGui import QFont
 
 logger = logging.getLogger(__name__)
 

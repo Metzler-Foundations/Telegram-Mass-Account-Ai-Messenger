@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Message validator - Validate Telegram messages for length, emoji, formatting."""
 
-import re
 import logging
 from typing import Optional
 

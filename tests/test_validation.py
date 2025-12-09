@@ -2,10 +2,11 @@
 """Unit tests for validation modules."""
 
 import pytest
-from utils.input_validation import InputValidator, ValidationError, SQLQueryBuilder
-from utils.message_validator import MessageValidator
+
 from accounts.phone_normalizer import PhoneNormalizer
 from accounts.username_validator import UsernameValidator
+from utils.input_validation import InputValidator, SQLQueryBuilder, ValidationError
+from utils.message_validator import MessageValidator
 
 
 class TestInputValidation:

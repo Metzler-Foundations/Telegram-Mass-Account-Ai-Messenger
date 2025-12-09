@@ -11,26 +11,22 @@ Features:
 - Message diversity scoring
 """
 
-import asyncio
-import logging
-import random
-import time
-import hashlib
-import platform
-import psutil
-import subprocess
-import threading
-import sqlite3
 import json
-import re
-from typing import Dict, List, Optional, Any, Tuple, Set, Callable
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from collections import defaultdict, deque
+import logging
 import os
+import platform
+import random
+import re
 import sys
-import statistics
+import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+import psutil
 
 logger = logging.getLogger(__name__)
 
@@ -232,10 +228,9 @@ class SystemFingerprintMasker:
             import uuid
 
             return ":".join(
-                [
-                    "{:02x}".format((uuid.getnode() >> elements) & 0xFF)
-                    for elements in range(0, 8 * 6, 8)
-                ][::-1]
+                [f"{(uuid.getnode() >> elements) & 0xFF:02x}" for elements in range(0, 8 * 6, 8)][
+                    ::-1
+                ]
             )
         except (OSError, ValueError):
             return "00:00:00:00:00:00"
@@ -457,7 +452,7 @@ class BehavioralPatternSimulator:
             ]
 
         # Apply current period modifiers
-        for period, config in self.user_patterns["activity_cycles"].items():
+        for _period, config in self.user_patterns["activity_cycles"].items():
             if isinstance(config, dict) and "start" in config:
                 if config["start"] <= current_hour < config["end"]:
                     base_activity *= config["activity_multiplier"]
@@ -481,7 +476,7 @@ class BehavioralPatternSimulator:
         rand = random.random()
         cumulative_prob = 0.0
 
-        for pattern_name, pattern_data in patterns.items():
+        for _pattern_name, pattern_data in patterns.items():
             cumulative_prob += pattern_data["probability"]
             if rand <= cumulative_prob:
                 delay_min, delay_max = pattern_data["delay_range"]
@@ -1308,7 +1303,7 @@ class AccountQuarantineManager:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(db_path)
-        except:
+        except Exception:
             pass
         self._init_database()
         self.quarantine_callbacks: List[Callable[[str, QuarantineReason], None]] = []
@@ -1382,7 +1377,7 @@ class AccountQuarantineManager:
                 # Add to active quarantine
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO active_quarantine 
+                    INSERT OR REPLACE INTO active_quarantine
                     (account_id, reason, quarantined_at, release_at, metrics_snapshot)
                     VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)
                 """,
@@ -1392,7 +1387,7 @@ class AccountQuarantineManager:
                 # Log to history
                 conn.execute(
                     """
-                    INSERT INTO quarantine_history 
+                    INSERT INTO quarantine_history
                     (account_id, reason, duration_minutes, metrics_snapshot)
                     VALUES (?, ?, ?, ?)
                 """,
@@ -1424,8 +1419,8 @@ class AccountQuarantineManager:
                 # Update history
                 conn.execute(
                     """
-                    UPDATE quarantine_history 
-                    SET released_at = CURRENT_TIMESTAMP 
+                    UPDATE quarantine_history
+                    SET released_at = CURRENT_TIMESTAMP
                     WHERE account_id = ? AND released_at IS NULL
                 """,
                     (account_id,),
@@ -1448,7 +1443,7 @@ class AccountQuarantineManager:
             with self._get_connection() as conn:
                 cursor = conn.execute(
                     """
-                    SELECT release_at FROM active_quarantine 
+                    SELECT release_at FROM active_quarantine
                     WHERE account_id = ? AND release_at > CURRENT_TIMESTAMP
                 """,
                     (account_id,),
@@ -1471,7 +1466,7 @@ class AccountQuarantineManager:
             with self._get_connection() as conn:
                 cursor = conn.execute(
                     """
-                    SELECT account_id FROM active_quarantine 
+                    SELECT account_id FROM active_quarantine
                     WHERE release_at <= CURRENT_TIMESTAMP
                 """
                 )
@@ -1495,7 +1490,7 @@ class AccountQuarantineManager:
                     SELECT COUNT(*) as total_quarantines,
                            SUM(duration_minutes) as total_minutes,
                            MAX(quarantined_at) as last_quarantine
-                    FROM quarantine_history 
+                    FROM quarantine_history
                     WHERE account_id = ?
                 """,
                     (account_id,),

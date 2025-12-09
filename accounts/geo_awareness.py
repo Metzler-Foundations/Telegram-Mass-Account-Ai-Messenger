@@ -3,6 +3,7 @@
 
 import logging
 from typing import Dict, List, Optional
+
 import requests
 
 logger = logging.getLogger(__name__)

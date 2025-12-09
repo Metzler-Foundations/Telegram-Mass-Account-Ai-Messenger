@@ -4,9 +4,9 @@ Configuration Manager - Centralized configuration handling.
 
 import json
 import logging
-from typing import Dict, Any, Optional
-from pathlib import Path
 from copy import deepcopy
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,7 @@ class ConfigurationManager:
     def _load(self) -> None:
         if self.config_path.exists():
             try:
-                with open(self.config_path, "r", encoding="utf-8") as handle:
+                with open(self.config_path, encoding="utf-8") as handle:
                     data = json.load(handle)
 
                 # SECURITY: Migrate any credentials found in config to secrets manager

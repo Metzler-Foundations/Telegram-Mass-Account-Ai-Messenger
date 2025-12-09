@@ -1,10 +1,11 @@
 """Comprehensive tests for secrets manager."""
 
-import pytest
 import os
 import tempfile
-from pathlib import Path
-from core.secrets_manager import SecretsManager, get_secrets_manager
+
+import pytest
+
+from core.secrets_manager import SecretsManager
 
 
 class TestSecretsManager:

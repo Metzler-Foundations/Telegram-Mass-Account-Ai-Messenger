@@ -10,15 +10,13 @@ Features:
 - Timeout handling
 """
 
+import logging
 import sqlite3
 import threading
 import time
-import logging
-from typing import Optional, Dict, Any, Literal
-from pathlib import Path
-from queue import Queue, Empty, Full
-from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime
+from queue import Empty, Full, Queue
+from typing import Any, Dict, Literal
 
 logger = logging.getLogger(__name__)
 
@@ -302,7 +300,7 @@ class ConnectionPool:
                         raise TimeoutError(
                             f"Could not get {connection_type} connection within {self.timeout}s "
                             f"(pool exhausted, {pool_size}/{pool_max} connections)"
-                        )
+                        ) from None
 
             # Check connection health
             if not self._is_connection_healthy(conn):
@@ -506,6 +504,6 @@ def close_all_pools():
 
 
 # Register cleanup on exit
-import atexit
+import atexit  # noqa: E402
 
 atexit.register(close_all_pools)

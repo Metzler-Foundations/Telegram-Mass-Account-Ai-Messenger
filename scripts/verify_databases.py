@@ -16,7 +16,7 @@ def check_database_tables(db_path, expected_tables):
     print(f"\n📊 Checking {db_path.name}...")
 
     if not db_path.exists():
-        print(f"  ❌ Database file doesn't exist!")
+        print("  ❌ Database file doesn't exist!")
         return False
 
     try:

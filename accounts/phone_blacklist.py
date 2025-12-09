@@ -2,8 +2,8 @@
 """Phone number blacklist management."""
 
 import logging
-from typing import Set
 from pathlib import Path
+from typing import Set
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class PhoneBlacklist:
             return set()
 
         try:
-            with open(self.blacklist_file, "r") as f:
+            with open(self.blacklist_file) as f:
                 phones = {line.strip() for line in f if line.strip()}
             logger.info(f"Loaded {len(phones)} blacklisted phone numbers")
             return phones

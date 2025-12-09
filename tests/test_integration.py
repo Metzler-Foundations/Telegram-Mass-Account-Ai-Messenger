@@ -2,19 +2,17 @@
 Integration tests for critical workflows and component interactions.
 """
 
-import pytest
-import asyncio
-import sys
 import os
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
+import sys
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ui.ui_controller import UIController
 from core.services import BusinessLogicCoordinator
-from core.error_handler import ErrorHandler
+from ui.ui_controller import UIController
 
 
 class TestUIControllerIntegration:

@@ -6,12 +6,12 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QThread, pyqtSignal, QObject
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from pyrogram.errors import AuthKeyUnregistered
 
-from telegram.telegram_client import TelegramClient
 from ai.gemini_service import GeminiService
-from monitoring.performance_monitor import RateLimiter, NetworkRecoveryManager
+from monitoring.performance_monitor import NetworkRecoveryManager, RateLimiter
+from telegram.telegram_client import TelegramClient
 
 if TYPE_CHECKING:
     from monitoring.performance_monitor import NetworkRecoveryManager
@@ -125,7 +125,7 @@ class TelegramWorker(QThread):
                 self.signals.log_message.emit(
                     f"Network error (attempt {self.connection_attempts}): {e}"
                 )
-                self.signals.status_update.emit(f"Network Error: Reconnecting...", "orange")
+                self.signals.status_update.emit("Network Error: Reconnecting...", "orange")
 
             except Exception as e:
                 # Other errors - don't retry

@@ -2,11 +2,10 @@
 """
 Quality Assurance Script - Run all code quality checks locally
 """
+import argparse
 import subprocess
 import sys
-import os
 from pathlib import Path
-import argparse
 
 
 def run_command(cmd, description, fail_on_error=True):
@@ -96,7 +95,7 @@ def main():
     # 5. Ruff linting (if available)
     total_checks += 1
     try:
-        import ruff
+        import ruff  # noqa: F401
 
         cmd = ["ruff", "check", "."]
         if args.fix:
@@ -110,7 +109,7 @@ def main():
     # 6. MyPy type checking (if available)
     total_checks += 1
     try:
-        import mypy
+        import mypy  # noqa: F401
 
         if run_command(["mypy", ".", "--ignore-missing-imports"], "MyPy Type Checking"):
             success_count += 1
@@ -121,7 +120,7 @@ def main():
     # 7. Black formatting check (if available)
     total_checks += 1
     try:
-        import black
+        import black  # noqa: F401
 
         cmd = ["black", "--check", "--diff", "."]
         if args.fix:
@@ -135,7 +134,7 @@ def main():
     # 8. Security checks (if available)
     total_checks += 1
     try:
-        import bandit
+        import bandit  # noqa: F401
 
         if run_command(
             ["bandit", "-r", ".", "-f", "json", "-o", "bandit-report.json"],
@@ -149,7 +148,7 @@ def main():
     # 9. Pre-commit hooks (if available)
     total_checks += 1
     try:
-        import pre_commit
+        import pre_commit  # noqa: F401
 
         if run_command(["pre-commit", "run", "--all-files"], "Pre-commit Hooks"):
             success_count += 1

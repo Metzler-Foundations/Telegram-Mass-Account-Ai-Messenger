@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Session file encryption at rest."""
 
-import os
 import logging
+import os
 from pathlib import Path
-from cryptography.fernet import Fernet
 from typing import Optional
+
+from cryptography.fernet import Fernet
 
 logger = logging.getLogger(__name__)
 

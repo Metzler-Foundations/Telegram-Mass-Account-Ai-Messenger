@@ -9,14 +9,13 @@ Features:
 - Find key connectors
 """
 
+import json
 import logging
 import sqlite3
-import json
-from typing import List, Dict, Optional, Tuple, Set
-from datetime import datetime
-from dataclasses import dataclass, field
-from collections import defaultdict
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
 try:
     import networkx as nx

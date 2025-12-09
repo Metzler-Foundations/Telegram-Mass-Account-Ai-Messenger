@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Database backup and restore manager."""
 
-import shutil
 import gzip
-from pathlib import Path
-from datetime import datetime
 import logging
-import hashlib
-from typing import Optional, List, Dict, Tuple
+import shutil
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +44,7 @@ class BackupManager:
             if encrypt:
                 from core.secrets_manager import get_secrets_manager
 
-                secrets = get_secrets_manager()
+                get_secrets_manager()
                 # Would encrypt here
                 pass
 

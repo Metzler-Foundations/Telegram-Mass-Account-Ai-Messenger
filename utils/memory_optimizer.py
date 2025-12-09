@@ -11,13 +11,12 @@ Advanced memory management techniques:
 
 import gc
 import logging
-import weakref
-import sys
 import threading
-from typing import Any, Dict, Optional, List, Callable
-from functools import wraps
+import weakref
 from dataclasses import dataclass
 from datetime import datetime
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

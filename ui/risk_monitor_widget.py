@@ -10,24 +10,24 @@ Features:
 """
 
 import logging
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
+    QComboBox,
     QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QPushButton,
-    QProgressBar,
-    QLineEdit,
-    QComboBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QColor
 
 from ui.theme_manager import ThemeManager
 

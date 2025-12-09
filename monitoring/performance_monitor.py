@@ -2,12 +2,12 @@
 Performance Monitor - Application performance tracking, rate limiting, and resource management.
 """
 
-import time
-import logging
 import asyncio
-from typing import Dict, Any, List, Optional, Callable, Awaitable
-from collections import defaultdict
+import logging
 import threading
+import time
+from collections import defaultdict
+from typing import Any, Awaitable, Dict, Optional
 
 try:
     import psutil
@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 if psutil is None:
     logger.warning("psutil not available - performance metrics and throttling degraded")
 
-from utils.utils import RandomizationUtils
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ class ResourceManager:
         self._resource_monitor_task = asyncio.create_task(self._monitor_resources())
 
         # Start worker tasks
-        for i in range(3):  # 3 worker threads
+        for _i in range(3):  # 3 worker threads
             worker = asyncio.create_task(self._process_queues())
             self._workers.append(worker)
 

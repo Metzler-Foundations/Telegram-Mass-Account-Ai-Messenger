@@ -1,28 +1,21 @@
 import asyncio
 import logging
-import random
-import json
 import os
+import random
 import time
-import hashlib
-import base64
-from typing import Dict, List, Optional, Any, Tuple, TYPE_CHECKING
-from datetime import datetime, timedelta
-from pathlib import Path
-from enum import Enum
 from dataclasses import dataclass
-import aiofiles
-import requests
-import aiohttp
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from pyrogram import Client
-from pyrogram.types import User, Chat
+
+from accounts.username_generator import UsernameGenerator
 from ai.gemini_service import GeminiService
 from anti_detection.anti_detection_system import AntiDetectionSystem
-from accounts.username_generator import UsernameGenerator
 
 if TYPE_CHECKING:
-    from accounts.account_creator import AccountCreator, DeviceFingerprint
     from accounts.account_manager import AccountManager
 
 logger = logging.getLogger(__name__)
@@ -361,7 +354,7 @@ class AdvancedCloningSystem:
                         # Continue with other components unless it's critical
 
                     completed += 1
-                    progress = completed / total_components * 70 + 30  # 30-100% range
+                    completed / total_components * 70 + 30  # 30-100% range
 
                 logger.info(f"🎯 Cloning completed for {target_phone_number}")
                 return True
@@ -757,11 +750,11 @@ class AdvancedCloningSystem:
             return bio
 
         try:
-            prompt = f"""Modify this Telegram bio to make it unique while keeping the same general meaning and style. 
+            prompt = f"""Modify this Telegram bio to make it unique while keeping the same general meaning and style.
             Keep it under 70 characters. Return only the modified bio, nothing else.
-            
+
             Original bio: {bio}
-            
+
             Modified bio:"""
 
             modified_bio = await self.gemini_service.generate_reply(

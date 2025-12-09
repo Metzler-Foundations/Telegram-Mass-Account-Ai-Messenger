@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Database lock handler - Handle SQLite lock errors gracefully."""
 
+import logging
 import sqlite3
 import time
-import logging
-from typing import Optional, Callable, Any
 from functools import wraps
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 

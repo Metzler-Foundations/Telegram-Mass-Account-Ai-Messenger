@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Telegram ToS-compliant scraping rate limits."""
 
-import logging
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from typing import Dict
 

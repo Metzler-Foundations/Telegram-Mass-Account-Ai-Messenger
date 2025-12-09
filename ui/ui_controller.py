@@ -3,11 +3,12 @@ UI Controller Layer - Mediates between UI and business logic.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List
+
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from core.services import BusinessLogicCoordinator
 from core.error_handler import ErrorHandler
+from core.services import BusinessLogicCoordinator
 
 logger = logging.getLogger(__name__)
 

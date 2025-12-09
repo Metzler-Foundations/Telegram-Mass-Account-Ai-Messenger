@@ -8,13 +8,11 @@ Features:
 - Progressive recovery steps
 """
 
-import asyncio
 import logging
-import sqlite3
-from typing import Dict, Optional, Tuple
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +50,7 @@ class RecoveryProtocol:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(self.db_path)
-        except:
+        except Exception:
             pass
         self._init_database()
 

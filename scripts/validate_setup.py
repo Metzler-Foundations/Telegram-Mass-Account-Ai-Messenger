@@ -10,7 +10,6 @@ This script checks:
 """
 
 import sys
-import os
 from pathlib import Path
 
 # Add parent directory to path
@@ -192,7 +191,7 @@ def check_config_file():
     try:
         import json
 
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             config = json.load(f)
 
         print_check("config.json", True, "Valid JSON")

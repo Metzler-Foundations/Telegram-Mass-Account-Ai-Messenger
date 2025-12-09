@@ -3,8 +3,8 @@
 Test script to check application startup and catch import errors
 """
 
-import sys
 import os
+import sys
 import traceback
 
 # Add the parent directory to Python path for package imports
@@ -17,49 +17,48 @@ def test_startup(qapp):
 
     try:
         print("1. Testing basic Python imports...")
-        import asyncio
-        import logging
-        import time
-        import random
-        from typing import Optional, Dict, Any, List
-        from pathlib import Path
-        from collections import defaultdict
+        import asyncio  # noqa: F401
+        import logging  # noqa: F401
+        import random  # noqa: F401
+        import time  # noqa: F401
+        from collections import defaultdict  # noqa: F401
+        from pathlib import Path  # noqa: F401
+        from typing import Any, Dict, List, Optional  # noqa: F401
 
         print("✅ Basic Python imports OK")
 
         print("2. Testing PyQt6 imports...")
-        from PyQt6.QtWidgets import (
+        from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal  # noqa: F401
+        from PyQt6.QtGui import QAction, QFont, QIcon, QTextCursor  # noqa: F401
+        from PyQt6.QtWidgets import (  # noqa: F401
             QApplication,
-            QMainWindow,
-            QWidget,
-            QVBoxLayout,
-            QHBoxLayout,
-            QLabel,
-            QPushButton,
-            QTextEdit,
-            QStatusBar,
-            QSplitter,
-            QListWidget,
-            QListWidgetItem,
-            QMessageBox,
-            QSystemTrayIcon,
-            QMenu,
-            QProgressBar,
             QComboBox,
             QGroupBox,
+            QHBoxLayout,
+            QLabel,
+            QListWidget,
+            QListWidgetItem,
+            QMainWindow,
+            QMenu,
+            QMessageBox,
+            QProgressBar,
+            QPushButton,
+            QSplitter,
+            QStatusBar,
+            QSystemTrayIcon,
+            QTextEdit,
+            QVBoxLayout,
+            QWidget,
         )
-        from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject
-        from PyQt6.QtGui import QTextCursor
-        from PyQt6.QtGui import QIcon, QFont, QAction
 
         print("✅ PyQt6 imports OK")
 
         print("3. Testing application modules...")
-        from telegram.telegram_client import TelegramClient
-        from ai.gemini_service import GeminiService
-        from scraping.member_scraper import MemberScraper, MemberDatabase
-        from accounts.account_creator import AccountCreator
-        from anti_detection.anti_detection_system import AntiDetectionSystem
+        from accounts.account_creator import AccountCreator  # noqa: F401
+        from ai.gemini_service import GeminiService  # noqa: F401
+        from anti_detection.anti_detection_system import AntiDetectionSystem  # noqa: F401
+        from scraping.member_scraper import MemberDatabase, MemberScraper  # noqa: F401
+        from telegram.telegram_client import TelegramClient  # noqa: F401
 
         print("✅ Application modules OK")
 
@@ -67,13 +66,13 @@ def test_startup(qapp):
         from main import MainWindow
 
         # Try to create main window
-        main_window = MainWindow()
+        MainWindow()
         print("✅ Main window created successfully")
 
         # Try to create settings window
         from ui.settings_window import SettingsWindow
 
-        settings_window = SettingsWindow()
+        SettingsWindow()
         print("✅ Settings window created successfully")
 
         print("\n🎉 All startup tests passed!")

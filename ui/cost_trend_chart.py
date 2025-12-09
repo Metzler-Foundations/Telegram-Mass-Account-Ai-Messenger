@@ -3,20 +3,20 @@ Cost Trend Chart Widget - Visualizes cost trends over time.
 """
 
 import logging
-from typing import List, Tuple, Optional
-from datetime import datetime, timedelta
 import sqlite3
+from datetime import datetime, timedelta
+from typing import List, Optional, Tuple
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QGroupBox
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QComboBox, QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ui.theme_manager import ThemeManager
 
 try:
+    import matplotlib.dates as mdates
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
     from matplotlib.figure import Figure
-    import matplotlib.dates as mdates
 
     MATPLOTLIB_AVAILABLE = True
 except ImportError:

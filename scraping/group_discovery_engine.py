@@ -10,29 +10,25 @@ Features:
 """
 
 import asyncio
-import logging
-import sqlite3
 import json
-import re
+import logging
 import random
-from typing import List, Dict, Optional, Set, Tuple, Any
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict, field
+import re
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from collections import defaultdict
-import hashlib
+from typing import Any, Dict, List, Optional, Set
 
 from pyrogram import Client
-from pyrogram.types import Chat, Message, ChatEvent
 from pyrogram.errors import (
+    ChannelPrivate,
+    ChatAdminRequired,
     FloodWait,
     InviteHashExpired,
     InviteHashInvalid,
-    ChannelPrivate,
-    ChatAdminRequired,
     PeerIdInvalid,
 )
-from pyrogram.enums import ChatType, ChatMemberStatus
+from pyrogram.types import Chat
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +122,7 @@ class GroupDiscoveryEngine:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(self.db_path)
-        except:
+        except Exception:
             pass
         self._init_database()
 
@@ -688,7 +684,7 @@ class GroupDiscoveryEngine:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT OR REPLACE INTO invite_links 
+            INSERT OR REPLACE INTO invite_links
             (link_hash, full_link, group_id, discovered_at, is_valid, last_checked)
             VALUES (?, ?, ?, ?, ?, ?)
         """,
@@ -804,8 +800,8 @@ class GroupDiscoveryEngine:
         # By method
         cursor.execute(
             """
-            SELECT discovery_method, COUNT(*) 
-            FROM discovered_groups 
+            SELECT discovery_method, COUNT(*)
+            FROM discovered_groups
             GROUP BY discovery_method
         """
         )
@@ -814,8 +810,8 @@ class GroupDiscoveryEngine:
         # By quality
         cursor.execute(
             """
-            SELECT quality_level, COUNT(*) 
-            FROM discovered_groups 
+            SELECT quality_level, COUNT(*)
+            FROM discovered_groups
             GROUP BY quality_level
         """
         )
@@ -828,8 +824,8 @@ class GroupDiscoveryEngine:
         # Joined vs not joined
         cursor.execute(
             """
-            SELECT is_joined, COUNT(*) 
-            FROM discovered_groups 
+            SELECT is_joined, COUNT(*)
+            FROM discovered_groups
             GROUP BY is_joined
         """
         )

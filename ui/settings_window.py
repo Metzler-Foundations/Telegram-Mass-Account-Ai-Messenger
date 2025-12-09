@@ -3,58 +3,54 @@
 Settings Window - Configuration interface for the Telegram bot
 """
 
-import logging
-import os
-import json
+import asyncio
 import datetime
+import json
+import logging
 import threading
 import time
-import asyncio
-from typing import Dict, Any, Optional, List, Tuple
-from pathlib import Path
-import requests
-from concurrent.futures import ThreadPoolExecutor
-
-from PyQt6.QtWidgets import (
-    QDialog,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QFormLayout,
-    QLabel,
-    QPushButton,
-    QLineEdit,
-    QTextEdit,
-    QComboBox,
-    QSpinBox,
-    QDoubleSpinBox,
-    QCheckBox,
-    QGroupBox,
-    QTabWidget,
-    QScrollArea,
-    QMessageBox,
-    QFileDialog,
-    QListWidget,
-    QListWidgetItem,
-    QProgressBar,
-    QInputDialog,
-    QFrame,
-    QToolButton,
-    QApplication,
-    QProgressDialog,
-    QSizePolicy,
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QCoreApplication
-from PyQt6.QtGui import QIcon, QFont
-
-from utils.user_helpers import ValidationHelper, get_tooltip
-from core.error_handler import ErrorHandler
-from ui.theme_manager import ThemeManager
 import webbrowser
-from integrations.api_key_manager import APIKeyManager
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
+from PyQt6.QtCore import QCoreApplication, QPropertyAnimation, Qt, QTimer, pyqtSignal
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFileDialog,
+    QFormLayout,
+    QFrame,
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpinBox,
+    QTabWidget,
+    QTextEdit,
+    QToolButton,
+    QVBoxLayout,
+    QWidget,
+)
 from pyrogram import Client
-from pyrogram.raw.functions.help import GetNearestDc
 from pyrogram.errors import SessionPasswordNeeded
+from pyrogram.raw.functions.help import GetNearestDc
+
+from core.error_handler import ErrorHandler
+from integrations.api_key_manager import APIKeyManager
+from ui.theme_manager import ThemeManager
+from utils.user_helpers import ValidationHelper, get_tooltip
 
 logger = logging.getLogger(__name__)
 
@@ -240,7 +236,7 @@ class SetupWizardManager:
         """Load saved progress if exists."""
         try:
             if self.wizard_progress_file.exists():
-                with open(self.wizard_progress_file, "r") as f:
+                with open(self.wizard_progress_file) as f:
                     progress = json.load(f)
                 if self._is_progress_metadata_valid(progress):
                     return progress
@@ -272,7 +268,7 @@ class SetupWizardManager:
     def _load_completion_marker(self) -> Optional[Dict[str, Any]]:
         """Load and validate the wizard completion marker."""
         try:
-            with open(self.wizard_complete_file, "r") as f:
+            with open(self.wizard_complete_file) as f:
                 marker = json.load(f)
             if not self._is_completion_metadata_valid(marker):
                 logger.warning(
@@ -1358,6 +1354,7 @@ class SettingsWindow(QDialog):
         # Use a simple, guaranteed-to-work approach
         # Set window to stay on top temporarily to ensure visibility
         from PyQt6.QtCore import Qt
+
         from ui.theme_manager import ThemeManager
 
         # Make window modal and ensure it's visible
@@ -1858,16 +1855,16 @@ class SettingsWindow(QDialog):
             self.anti_detection_widget,
             instructions="""
             <p><b>Note: You can safely skip this step!</b></p>
-            <p>The default settings are optimized for safety and work great for beginners. 
+            <p>The default settings are optimized for safety and work great for beginners.
             You can always adjust these later in the Settings menu.</p>
-            
+
             <p><b>What you can configure here (optional):</b></p>
             <ul>
                 <li><b>Anti-Detection:</b> Rate limiting and behavior simulation (default: 50 msg/hour)</li>
                 <li><b>Timing:</b> Message delays and response patterns (default: 2-30 seconds)</li>
                 <li><b>Safety Features:</b> Auto-retry and session recovery (default: enabled)</li>
             </ul>
-            
+
             <p><b>💡 Recommendation:</b> Skip this step now, use defaults, and adjust later if needed.</p>
             """,
             help_url=None,
@@ -3194,7 +3191,7 @@ class SettingsWindow(QDialog):
 
             if success:
                 c = ThemeManager.get_colors()
-                self.voice_status_label.setText(f"Success: Voice test passed")
+                self.voice_status_label.setText("Success: Voice test passed")
                 self.voice_status_label.setStyleSheet(
                     f"color: {c['ACCENT_SUCCESS']}; font-weight: 600;"
                 )
@@ -3205,7 +3202,7 @@ class SettingsWindow(QDialog):
                 )
             else:
                 c = ThemeManager.get_colors()
-                self.voice_status_label.setText(f"Error: Voice test failed")
+                self.voice_status_label.setText("Error: Voice test failed")
                 self.voice_status_label.setStyleSheet(
                     f"color: {c['ACCENT_DANGER']}; font-weight: 600;"
                 )
@@ -3347,7 +3344,7 @@ class SettingsWindow(QDialog):
                     )
                     return
 
-                with open(resolved, "r", encoding="utf-8") as f:
+                with open(resolved, encoding="utf-8") as f:
                     proxies = f.read().strip()
                     self.proxy_list_edit.setPlainText(proxies)
                     self.update_proxy_count()
@@ -3712,7 +3709,7 @@ class SettingsWindow(QDialog):
         failed = len(results) - successful
 
         # Update summary
-        summary_text = f"Creation Complete\n"
+        summary_text = "Creation Complete\n"
         summary_text += f"• Total: {len(results)}\n"
         summary_text += f"• Successful: {successful}\n"
         summary_text += f"• Failed: {failed}"
@@ -3859,9 +3856,8 @@ class SettingsWindow(QDialog):
         # Import and initialize scraper
         try:
             from member_scraper import (
-                MemberScraper,
                 EliteAntiDetectionSystem,
-                ComprehensiveDataExtractor,
+                MemberScraper,
             )
 
             if not hasattr(main_window, "member_db") or not main_window.member_db:
@@ -3893,7 +3889,7 @@ class SettingsWindow(QDialog):
 
                     # Update UI with results
                     if result.get("success"):
-                        self.scraper_results_text.append(f"\nScraping complete!\n")
+                        self.scraper_results_text.append("\nScraping complete!\n")
                         self.scraper_results_text.append(
                             f"Channel: {result.get('channel_title', 'Unknown')}\n"
                         )
@@ -4112,7 +4108,7 @@ class SettingsWindow(QDialog):
         try:
             config_path = Path("config.json")
             if config_path.exists():
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, encoding="utf-8") as f:
                     loaded_settings = json.load(f)
                     # Merge with defaults
                     self._merge_settings(default_settings, loaded_settings)
@@ -4145,7 +4141,7 @@ class SettingsWindow(QDialog):
         # Continue with remaining settings that haven't been refactored yet
         # Note: Brain and anti-detection settings are now handled by their respective widgets
         # Only load settings for UI elements that still exist in the main window
-        brain = self.settings_data.get("brain", {})
+        self.settings_data.get("brain", {})
 
         # Account defaults settings
         account_defaults = self.settings_data.get("account_defaults", {})

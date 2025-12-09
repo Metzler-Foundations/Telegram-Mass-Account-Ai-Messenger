@@ -4,30 +4,26 @@ Member Filter - Advanced filtering and segmentation for scraped members
 """
 
 import logging
-from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+
+from PyQt6.QtCore import QDate, Qt, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDateEdit,
     QDialog,
-    QWidget,
-    QVBoxLayout,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QCheckBox,
-    QSpinBox,
-    QDateEdit,
-    QComboBox,
-    QGroupBox,
-    QFormLayout,
     QLineEdit,
     QListWidget,
-    QListWidgetItem,
     QMessageBox,
-    QRadioButton,
-    QButtonGroup,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, QDate, pyqtSignal
-from PyQt6.QtGui import QFont
 
 logger = logging.getLogger(__name__)
 
@@ -310,7 +306,7 @@ class MemberFilterDialog(QDialog):
             logger.error(f"Failed to get actual count: {e}")
             # Fallback to estimated if database unavailable
             self.results_label.setText(
-                f"⚠️ <b>Cannot query database.</b> Select criteria and click Preview for actual count."
+                "⚠️ <b>Cannot query database.</b> Select criteria and click Preview for actual count."
             )
             self.results_label.setTextFormat(Qt.TextFormat.RichText)
 
@@ -488,7 +484,7 @@ class FilterPresetManager(QDialog):
         preset_file = Path("filter_presets.json")
         if preset_file.exists():
             try:
-                with open(preset_file, "r") as f:
+                with open(preset_file) as f:
                     return json.load(f)
             except Exception as e:
                 logger.error(f"Failed to load presets: {e}")
@@ -498,7 +494,6 @@ class FilterPresetManager(QDialog):
     def save_presets(self):
         """Save presets to file."""
         import json
-        from pathlib import Path
 
         try:
             with open("filter_presets.json", "w") as f:
@@ -516,7 +511,7 @@ class FilterPresetManager(QDialog):
         """Load selected preset."""
         selected = self.presets_list.currentItem()
         if selected:
-            preset_name = selected.text()
+            selected.text()
             # Would return preset data to caller
             self.accept()
 

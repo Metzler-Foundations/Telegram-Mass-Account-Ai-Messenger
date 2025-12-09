@@ -8,12 +8,11 @@ Features:
 - Configurable poll interval
 """
 
-import logging
 import asyncio
+import logging
 import sqlite3
-from typing import Optional, List, Dict
 from datetime import datetime, timedelta
-from pyrogram import Client
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Table pagination for large datasets."""
 
-from PyQt6.QtWidgets import QWidget, QPushButton, QLabel, QHBoxLayout
+from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QWidget
 
 
 class TablePaginator(QWidget):
@@ -45,7 +45,7 @@ class TablePaginator(QWidget):
         """Update table with current page."""
         start = self.current_page * self.page_size
         end = min(start + self.page_size, self.total_rows)
-        page_data = self.all_data[start:end]
+        self.all_data[start:end]
 
         # Update table (implementation depends on table structure)
         total_pages = (self.total_rows + self.page_size - 1) // self.page_size

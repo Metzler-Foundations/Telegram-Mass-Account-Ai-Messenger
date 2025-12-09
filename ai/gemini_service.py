@@ -1,13 +1,13 @@
 import asyncio
-import os
 import logging
+import os
 import random
 import time
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 try:
     import google.generativeai as genai
-    from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    from google.generativeai.types import HarmBlockThreshold, HarmCategory
 
     GEMINI_AVAILABLE = True
 except Exception as exc:  # noqa: BLE001
@@ -22,8 +22,8 @@ import psutil
 logger = logging.getLogger(__name__)
 
 # Import randomization utilities and app context
-from utils.utils import RandomizationUtils, app_context
-from monitoring.performance_monitor import get_resilience_manager
+from monitoring.performance_monitor import get_resilience_manager  # noqa: E402
+from utils.utils import RandomizationUtils, app_context  # noqa: E402
 
 
 class GeminiService:
@@ -585,7 +585,6 @@ class GeminiService:
     ):
         """Clean up old conversation histories to prevent memory leaks."""
         import time
-        import sys
 
         current_time = time.time()
         max_age_seconds = max_age_hours * 3600

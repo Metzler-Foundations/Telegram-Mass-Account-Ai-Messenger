@@ -3,34 +3,30 @@
 Data Export - Export members, campaigns, and analytics to various formats
 """
 
-import logging
 import csv
 import json
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+import logging
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from integrations.export_manager import normalize_export_path
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QButtonGroup,
+    QCheckBox,
     QDialog,
-    QWidget,
-    QVBoxLayout,
+    QFileDialog,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QComboBox,
-    QCheckBox,
-    QGroupBox,
-    QFormLayout,
-    QFileDialog,
-    QMessageBox,
-    QProgressBar,
-    QRadioButton,
-    QButtonGroup,
     QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread
-from PyQt6.QtGui import QFont
+
+from integrations.export_manager import normalize_export_path
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +90,7 @@ class DataExportDialog(QDialog):
         format_layout.addWidget(self.excel_radio)
 
         try:
-            import openpyxl
+            import openpyxl  # noqa: F401
 
             self.excel_radio.setEnabled(True)
         except ImportError:
@@ -262,7 +258,7 @@ class DataExportDialog(QDialog):
             )
             self.export_btn.setEnabled(True)
         else:
-            self.status_label.setText(f"⚠️ Choose a save location to continue")
+            self.status_label.setText("⚠️ Choose a save location to continue")
             self.export_btn.setEnabled(False)
 
     def get_export_config(self) -> Dict[str, Any]:
@@ -319,6 +315,7 @@ class DataExporter:
     def fetch_real_member_data(filter_criteria: Dict = None) -> List[Dict]:
         """Fetch ACTUAL member data from database."""
         import sqlite3
+
         from member_scraper import MemberDatabase
 
         try:
@@ -345,11 +342,11 @@ class DataExporter:
 
             where_clause = " AND ".join(conditions) if conditions else "1=1"
             query = f"""
-                SELECT 
+                SELECT
                     user_id, username, first_name, last_name, phone,
                     bio, is_bot, is_verified, is_premium, has_photo,
                     language_code, scraped_at, last_seen, message_count
-                FROM members 
+                FROM members
                 WHERE {where_clause}
                 ORDER BY scraped_at DESC
             """
@@ -382,7 +379,7 @@ class DataExporter:
             cursor = conn.cursor()
 
             query = """
-                SELECT 
+                SELECT
                     id, name, status, message_template,
                     total_targets, sent_count, failed_count,
                     created_at, started_at, completed_at
@@ -407,6 +404,7 @@ class DataExporter:
     def fetch_real_account_data() -> List[Dict]:
         """Fetch ACTUAL account data from database."""
         import sqlite3
+
         from member_scraper import MemberDatabase
 
         try:
@@ -416,7 +414,7 @@ class DataExporter:
             cursor = conn.cursor()
 
             query = """
-                SELECT 
+                SELECT
                     phone_number, status, session_file,
                     created_at, last_active, messages_sent,
                     is_warmed_up, warmup_stage, proxy_used
@@ -453,7 +451,7 @@ class DataExporter:
                 for item in data:
                     fieldnames.update(item.keys())
 
-                fieldnames = sorted(list(fieldnames))
+                fieldnames = sorted(fieldnames)
 
                 writer = csv.DictWriter(f, fieldnames=fieldnames)
                 writer.writeheader()
@@ -493,7 +491,7 @@ class DataExporter:
         """Export data to Excel."""
         try:
             import openpyxl
-            from openpyxl.styles import Font, Alignment, PatternFill
+            from openpyxl.styles import Alignment, Font, PatternFill
 
             wb = openpyxl.Workbook()
             ws = wb.active

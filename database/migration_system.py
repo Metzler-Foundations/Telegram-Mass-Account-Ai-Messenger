@@ -10,13 +10,13 @@ Features:
 - Automatic backup before migration
 """
 
-import sqlite3
-import logging
 import hashlib
-from pathlib import Path
-from datetime import datetime
-from typing import List, Callable, Optional, Dict
+import logging
 import shutil
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+from typing import Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

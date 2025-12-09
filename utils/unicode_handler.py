@@ -9,9 +9,8 @@ Features:
 - Invalid character filtering
 """
 
-import unicodedata
 import logging
-import re
+import unicodedata
 
 logger = logging.getLogger(__name__)
 

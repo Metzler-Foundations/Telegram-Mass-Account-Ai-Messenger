@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Webhook signature verification."""
 
-import hmac
 import hashlib
+import hmac
 import logging
 
 logger = logging.getLogger(__name__)

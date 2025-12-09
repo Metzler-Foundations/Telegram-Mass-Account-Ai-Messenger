@@ -11,13 +11,13 @@ Features:
 - Structured logging format
 """
 
+import hashlib
+import json
 import logging
 import re
-import hashlib
-from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pathlib import Path
-import json
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ class PIIRedactor:
             if pii_type in PIIRedactor.PATTERNS:
                 pattern = PIIRedactor.PATTERNS[pii_type]
 
-                def replace_with_hash(match):
+                def replace_with_hash(match, pii_type=pii_type):
                     value = match.group(0)
                     # Hash first 6 chars for reference
                     hash_val = hashlib.sha256(value.encode()).hexdigest()[:6]

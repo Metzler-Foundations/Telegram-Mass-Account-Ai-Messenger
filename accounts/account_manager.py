@@ -13,29 +13,27 @@ Features:
 """
 
 import asyncio
-import logging
 import json
+import logging
 import os
-import sqlite3
-import psutil
-import time
-import weakref
 import random
-from typing import Dict, List, Optional, Any, Tuple, Callable, Set
-from datetime import datetime, timedelta
-from pathlib import Path
-from enum import Enum
-from dataclasses import dataclass, asdict, field
-from collections import defaultdict
+import sqlite3
+import time
 from concurrent.futures import ThreadPoolExecutor
-import threading
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+import psutil
 from pyrogram import Client
-from pyrogram.errors import FloodWait, UserPrivacyRestricted, UserBlocked, PeerIdInvalid
-from telegram.telegram_client import TelegramClient
+from pyrogram.errors import FloodWait, PeerIdInvalid, UserBlocked, UserPrivacyRestricted
+
 from accounts.account_creator import AccountCreator
 from scraping.database import MemberDatabase
 from telegram.persistent_connection_manager import PersistentConnectionManager
+from telegram.telegram_client import TelegramClient
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +41,9 @@ logger = logging.getLogger(__name__)
 # Import enhanced anti-detection if available
 try:
     from anti_detection.anti_detection_system import (
-        EnhancedAntiDetectionSystem,
-        AccountRiskMetrics,
         BanRiskLevel,
+        EnhancedAntiDetectionSystem,
         QuarantineReason,
-        TelegramFingerprintGenerator,
-        TelegramClientType,
     )
 
     ENHANCED_ANTI_DETECTION_AVAILABLE = True
@@ -634,7 +629,6 @@ class AccountManager:
                 if self._proxy_pool_manager is None:
                     try:
                         from proxy_pool_manager import (
-                            get_proxy_pool_manager,
                             init_proxy_pool_manager,
                         )
 
@@ -836,7 +830,7 @@ class AccountManager:
         # First try file
         if self.accounts_file.exists():
             try:
-                with open(self.accounts_file, "r") as f:
+                with open(self.accounts_file) as f:
                     data = json.load(f)
                     self.accounts = data.get("accounts", {})
                     self.account_status = data.get("status", {})
@@ -895,7 +889,7 @@ class AccountManager:
 
                     conn.execute(
                         """
-                        INSERT OR REPLACE INTO accounts 
+                        INSERT OR REPLACE INTO accounts
                         (phone_number, account_data, status_data, shard_id, updated_at)
                         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
                     """,
@@ -948,44 +942,6 @@ class AccountManager:
             # Fall back to file save
             self.save_accounts()
 
-    def save_accounts(self):
-        """Save account data to file and database."""
-        # Save to file
-        try:
-            data = {
-                "accounts": self.accounts,
-                "status": self.account_status,
-                "last_updated": datetime.now().isoformat(),
-            }
-            with open(self.accounts_file, "w") as f:
-                json.dump(data, f, indent=2, default=str)
-        except Exception as e:
-            logger.error(f"Failed to save accounts to file: {e}")
-
-        # Save to database (backup persistence)
-        try:
-            with self._get_connection() as conn:
-                for phone, account_data in self.accounts.items():
-                    status_data = self.account_status.get(phone, {})
-                    shard_id = self.account_to_shard.get(phone)
-
-                    conn.execute(
-                        """
-                        INSERT OR REPLACE INTO accounts
-                        (phone_number, account_data, status_data, shard_id, updated_at)
-                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-                    """,
-                        (
-                            phone,
-                            json.dumps(account_data, default=str),
-                            json.dumps(status_data, default=str),
-                            shard_id,
-                        ),
-                    )
-                conn.commit()
-        except Exception as e:
-            logger.error(f"Failed to save accounts to database: {e}")
-
     def add_account(self, phone_number: str, account_data: Dict):
         """Add a new account to the manager."""
         # Validate inputs
@@ -1017,7 +973,7 @@ class AccountManager:
             logger.warning("ValidationHelper not available, skipping input validation")
         except Exception as e:
             logger.error(f"Account validation failed: {e}")
-            raise ValueError(f"Invalid account data: {e}")
+            raise ValueError(f"Invalid account data: {e}") from e
 
         # Ensure account type is set
         if "account_type" not in account_data:
@@ -1271,8 +1227,9 @@ class AccountManager:
 
                 # Hook engagement automation if available
                 try:
-                    from campaigns.engagement_automation import EngagementAutomation
                     from pyrogram import filters
+
+                    from campaigns.engagement_automation import EngagementAutomation
 
                     # Create or get engagement automation instance
                     if not hasattr(self, "_engagement_automation"):
@@ -1341,7 +1298,7 @@ class AccountManager:
 
                 config_path = Path("config.json")
                 if config_path.exists():
-                    with open(config_path, "r") as f:
+                    with open(config_path) as f:
                         config = json.load(f)
                     elevenlabs_key = config.get("elevenlabs", {}).get("api_key", "")
                     if elevenlabs_key:
@@ -1364,7 +1321,7 @@ class AccountManager:
             if not gemini_key:
                 config_path = Path("config.json")
                 if config_path.exists():
-                    with open(config_path, "r") as f:
+                    with open(config_path) as f:
                         config = json.load(f)
                     gemini_key = config.get("gemini", {}).get("api_key", "")
 
@@ -1372,7 +1329,7 @@ class AccountManager:
                 # Get shared prompt
                 shared_prompt = ""
                 try:
-                    with open(Path("config.json"), "r") as f:
+                    with open(Path("config.json")) as f:
                         config = json.load(f)
                     shared_prompt = config.get("brain", {}).get("prompt", "")
                 except Exception:
@@ -2008,7 +1965,7 @@ class AccountManager:
         # Retry warmup if needed
         warmup_job_id = status_info.get("warmup_job_id")
         if warmup_job_id and self.warmup_service:
-            from account_warmup_service import WarmupStage, WarmupPriority
+            from account_warmup_service import WarmupPriority, WarmupStage
 
             warmup_job = self.warmup_service.get_job_status(warmup_job_id)
             if warmup_job and warmup_job.stage == WarmupStage.FAILED:
@@ -2050,7 +2007,7 @@ class AccountManager:
     def update_creation_settings(self, settings: Dict[str, Any]) -> None:
         """Update account creation settings dynamically."""
         self.creation_settings = settings
-        logger.info(f"Account creation settings updated")
+        logger.info("Account creation settings updated")
 
     # ============== Ban Prevention & Detection ==============
 
@@ -2304,7 +2261,7 @@ class AccountManager:
             "total_flood_waits": 0,
         }
 
-        for phone_number, indicators in self.ban_indicators.items():
+        for _phone_number, indicators in self.ban_indicators.items():
             if indicators.get("total_errors_24h", 0) > 0:
                 stats["accounts_with_errors"] += 1
             stats["total_flood_waits"] += indicators.get("flood_wait_count", 0)

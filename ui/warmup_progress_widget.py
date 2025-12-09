@@ -10,22 +10,23 @@ Features:
 """
 
 import logging
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional
+
+from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
+    QProgressBar,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QGroupBox,
-    QProgressBar,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont, QColor
 
 from ui.theme_manager import ThemeManager
 
@@ -33,7 +34,11 @@ logger = logging.getLogger(__name__)
 
 # Try to import warmup service
 try:
-    from accounts.account_warmup_service import AccountWarmupService, WarmupJob, WarmupStage
+    from accounts.account_warmup_service import (  # noqa: F401
+        AccountWarmupService,
+        WarmupJob,
+        WarmupStage,
+    )
 
     WARMUP_AVAILABLE = True
 except ImportError:

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Toast notifications for user feedback."""
 
-from PyQt6.QtWidgets import QLabel, QGraphicsOpacityEffect
-from PyQt6.QtCore import QTimer, QPropertyAnimation, Qt
+from PyQt6.QtCore import QPropertyAnimation, Qt, QTimer
+from PyQt6.QtWidgets import QGraphicsOpacityEffect, QLabel
 
 
 class ToastNotification(QLabel):

@@ -7,25 +7,25 @@ Preview how messages will look with actual data
 import logging
 import re
 from typing import Dict, List, Optional
-from PyQt6.QtWidgets import (
-    QDialog,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTextEdit,
-    QLineEdit,
-    QComboBox,
-    QGroupBox,
-    QFormLayout,
-    QMessageBox,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
-)
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QComboBox,
+    QDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ class TemplateTestDialog(QDialog):
         if self.members:
             self.member_combo = QComboBox()
             self.member_combo.addItem("Custom test data", None)
-            for i, member in enumerate(self.members[:20]):  # Limit to first 20
+            for _i, member in enumerate(self.members[:20]):  # Limit to first 20
                 display = f"{member.get('first_name', '')} {member.get('last_name', '')} (@{member.get('username', 'N/A')})"
                 self.member_combo.addItem(display.strip(), member)
             self.member_combo.currentIndexChanged.connect(self.on_member_selected)

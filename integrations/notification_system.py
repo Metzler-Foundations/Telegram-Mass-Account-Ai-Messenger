@@ -6,10 +6,10 @@ Uses actual system tray and desktop notification APIs
 
 import logging
 from typing import Optional
-from datetime import datetime
-from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
-from PyQt6.QtGui import QIcon, QAction
+
+from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ class KeyboardShortcuts:
     @staticmethod
     def setup_shortcuts(main_window):
         """Setup REAL keyboard shortcuts."""
-        from PyQt6.QtGui import QShortcut, QKeySequence
+        from PyQt6.QtGui import QKeySequence, QShortcut
 
         shortcuts = []
 

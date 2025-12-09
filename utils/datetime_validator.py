@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """DateTime validation and safe parsing."""
 
-from datetime import datetime, timezone
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)

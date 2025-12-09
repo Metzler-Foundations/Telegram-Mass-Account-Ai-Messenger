@@ -8,14 +8,12 @@ Features:
 - Find relationship paths between users
 """
 
+import json
 import logging
 import sqlite3
-import json
-from typing import List, Dict, Set, Tuple, Optional, Any
-from datetime import datetime, timedelta
 from dataclasses import dataclass, field
-from collections import defaultdict, deque
-import random
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
     import networkx as nx
@@ -25,7 +23,6 @@ except ImportError:
     NETWORKX_AVAILABLE = False
     logging.warning("NetworkX not available - limited graph functionality")
 
-from pyrogram import Client
 from pyrogram.types import Message
 
 logger = logging.getLogger(__name__)
@@ -168,8 +165,8 @@ class RelationshipMapper:
         # Check if relationship exists
         cursor.execute(
             """
-            SELECT interactions, strength, first_interaction 
-            FROM relationships 
+            SELECT interactions, strength, first_interaction
+            FROM relationships
             WHERE user_id_1 = ? AND user_id_2 = ?
         """,
             (user_id_1, user_id_2),
@@ -184,7 +181,7 @@ class RelationshipMapper:
             new_strength = min(1.0, row[1] + (weight * 0.05))  # Incremental strength increase
             cursor.execute(
                 """
-                UPDATE relationships 
+                UPDATE relationships
                 SET interactions = ?, strength = ?, last_interaction = ?
                 WHERE user_id_1 = ? AND user_id_2 = ?
             """,
@@ -195,7 +192,7 @@ class RelationshipMapper:
             cursor.execute(
                 """
                 INSERT INTO relationships (
-                    user_id_1, user_id_2, strength, interactions, 
+                    user_id_1, user_id_2, strength, interactions,
                     first_interaction, last_interaction, relationship_type
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -538,8 +535,8 @@ class RelationshipMapper:
         # Relationship distribution by strength
         cursor.execute(
             """
-            SELECT 
-                CASE 
+            SELECT
+                CASE
                     WHEN strength < 0.2 THEN 'weak'
                     WHEN strength < 0.5 THEN 'moderate'
                     WHEN strength < 0.8 THEN 'strong'

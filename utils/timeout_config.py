@@ -2,8 +2,8 @@
 """Centralized timeout configuration for network operations."""
 
 import logging
-from typing import Dict, Any
 from enum import Enum
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 

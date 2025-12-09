@@ -6,11 +6,11 @@ Provides standardized exception handling patterns and specific error types
 to replace broad 'except Exception' blocks throughout the application.
 """
 
-import logging
 import functools
-from typing import Callable, Any, Optional, Type, Union, Tuple
-from contextlib import contextmanager
+import logging
 import traceback
+from contextlib import contextmanager
+from typing import Any, Callable, Tuple, Type
 
 logger = logging.getLogger(__name__)
 
@@ -227,9 +227,10 @@ def handle_file_operation(operation_name: str):
 
 # Import required modules for type hints
 try:
-    import sqlite3
-    import aiohttp
     import asyncio
+    import sqlite3
+
+    import aiohttp
 except ImportError:
     # Define dummy classes for type hints when modules aren't available
     class sqlite3:

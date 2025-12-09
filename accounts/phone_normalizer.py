@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Phone number normalizer - Ensure consistent phone number format."""
 
-import re
 import logging
-from typing import Optional
+import re
 
 logger = logging.getLogger(__name__)
 

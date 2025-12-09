@@ -2,7 +2,6 @@
 """Table search functionality."""
 
 from PyQt6.QtWidgets import QLineEdit, QTableWidget
-from PyQt6.QtCore import Qt
 
 
 class TableSearch:

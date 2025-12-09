@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Gemini API error handler - Prevent crashes from AI errors."""
 
+import asyncio
 import logging
 from typing import Optional
-import asyncio
 
 logger = logging.getLogger(__name__)
 

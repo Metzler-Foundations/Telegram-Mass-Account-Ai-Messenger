@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Database monitoring - Track size, performance, health."""
 
-import os
 import logging
-from pathlib import Path
-from typing import Dict, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 

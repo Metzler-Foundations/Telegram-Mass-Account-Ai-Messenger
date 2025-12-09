@@ -14,15 +14,14 @@ Features:
 import asyncio
 import hashlib
 import logging
-import os
-import time
 import random
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
+import time
 from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -488,8 +487,6 @@ class VoiceService:
             voice_profile = AVAILABLE_VOICES[DEFAULT_VOICE]
             voice_id = DEFAULT_VOICE
 
-        elevenlabs_voice_id = voice_profile.voice_id
-
         # Check cache first
         if use_cache:
             cached = self._check_cache(text, voice_id)
@@ -516,7 +513,7 @@ class VoiceService:
                 # Generate audio using ElevenLabs API
                 audio = await asyncio.get_event_loop().run_in_executor(
                     None,
-                    lambda: client.generate(
+                    lambda client=client, try_elevenlabs_id=try_elevenlabs_id: client.generate(
                         text=text,
                         voice=try_elevenlabs_id,
                         model=self.model_id,

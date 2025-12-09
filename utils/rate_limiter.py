@@ -11,11 +11,10 @@ Features:
 """
 
 import asyncio
-import time
 import logging
-from typing import Dict, Any, Optional
+import time
 from dataclasses import dataclass
-from collections import defaultdict
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 

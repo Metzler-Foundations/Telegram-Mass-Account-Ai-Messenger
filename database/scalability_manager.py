@@ -10,13 +10,11 @@ Features:
 - Performance monitoring
 """
 
-import sqlite3
 import logging
 import time
-from typing import Optional, Dict, Any, List, Union
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +132,7 @@ class DatabaseScalabilityManager:
         Returns:
             List of result dictionaries
         """
-        start_time = time.time()
+        time.time()
 
         with self.get_read_connection() as conn:
             cursor = conn.cursor()
@@ -157,7 +155,7 @@ class DatabaseScalabilityManager:
         Returns:
             Number of affected rows
         """
-        start_time = time.time()
+        time.time()
 
         with self.get_write_connection() as conn:
             cursor = conn.cursor()

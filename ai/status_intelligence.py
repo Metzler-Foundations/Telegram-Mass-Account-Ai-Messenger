@@ -10,19 +10,17 @@ Features:
 """
 
 import asyncio
+import json
 import logging
 import random
-import sqlite3
-import json
-from typing import List, Dict, Optional, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
-from enum import Enum
-from collections import defaultdict, deque
 import statistics
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Dict, List, Optional, Tuple
 
 from pyrogram import Client
-from pyrogram.types import User, Message
 from pyrogram.enums import UserStatus
 from pyrogram.errors import FloodWait, PeerIdInvalid
 
@@ -456,7 +454,7 @@ class StatusIntelligence:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO response_times 
+            INSERT INTO response_times
             (user_id, our_message_time, their_response_time, response_delay, hour_of_day, day_of_week)
             VALUES (?, ?, ?, ?, ?, ?)
         """,
@@ -486,9 +484,9 @@ class StatusIntelligence:
 
         cursor.execute(
             """
-            SELECT response_delay FROM response_times 
-            WHERE user_id = ? 
-            ORDER BY their_response_time DESC 
+            SELECT response_delay FROM response_times
+            WHERE user_id = ?
+            ORDER BY their_response_time DESC
             LIMIT 50
         """,
             (user_id,),

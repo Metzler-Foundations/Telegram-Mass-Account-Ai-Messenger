@@ -43,14 +43,14 @@ def create_account_risk_scores_table():
         # Create indexes
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_account_risk_level 
+            CREATE INDEX IF NOT EXISTS idx_account_risk_level
             ON account_risk_scores(risk_level)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_account_quarantine 
+            CREATE INDEX IF NOT EXISTS idx_account_quarantine
             ON account_risk_scores(quarantine_status)
         """
         )
@@ -95,21 +95,21 @@ def create_shadowban_monitor_table():
         # Create indexes
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_shadowban_account 
+            CREATE INDEX IF NOT EXISTS idx_shadowban_account
             ON shadowban_monitor(account_phone)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_shadowban_status 
+            CREATE INDEX IF NOT EXISTS idx_shadowban_status
             ON shadowban_monitor(is_shadowbanned)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_shadowban_checked_at 
+            CREATE INDEX IF NOT EXISTS idx_shadowban_checked_at
             ON shadowban_monitor(checked_at)
         """
         )
@@ -190,14 +190,14 @@ def create_conversation_context_table():
         # Create indexes
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_conversation_account 
+            CREATE INDEX IF NOT EXISTS idx_conversation_account
             ON conversation_context(account_phone)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_conversation_updated 
+            CREATE INDEX IF NOT EXISTS idx_conversation_updated
             ON conversation_context(updated_at)
         """
         )
@@ -251,14 +251,14 @@ def create_warmup_jobs_table():
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_warmup_account 
+            CREATE INDEX IF NOT EXISTS idx_warmup_account
             ON warmup_jobs(account_phone)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_warmup_status 
+            CREATE INDEX IF NOT EXISTS idx_warmup_status
             ON warmup_jobs(status)
         """
         )
@@ -292,31 +292,31 @@ def create_audit_events_table():
             try:
                 cursor.execute("ALTER TABLE audit_events ADD COLUMN account_phone TEXT")
                 print("  ✅ Added account_phone column")
-            except:
+            except Exception:
                 pass  # Column might already exist
 
             try:
                 cursor.execute("ALTER TABLE audit_events ADD COLUMN severity TEXT DEFAULT 'info'")
                 print("  ✅ Added severity column")
-            except:
+            except Exception:
                 pass
 
             try:
                 cursor.execute("ALTER TABLE audit_events ADD COLUMN user_id TEXT")
                 print("  ✅ Added user_id column")
-            except:
+            except Exception:
                 pass
 
             try:
                 cursor.execute("ALTER TABLE audit_events ADD COLUMN ip_address TEXT")
                 print("  ✅ Added ip_address column")
-            except:
+            except Exception:
                 pass
 
             try:
                 cursor.execute("ALTER TABLE audit_events ADD COLUMN session_id TEXT")
                 print("  ✅ Added session_id column")
-            except:
+            except Exception:
                 pass
         else:
             # Create new table
@@ -340,28 +340,28 @@ def create_audit_events_table():
         # Create indexes (IF NOT EXISTS is safe)
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_audit_account 
+            CREATE INDEX IF NOT EXISTS idx_audit_account
             ON audit_events(account_phone)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_audit_type 
+            CREATE INDEX IF NOT EXISTS idx_audit_type
             ON audit_events(event_type)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_audit_timestamp 
+            CREATE INDEX IF NOT EXISTS idx_audit_timestamp
             ON audit_events(timestamp)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_audit_severity 
+            CREATE INDEX IF NOT EXISTS idx_audit_severity
             ON audit_events(severity)
         """
         )
@@ -403,7 +403,7 @@ def create_phone_blacklist_table():
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_phone_blacklist_expires 
+            CREATE INDEX IF NOT EXISTS idx_phone_blacklist_expires
             ON phone_blacklist(expires_at)
         """
         )

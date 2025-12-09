@@ -11,15 +11,16 @@ Tests the complete campaign workflow:
 7. Update campaign status
 """
 
-import pytest
 import asyncio
 import sqlite3
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import patch
+
+import pytest
+
 from tests.fixtures import (
     MockTelegramClient,
     create_test_campaign,
     create_test_member,
-    sample_accounts,
 )
 
 
@@ -29,7 +30,6 @@ async def test_campaign_execution_complete_flow():
     """Test complete campaign execution from creation to delivery."""
 
     # Setup
-    test_db = ":memory:"
 
     # Create test campaign
     campaign = create_test_campaign(
@@ -53,7 +53,7 @@ async def test_campaign_execution_complete_flow():
 
     # Mock campaign manager
     with patch("campaigns.dm_campaign_manager.Client", return_value=mock_client):
-        from campaigns.dm_campaign_manager import DMCampaignManager, MessageTemplateEngine
+        from campaigns.dm_campaign_manager import MessageTemplateEngine
 
         # Test template rendering
         for member in members:
@@ -69,7 +69,7 @@ async def test_campaign_execution_complete_flow():
             try:
                 await mock_client.send_message(member["user_id"], message_text)
                 sent_count += 1
-            except Exception as e:
+            except Exception:
                 # Handle errors (FloodWait, blocked, etc.)
                 pass
 
@@ -153,7 +153,7 @@ def test_campaign_idempotency():
     # Insert first message
     cursor.execute(
         """
-        INSERT INTO campaign_messages 
+        INSERT INTO campaign_messages
         (campaign_id, user_id, account_phone, message_text, status, idempotency_key)
         VALUES (?, ?, ?, ?, ?, ?)
     """,
@@ -165,7 +165,7 @@ def test_campaign_idempotency():
     with pytest.raises(sqlite3.IntegrityError):
         cursor.execute(
             """
-            INSERT INTO campaign_messages 
+            INSERT INTO campaign_messages
             (campaign_id, user_id, account_phone, message_text, status, idempotency_key)
             VALUES (?, ?, ?, ?, ?, ?)
         """,

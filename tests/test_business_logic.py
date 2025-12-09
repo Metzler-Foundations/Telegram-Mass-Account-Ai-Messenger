@@ -2,18 +2,18 @@
 Unit tests for business logic services.
 """
 
-import pytest
-import sqlite3
-import sys
 import os
-from unittest.mock import Mock, MagicMock, patch
+import sys
 from datetime import datetime, timedelta
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.services import MemberService, CampaignService, AccountService, BusinessLogicCoordinator
-from core.repositories import MemberRepository, CampaignRepository, AccountRepository
+from core.repositories import AccountRepository, CampaignRepository, MemberRepository
+from core.services import AccountService, BusinessLogicCoordinator, CampaignService, MemberService
 
 
 class TestMemberService:

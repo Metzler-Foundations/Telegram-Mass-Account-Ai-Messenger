@@ -5,10 +5,10 @@ Test script for proxy loading performance.
 This script tests the performance improvements for loading and managing large proxy datasets.
 """
 
-import time
 import logging
-import sys
 import os
+import sys
+import time
 from pathlib import Path
 
 # Add the parent directory to Python path for package imports

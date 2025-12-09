@@ -10,6 +10,7 @@ Usage:
 import sys
 import time
 from pathlib import Path
+
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication
 
@@ -95,7 +96,7 @@ def main():
                 pixmap.save(str(filename))
                 print(f"   ✓ Saved: {filename}")
             else:
-                print(f"   ✗ No screen available")
+                print("   ✗ No screen available")
 
         except Exception as e:
             print(f"   ✗ Error capturing {tab_name}: {e}")

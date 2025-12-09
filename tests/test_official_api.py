@@ -4,14 +4,13 @@ Test script to verify official Telegram API credentials work
 """
 
 import asyncio
-import sys
 import os
+import sys
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from telegram.telegram_client import TelegramClient
-from ai.gemini_service import GeminiService
 
 
 async def test_official_api():

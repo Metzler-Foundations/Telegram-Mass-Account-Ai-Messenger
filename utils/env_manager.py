@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Environment-specific configuration management."""
 
-import os
 import logging
-from typing import Optional, Any
+import os
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

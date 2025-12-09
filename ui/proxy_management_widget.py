@@ -14,35 +14,34 @@ import logging
 import re
 import socket
 import time
-from typing import Dict, List, Optional, Any
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
-    QGroupBox,
-    QProgressBar,
-    QComboBox,
-    QSpinBox,
     QCheckBox,
-    QTabWidget,
+    QComboBox,
     QFrame,
     QGridLayout,
-    QMessageBox,
-    QSplitter,
-    QTextEdit,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
     QLineEdit,
+    QMessageBox,
+    QPushButton,
     QScrollArea,
     QSizePolicy,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
-from PyQt6.QtGui import QColor, QFont
 
 from core.error_handler import ErrorHandler
 from ui.theme_manager import ThemeManager
@@ -56,12 +55,12 @@ except ImportError:
 
 # Try to import ProxyPoolManager
 try:
-    from proxy.proxy_pool_manager import (
+    from proxy.proxy_pool_manager import (  # noqa: F401
+        Proxy,
         ProxyPoolManager,
-        get_proxy_pool_manager,
         ProxyStatus,
         ProxyTier,
-        Proxy,
+        get_proxy_pool_manager,
     )
 
     PROXY_POOL_AVAILABLE = True
@@ -424,7 +423,7 @@ class ProxyTableWidget(QWidget):
         search = self.search_input.text().lower() if hasattr(self, "search_input") else ""
 
         filtered = []
-        for key, proxy in self.proxies.items():
+        for _key, proxy in self.proxies.items():
             # Apply tier filter
             if tier_filter != "all" and proxy.get("tier", "").lower() != tier_filter:
                 continue
@@ -1236,7 +1235,8 @@ class ProxyManagementWidget(QWidget):
     def _export_health_results(self):
         """Export current proxy health data for audits with optional encryption."""
         import csv
-        from PyQt6.QtWidgets import QMessageBox, QInputDialog
+
+        from PyQt6.QtWidgets import QInputDialog
 
         now = datetime.now().astimezone()
         timestamp = now.strftime("%Y%m%d_%H%M%S")
@@ -1383,10 +1383,11 @@ class ProxyManagementWidget(QWidget):
             # Encrypt the file if password was provided
             if encryption_password:
                 try:
+                    import base64
+
                     from cryptography.fernet import Fernet
                     from cryptography.hazmat.primitives import hashes
                     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
-                    import base64
 
                     # Read the CSV content
                     with open(temp_filepath, "rb") as f:

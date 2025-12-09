@@ -1,7 +1,7 @@
 """Pytest configuration and fixtures for GUI tests."""
 
 import os
-from typing import Generator
+from typing import Generator, Optional
 
 import pytest
 
@@ -18,7 +18,6 @@ os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", "")
 _qt_app = None
 try:
     from PyQt6.QtWidgets import QApplication
-    from PyQt6.QtCore import QEventLoop
 
     # Get or create QApplication instance immediately
     _qt_app = QApplication.instance()
@@ -35,7 +34,7 @@ except Exception:
     pass
 
 
-def _safe_process_events(app, max_events=5):
+def _safe_process_events(app: Optional[object], max_events: int = 5) -> None:
     """Safely process Qt events with a limit to prevent blocking.
 
     In headless/CI environments, processEvents() can block indefinitely.
@@ -45,6 +44,7 @@ def _safe_process_events(app, max_events=5):
         return
     try:
         from PyQt6.QtCore import QEventLoop
+
         # In headless/CI mode, minimize event processing to avoid hangs
         # Only process if there are actually pending events
         if not app.hasPendingEvents():
@@ -66,7 +66,7 @@ def _safe_process_events(app, max_events=5):
         pass
 
 
-def _ensure_qapplication():
+def _ensure_qapplication() -> Optional[object]:
     """Ensure QApplication exists before tests run."""
     global _qt_app
     if _qt_app is None:
@@ -86,7 +86,7 @@ def _ensure_qapplication():
     return _qt_app
 
 
-def pytest_load_initial_conftests(early_config, parser, args):
+def pytest_load_initial_conftests(early_config, parser, args) -> None:  # type: ignore
     """Called very early, before test collection starts.
 
     This is the earliest hook available - ensures QApplication exists
@@ -96,7 +96,7 @@ def pytest_load_initial_conftests(early_config, parser, args):
     _ensure_qapplication()
 
 
-def pytest_configure(config):
+def pytest_configure(config) -> None:  # type: ignore
     """Called after command line options have been parsed and all plugins initialized.
 
     This ensures QApplication is created very early, before any test
@@ -106,7 +106,7 @@ def pytest_configure(config):
     _ensure_qapplication()
 
 
-def pytest_sessionstart(session):
+def pytest_sessionstart(session) -> None:  # type: ignore
     """Called after test collection is complete but before tests run.
 
     This ensures QApplication is ready before any tests execute.
@@ -159,7 +159,7 @@ def qapplication() -> Generator:
 
 
 @pytest.fixture(scope="function")
-def qapp(qapplication) -> Generator:
+def qapp(qapplication: object) -> Generator:
     """Provide QApplication instance for individual test functions.
 
     This is a function-scoped fixture that ensures the QApplication is

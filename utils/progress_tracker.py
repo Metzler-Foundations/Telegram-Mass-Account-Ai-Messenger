@@ -5,21 +5,21 @@ Provides visual feedback and allows cancellation/pause
 """
 
 import logging
-from typing import Optional, Callable, Dict, Any
 from datetime import datetime, timedelta
+from typing import Callable, Optional
+
+from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QDialog,
-    QWidget,
-    QVBoxLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QProgressBar,
+    QPushButton,
     QTextEdit,
-    QFrame,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont
 
 logger = logging.getLogger(__name__)
 

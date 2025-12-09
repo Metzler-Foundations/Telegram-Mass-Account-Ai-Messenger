@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Group join request management with cooldown."""
 
-import logging
 import asyncio
-from datetime import datetime, timedelta
+import logging
+from datetime import datetime
 from typing import Dict
 
 logger = logging.getLogger(__name__)

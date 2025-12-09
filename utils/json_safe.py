@@ -12,8 +12,8 @@ Features:
 
 import json
 import logging
-from typing import Any, Optional, Dict, Callable
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +192,7 @@ def safe_json_load_file(
             return default
 
         # Read file
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
 
         # Parse
@@ -235,7 +235,7 @@ def safe_json_save_file(
 
         # Backup existing file
         if create_backup and path.exists():
-            backup_path = path.with_suffix(f".json.backup")
+            backup_path = path.with_suffix(".json.backup")
             import shutil
 
             shutil.copy(path, backup_path)

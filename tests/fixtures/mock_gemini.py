@@ -2,8 +2,8 @@
 Mock Google Gemini AI service for testing.
 """
 
-from typing import Optional, List, Dict, Any
 import asyncio
+from typing import Any, Dict, List, Optional
 
 
 class MockGenerativeModel:

@@ -5,24 +5,25 @@ All metrics pulled from production database - NO MOCK DATA
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
+from typing import Dict, List, Optional
+
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
+    QLabel,
     QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont
 
-from database.database_queries import member_queries, campaign_queries, account_queries
-from ui.ui_components import LoadingOverlay
+from database.database_queries import account_queries, campaign_queries, member_queries
 from ui.theme_manager import ThemeManager
+from ui.ui_components import LoadingOverlay
 
 logger = logging.getLogger(__name__)
 
@@ -320,8 +321,8 @@ class AnalyticsDashboard(QWidget):
 
         # Risk Distribution Chart
         try:
-            from ui.risk_distribution_chart import RiskDistributionChart
             from monitoring.account_risk_monitor import get_risk_monitor
+            from ui.risk_distribution_chart import RiskDistributionChart
 
             risk_monitor = get_risk_monitor()
             self.risk_chart = RiskDistributionChart(risk_monitor=risk_monitor)
@@ -692,11 +693,11 @@ class AnalyticsDashboard(QWidget):
             # Query variant performance
             cursor = conn.execute(
                 """
-                SELECT 
+                SELECT
                     COALESCE(template_variant, 'default') as variant,
                     status,
                     COUNT(*) as count,
-                    AVG(CASE 
+                    AVG(CASE
                         WHEN status = 'sent' THEN 1.0
                         ELSE 0.0
                     END) as success_rate
@@ -728,7 +729,7 @@ class AnalyticsDashboard(QWidget):
                     variant_stats[variant][status] += count
 
             # Calculate success rates
-            for variant, stats in variant_stats.items():
+            for _variant, stats in variant_stats.items():
                 if stats["total"] > 0:
                     stats["success_rate"] = (stats["sent"] / stats["total"]) * 100
 
@@ -789,9 +790,11 @@ class AnalyticsDashboard(QWidget):
     def export_dashboard_data(self):
         """Export all dashboard data."""
         try:
-            from PyQt6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
-            from utils.export_manager import get_export_manager
             from datetime import datetime
+
+            from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
+
+            from utils.export_manager import get_export_manager
 
             # Ask for export type
             export_options = [

@@ -6,9 +6,8 @@ All functions connect to actual database and return real data
 
 import logging
 import sqlite3
-from typing import List, Dict, Optional, Any, Tuple
 from datetime import datetime, timedelta
-from pathlib import Path
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +221,7 @@ class MemberQueries:
         where_clause = " AND ".join(conditions) if conditions else "1=1"
 
         query = f"""
-            SELECT 
+            SELECT
                 user_id, username, first_name, last_name, phone,
                 bio, is_bot, is_verified, is_premium, has_photo,
                 language_code, scraped_at, last_seen, message_count,
@@ -308,7 +307,7 @@ class MemberQueries:
         # Get paginated data
         offset = (page - 1) * page_size
         data_query = f"""
-            SELECT 
+            SELECT
                 user_id, username, first_name, last_name, phone,
                 bio, is_bot, is_verified, is_premium, has_photo,
                 language_code, scraped_at, last_seen, message_count,
@@ -358,7 +357,7 @@ class MemberQueries:
     def get_members_by_channel(self, channel_id: int) -> List[Dict]:
         """Get all REAL members from a specific channel."""
         query = """
-            SELECT 
+            SELECT
                 user_id, username, first_name, last_name, phone,
                 bio, is_bot, is_verified, is_premium, has_photo,
                 language_code, scraped_at, last_seen, message_count
@@ -374,8 +373,8 @@ class MemberQueries:
     def get_channels(self) -> List[Dict]:
         """Get all REAL channels from database."""
         query = """
-            SELECT DISTINCT 
-                channel_id, channel_title, 
+            SELECT DISTINCT
+                channel_id, channel_title,
                 COUNT(*) as member_count,
                 MAX(scraped_at) as last_scraped
             FROM members
@@ -410,7 +409,7 @@ class CampaignQueries:
     def get_all_campaigns(self) -> List[Dict]:
         """Get ALL real campaigns from database."""
         query = """
-            SELECT 
+            SELECT
                 id, name, status, message_template,
                 total_targets, sent_count, failed_count,
                 created_at, started_at, completed_at,
@@ -426,7 +425,7 @@ class CampaignQueries:
     def get_campaign_by_id(self, campaign_id: int) -> Optional[Dict]:
         """Get a specific campaign."""
         query = """
-            SELECT 
+            SELECT
                 id, name, status, message_template,
                 total_targets, sent_count, failed_count,
                 created_at, started_at, completed_at,
@@ -443,7 +442,7 @@ class CampaignQueries:
     def get_campaign_stats(self) -> Dict:
         """Get REAL aggregate campaign statistics."""
         query = """
-            SELECT 
+            SELECT
                 COUNT(*) as total_campaigns,
                 SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) as running,
                 SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
@@ -467,7 +466,7 @@ class AccountQueries:
     def get_all_accounts(self) -> List[Dict]:
         """Get ALL real accounts from database."""
         query = """
-            SELECT 
+            SELECT
                 phone_number, status, session_file,
                 created_at, last_active, messages_sent,
                 is_warmed_up, warmup_stage, proxy_used,
@@ -483,7 +482,7 @@ class AccountQueries:
     def get_account_by_phone(self, phone_number: str) -> Optional[Dict]:
         """Get specific account."""
         query = """
-            SELECT 
+            SELECT
                 phone_number, status, session_file,
                 created_at, last_active, messages_sent,
                 is_warmed_up, warmup_stage, proxy_used
@@ -497,7 +496,7 @@ class AccountQueries:
     def get_account_stats(self) -> Dict:
         """Get REAL aggregate account statistics."""
         query = """
-            SELECT 
+            SELECT
                 COUNT(*) as total_accounts,
                 SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active,
                 SUM(CASE WHEN is_warmed_up = 1 THEN 1 ELSE 0 END) as warmed_up,

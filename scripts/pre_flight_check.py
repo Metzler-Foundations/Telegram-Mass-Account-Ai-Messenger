@@ -11,8 +11,8 @@ This script performs all validations that can be done without API keys:
 - Disk space
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add parent directory to path

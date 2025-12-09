@@ -2,16 +2,15 @@
 Data Access Layer - Repository pattern for clean data access.
 """
 
-import sqlite3
 import logging
-from typing import List, Dict, Any, Optional
-from abc import ABC, abstractmethod
+import sqlite3
 from datetime import datetime
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
-class BaseRepository(ABC):
+class BaseRepository:
     """Base repository with common database operations."""
 
     def __init__(self, db_path: str):

@@ -6,14 +6,13 @@ This script helps you set up all required API keys for the Telegram automation p
 It will guide you through setting each credential and validate they're configured correctly.
 """
 
-import os
 import sys
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.secrets_manager import SecretsManager, get_secrets_manager
+from core.secrets_manager import get_secrets_manager
 
 
 def print_header(text):
@@ -145,7 +144,7 @@ def interactive_setup():
 
     instructions = get_api_key_instructions()
 
-    for key_name, info in instructions.items():
+    for _key_name, info in instructions.items():
         print_header(f"Configure: {info['name']}")
 
         if info.get("optional"):
@@ -159,7 +158,7 @@ def interactive_setup():
         print()
         print(f"Example format: {info['example']}")
         print()
-        print(f"To set this key, run:")
+        print("To set this key, run:")
         print(f"  export {info['env_var']}=\"your-key-here\"")
         print()
 
@@ -264,7 +263,7 @@ def main():
             instructions = get_api_key_instructions()
             print("Copy and run these commands (with your actual values):")
             print()
-            for key_name, info in instructions.items():
+            for _key_name, info in instructions.items():
                 print(f"export {info['env_var']}=\"your-actual-key-here\"")
             print()
 

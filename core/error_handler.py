@@ -3,22 +3,22 @@ Error Handler - User-friendly error messages with actionable guidance.
 """
 
 import logging
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 # Make PyQt6 imports optional for headless environments (CI, testing)
 try:
+    from PyQt6.QtCore import Qt
     from PyQt6.QtWidgets import (
-        QMessageBox,
-        QWidget,
+        QApplication,
         QDialog,
-        QVBoxLayout,
         QHBoxLayout,
         QLabel,
+        QMessageBox,
         QPushButton,
         QTextEdit,
-        QApplication,
+        QVBoxLayout,
+        QWidget,
     )
-    from PyQt6.QtCore import Qt
 
     PYQT6_AVAILABLE = True
 except ImportError:
@@ -26,18 +26,18 @@ except ImportError:
     PYQT6_AVAILABLE = False
     # Create dummy types for type checking
     if TYPE_CHECKING:
+        from PyQt6.QtCore import Qt
         from PyQt6.QtWidgets import (
-            QMessageBox,
-            QWidget,
+            QApplication,
             QDialog,
-            QVBoxLayout,
             QHBoxLayout,
             QLabel,
+            QMessageBox,
             QPushButton,
             QTextEdit,
-            QApplication,
+            QVBoxLayout,
+            QWidget,
         )
-        from PyQt6.QtCore import Qt
     else:
         # Create minimal mock classes for runtime
         class QWidget:

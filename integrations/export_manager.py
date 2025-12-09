@@ -11,17 +11,17 @@ import csv
 import json
 import logging
 import re
-from typing import List, Dict, Any, Optional
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-import sqlite3
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
 # Check for optional Excel support
 try:
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    import openpyxl  # noqa: F401
+    from openpyxl.styles import Alignment, Font, PatternFill  # noqa: F401
 
     EXCEL_AVAILABLE = True
 except ImportError:
@@ -427,8 +427,8 @@ class ExportManager:
                 # Get message statistics
                 messages = conn.execute(
                     """
-                    SELECT status, COUNT(*) as count 
-                    FROM campaign_messages 
+                    SELECT status, COUNT(*) as count
+                    FROM campaign_messages
                     WHERE campaign_id = ?
                     GROUP BY status
                 """,
@@ -450,7 +450,7 @@ class ExportManager:
                 # Get account performance
                 accounts = conn.execute(
                     """
-                    SELECT account_phone, 
+                    SELECT account_phone,
                            COUNT(*) as total,
                            SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent,
                            SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
@@ -572,7 +572,7 @@ class ImportManager:
         imported = 0
 
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(filepath, encoding="utf-8") as f:
                 reader = csv.DictReader(f)
 
                 for row in reader:
@@ -619,7 +619,7 @@ class ImportManager:
         imported = 0
 
         try:
-            with open(filepath, "r", encoding="utf-8") as f:
+            with open(filepath, encoding="utf-8") as f:
                 members = json.load(f)
 
             if not isinstance(members, list):

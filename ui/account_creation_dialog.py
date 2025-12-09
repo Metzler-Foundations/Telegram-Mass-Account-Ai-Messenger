@@ -4,27 +4,25 @@ Account Creation Dialog - Streamlined account creation interface.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict
+
+from PyQt6.QtCore import QTimer, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
     QDialog,
-    QVBoxLayout,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QLineEdit,
-    QComboBox,
-    QProgressBar,
     QMessageBox,
-    QGroupBox,
-    QFormLayout,
-    QTextEdit,
-    QCheckBox,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont
 
-from utils.user_helpers import ValidationHelper, get_tooltip
-from core.error_handler import ErrorHandler
 from ui.theme_manager import ThemeManager
 
 logger = logging.getLogger(__name__)
@@ -256,7 +254,7 @@ class AccountCreationDialog(QDialog):
             except Exception as e:
                 logger.error(f"Failed to load API credentials: {e}")
                 self._show_error(
-                    f"Failed to load Telegram API credentials. Please configure them in Settings."
+                    "Failed to load Telegram API credentials. Please configure them in Settings."
                 )
                 return
 

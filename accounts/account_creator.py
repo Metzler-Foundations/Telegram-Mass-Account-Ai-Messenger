@@ -10,60 +10,62 @@ Features:
 """
 
 import asyncio
+import hashlib
+import importlib.util
+import json
 import logging
 import random
-import json
-import os
 import time
-import hashlib
-import requests
-from typing import Dict, List, Optional, Any, Tuple
-from utils.http_connection_pool import get_http_connection_pool
-from utils.rate_limiter import get_rate_limit_manager
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
-# Import rate limiter for API call protection
-try:
-    from utils.rate_limiter import get_rate_limiter
-
-    RATE_LIMITER_AVAILABLE = True
-except ImportError:
-    RATE_LIMITER_AVAILABLE = False
-
+import requests
 from pyrogram import Client
 from pyrogram.errors import (
     FloodWait,
-    PhoneNumberInvalid,
-    PhoneCodeInvalid,
     PhoneCodeExpired,
+    PhoneCodeInvalid,
+    PhoneNumberInvalid,
     SessionPasswordNeeded,
-    UserDeactivated,
-    UsernameOccupied,
     UsernameInvalid,
+    UsernameOccupied,
 )
 
-from anti_detection.anti_detection_system import AccountCreationAntiDetection
-from anti_detection.advanced_cloning_system import AdvancedCloningSystem
-from accounts.username_generator import UsernameGenerator
 from accounts.account_creation_failsafes import AccountCreationFailSafe, FailSafeLevel
-from utils.user_helpers import translate_error, get_progress_message, ValidationHelper
-from utils.retry_helper import RetryHelper, RetryConfig, RetryStrategy
+from accounts.username_generator import UsernameGenerator
+from anti_detection.advanced_cloning_system import AdvancedCloningSystem
+from anti_detection.anti_detection_system import AccountCreationAntiDetection
+from utils.rate_limiter import get_rate_limit_manager
+from utils.retry_helper import RetryConfig, RetryHelper, RetryStrategy
+from utils.user_helpers import get_progress_message, translate_error
 
-# Import audit logging
-try:
-    from accounts.account_audit_log import get_audit_log, AuditEvent, AuditEventType
+# Audit logging availability
+AUDIT_LOG_AVAILABLE = importlib.util.find_spec("accounts.account_audit_log") is not None
 
-    AUDIT_LOG_AVAILABLE = True
-except ImportError:
-    AUDIT_LOG_AVAILABLE = False
+if TYPE_CHECKING:
+    from accounts.account_audit_log import AuditEvent, AuditEventType  # noqa: F401
+    from proxy.proxy_pool_manager import ProxyPoolManager  # pragma: no cover
+
+
+def _safe_get_audit_log():
+    """Return audit log instance if available, else None."""
+    if not AUDIT_LOG_AVAILABLE:
+        return None
+    try:
+        from accounts.account_audit_log import get_audit_log
+
+        return get_audit_log()
+    except Exception as exc:
+        logger.warning("Failed to initialize audit log: %s", exc)
+        return None
+
 
 logger = logging.getLogger(__name__)
 
-# Try to import ProxyPoolManager
+# Try to import ProxyPoolManager utilities
 try:
-    from proxy.proxy_pool_manager import ProxyPoolManager, get_proxy_pool_manager, Proxy, ProxyTier
+    from proxy.proxy_pool_manager import get_proxy_pool_manager
 
     PROXY_POOL_AVAILABLE = True
 except ImportError:
@@ -1247,11 +1249,7 @@ class AccountCreator:
         # Audit logging integration
         self._audit_log = None
         if AUDIT_LOG_AVAILABLE:
-            try:
-                self._audit_log = get_audit_log()
-                logger.info("✓ Audit logging enabled for account creation")
-            except Exception as e:
-                logger.warning(f"Failed to initialize audit log: {e}")
+            self._audit_log = _safe_get_audit_log()
 
     def validate_bulk_run_preflight(
         self, provider: str, country: str, api_key: str, requested_count: int
@@ -1999,7 +1997,7 @@ class AccountCreator:
             if self.account_manager:
                 try:
                     self.account_manager._on_account_created(account_info)
-                    logger.info(f"✅ Account manager notified of new account")
+                    logger.info("✅ Account manager notified of new account")
                 except Exception as e:
                     logger.warning(f"Failed to notify account manager: {e}")
 
@@ -2145,8 +2143,6 @@ class AccountCreator:
         if not proxy:
             return None
 
-        import socks
-
         return {
             "scheme": "socks5" if proxy.get("type") == "socks5" else "http",
             "hostname": proxy["ip"],
@@ -2161,7 +2157,7 @@ class AccountCreator:
         """Handle SMS verification with human-like behavior."""
         max_sms_attempts = 5  # Wait up to 5 minutes for SMS
 
-        for attempt in range(max_sms_attempts):
+        for _attempt in range(max_sms_attempts):
             if not self.creation_active:
                 return None
 
@@ -2540,7 +2536,7 @@ class AccountCreator:
 
             # Log to audit if available
             try:
-                from accounts.account_audit_log import get_audit_log, AuditEvent, AuditEventType
+                from accounts.account_audit_log import AuditEvent, AuditEventType, get_audit_log
 
                 audit = get_audit_log()
                 audit.log_event(
@@ -2568,7 +2564,7 @@ class AccountCreator:
         """Load persisted profile photo hashes to prevent duplicate uploads."""
         try:
             if self._photo_hash_file.exists():
-                with open(self._photo_hash_file, "r") as f:
+                with open(self._photo_hash_file) as f:
                     data = json.load(f)
                     return set(data.get("hashes", []))
         except Exception as exc:
@@ -2627,7 +2623,7 @@ class AccountCreator:
         except ImportError:
             logger.warning("PIL not available, skipping image validation")
         except Exception as e:
-            raise ValueError(f"Invalid image file: {e}")
+            raise ValueError(f"Invalid image file: {e}") from e
 
         photo_hash = hashlib.sha256(photo_file.read_bytes()).hexdigest()
         if allow_skip and photo_hash in self._applied_photo_hashes:

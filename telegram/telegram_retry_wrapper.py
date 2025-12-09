@@ -3,14 +3,12 @@
 
 import asyncio
 import logging
+
 from pyrogram.errors import (
     FloodWait,
-    AuthKeyUnregistered,
-    UserDeactivated,
-    SessionPasswordNeeded,
-    PhoneNumberInvalid,
     NetworkError,
 )
+
 from utils.retry_logic import retry_on_exception
 
 logger = logging.getLogger(__name__)

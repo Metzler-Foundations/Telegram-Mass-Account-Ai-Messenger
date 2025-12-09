@@ -5,12 +5,13 @@ UI Update Optimization - Debouncing and Throttling.
 Prevents excessive UI updates that can cause lag and performance issues.
 """
 
-import time
 import logging
-from typing import Callable, Any, Dict, Optional, List
-from functools import wraps
-from collections import defaultdict
 import threading
+import time
+from collections import defaultdict
+from functools import wraps
+from typing import Any, Callable, Dict, List, Optional
+
 from PyQt6.QtCore import QTimer
 
 logger = logging.getLogger(__name__)

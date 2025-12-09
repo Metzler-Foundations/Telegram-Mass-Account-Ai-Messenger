@@ -2,7 +2,7 @@
 """Proxy configuration - timeouts and scoring."""
 
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 

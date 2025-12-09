@@ -6,21 +6,20 @@ Tracks actual message sending, not simulated
 
 import logging
 import sqlite3
-from typing import Dict, List, Optional
 from datetime import datetime
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QFrame,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QProgressBar,
     QTextEdit,
-    QPushButton,
-    QFrame,
-    QGroupBox,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFont
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +102,7 @@ class CampaignProgressTracker(QWidget):
 
             cursor.execute(
                 """
-                SELECT 
+                SELECT
                     name, status, message_template,
                     total_targets, sent_count, failed_count,
                     created_at, started_at, completed_at
@@ -125,7 +124,7 @@ class CampaignProgressTracker(QWidget):
             # Get recent messages for activity log
             cursor.execute(
                 """
-                SELECT 
+                SELECT
                     target_user_id, sent_at, status, error_message
                 FROM campaign_messages
                 WHERE campaign_id = ?
@@ -266,14 +265,14 @@ def initialize_campaign_database():
         # Create indexes for performance
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign 
+            CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign
             ON campaign_messages(campaign_id)
         """
         )
 
         cursor.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_campaign_messages_sent_at 
+            CREATE INDEX IF NOT EXISTS idx_campaign_messages_sent_at
             ON campaign_messages(sent_at)
         """
         )
@@ -310,7 +309,7 @@ def save_campaign_message(
         if status == "sent":
             cursor.execute(
                 """
-                UPDATE campaigns 
+                UPDATE campaigns
                 SET sent_count = sent_count + 1
                 WHERE id = ?
             """,
@@ -319,7 +318,7 @@ def save_campaign_message(
         else:
             cursor.execute(
                 """
-                UPDATE campaigns 
+                UPDATE campaigns
                 SET failed_count = failed_count + 1
                 WHERE id = ?
             """,

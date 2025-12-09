@@ -9,14 +9,13 @@ Features:
 - Multi-method scraping state management
 """
 
+import json
 import logging
 import sqlite3
-import json
-from typing import Dict, List, Optional, Any, Set
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path
 from enum import Enum
-from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +107,7 @@ class ResumableScraperManager:
             from database.connection_pool import get_pool
 
             self._connection_pool = get_pool(self.db_path)
-        except:
+        except Exception:
             pass
         self._init_database()
 
@@ -165,21 +164,21 @@ class ResumableScraperManager:
             # Indexes for performance
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_jobs_status 
+                CREATE INDEX IF NOT EXISTS idx_jobs_status
                 ON scraping_jobs(status, created_at DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_jobs_channel 
+                CREATE INDEX IF NOT EXISTS idx_jobs_channel
                 ON scraping_jobs(channel_identifier, status)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_checkpoints_job 
+                CREATE INDEX IF NOT EXISTS idx_checkpoints_job
                 ON scraping_checkpoints(job_id, method)
             """
             )
@@ -208,7 +207,7 @@ class ResumableScraperManager:
             with self._get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT INTO scraping_jobs 
+                    INSERT INTO scraping_jobs
                     (job_id, channel_identifier, status, started_at)
                     VALUES (?, ?, ?, ?)
                 """,
@@ -257,7 +256,7 @@ class ResumableScraperManager:
                 conn.execute(
                     """
                     INSERT INTO scraping_checkpoints
-                    (job_id, channel_id, channel_name, method, cursor_position, 
+                    (job_id, channel_id, channel_name, method, cursor_position,
                      members_scraped, last_user_id, progress_percentage, metadata, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
@@ -341,7 +340,7 @@ class ResumableScraperManager:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
                     """
-                    SELECT * FROM scraping_checkpoints 
+                    SELECT * FROM scraping_checkpoints
                     WHERE job_id = ?
                     ORDER BY created_at DESC
                 """,
@@ -472,7 +471,7 @@ class ResumableScraperManager:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
                     """
-                    SELECT job_id FROM scraping_jobs 
+                    SELECT job_id FROM scraping_jobs
                     WHERE status IN (?, ?)
                     ORDER BY updated_at DESC
                 """,

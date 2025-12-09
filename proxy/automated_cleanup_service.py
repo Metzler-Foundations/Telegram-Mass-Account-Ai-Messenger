@@ -9,13 +9,13 @@ Features:
 - Manual override controls
 """
 
+import asyncio
 import logging
 import sqlite3
-import asyncio
-from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime, timedelta
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -110,14 +110,14 @@ class AutomatedProxyCleanupService:
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_cleanup_timestamp 
+                CREATE INDEX IF NOT EXISTS idx_cleanup_timestamp
                 ON cleanup_events(timestamp DESC)
             """
             )
 
             conn.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_cleanup_reason 
+                CREATE INDEX IF NOT EXISTS idx_cleanup_reason
                 ON cleanup_events(reason, timestamp DESC)
             """
             )
@@ -214,7 +214,7 @@ class AutomatedProxyCleanupService:
                     try:
                         first_seen_dt = datetime.fromisoformat(first_seen)
                         age_days = (now - first_seen_dt).days
-                    except:
+                    except Exception:
                         age_days = 0
                 else:
                     age_days = 0

@@ -4,7 +4,6 @@ Verifies all critical integrations are working as claimed in README.
 """
 
 import logging
-import asyncio
 import sys
 from pathlib import Path
 
@@ -57,8 +56,9 @@ class IntegrationVerifier:
         logger.info("Testing warmup service integration...")
 
         try:
-            from accounts.account_warmup_service import AccountWarmupService
             from accounts.warmup_intelligence import WarmupIntelligence
+
+            from accounts.account_warmup_service import AccountWarmupService
 
             # Check WarmupIntelligence methods
             wi = WarmupIntelligence()
@@ -97,9 +97,6 @@ class IntegrationVerifier:
 
         try:
             from campaigns.dm_campaign_manager import DMCampaignManager
-            from campaigns.delivery_analytics import DeliveryAnalytics
-            from campaigns.read_receipt_poller import ReadReceiptPoller
-            from campaigns.response_tracker import ResponseTracker
             from campaigns.variant_statistics import VariantStatistics
 
             # Check that response tracker and poller exist
@@ -134,9 +131,9 @@ class IntegrationVerifier:
         logger.info("Testing analytics export functionality...")
 
         try:
+            from ui.analytics_dashboard import AnalyticsDashboard
             from ui.campaign_analytics_widget import CampaignAnalyticsWidget
             from ui.delivery_analytics_widget import DeliveryAnalyticsWidget
-            from ui.analytics_dashboard import AnalyticsDashboard
             from utils.export_manager import ExportManager
 
             # Check export methods exist
@@ -228,8 +225,9 @@ class IntegrationVerifier:
         logger.info("Testing tooltips...")
 
         try:
-            from ui.ui_components import CreateCampaignDialog
             import inspect
+
+            from ui.ui_components import CreateCampaignDialog
 
             source = inspect.getsource(CreateCampaignDialog.setup_ui)
 
@@ -254,8 +252,9 @@ class IntegrationVerifier:
         logger.info("Testing template variant UI...")
 
         try:
-            from ui.ui_components import CreateCampaignDialog
             import inspect
+
+            from ui.ui_components import CreateCampaignDialog
 
             source = inspect.getsource(CreateCampaignDialog.setup_ui)
 

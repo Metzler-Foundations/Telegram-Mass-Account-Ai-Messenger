@@ -5,9 +5,9 @@ Critical for one-time use phone numbers - if disconnected, account is lost forev
 
 import asyncio
 import logging
-import time
-from typing import Dict, Optional, Callable
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Callable, Dict, Optional
+
 from pyrogram import Client
 
 logger = logging.getLogger(__name__)

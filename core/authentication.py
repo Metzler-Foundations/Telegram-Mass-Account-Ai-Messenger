@@ -11,15 +11,13 @@ Features:
 - Token expiration
 """
 
-import secrets
-import hashlib
-import time
 import logging
-from typing import Optional, Dict, List, Set
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
-from enum import Enum
+import secrets
 import threading
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """A/B test statistical significance calculator."""
 
-import math
 import logging
-from typing import Dict, Optional, Tuple
+import math
 from dataclasses import dataclass
+from typing import Dict, Tuple
 
 logger = logging.getLogger(__name__)
 

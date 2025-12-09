@@ -11,12 +11,12 @@ Features:
 - Template injection prevention
 """
 
-import re
 import html
+import logging
+import re
 import urllib.parse
 from pathlib import Path
-from typing import Optional, List, Any, Dict
-import logging
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ class InputValidator:
         try:
             parsed = urllib.parse.urlparse(url)
         except Exception as e:
-            raise ValidationError(f"Invalid URL: {e}")
+            raise ValidationError(f"Invalid URL: {e}") from e
 
         # Check scheme
         if parsed.scheme not in allowed_schemes:
@@ -285,7 +285,7 @@ class InputValidator:
         try:
             file_path = Path(path).resolve()
         except Exception as e:
-            raise ValidationError(f"Invalid file path: {e}")
+            raise ValidationError(f"Invalid file path: {e}") from e
 
         # Check for directory traversal
         if ".." in path or path.startswith("/"):
@@ -296,8 +296,8 @@ class InputValidator:
             base_path = Path(base_dir).resolve()
             try:
                 file_path.relative_to(base_path)
-            except ValueError:
-                raise ValidationError(f"Path {path} is outside allowed directory {base_dir}")
+            except ValueError as e:
+                raise ValidationError(f"Path {path} is outside allowed directory {base_dir}") from e
 
         return file_path
 

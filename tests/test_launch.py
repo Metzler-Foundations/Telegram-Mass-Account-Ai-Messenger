@@ -4,10 +4,9 @@ Test script to verify the ultra-premium Telegram AI Assistant can launch.
 This runs the application initialization without the GUI for testing.
 """
 
-import sys
-import os
 import asyncio
-from pathlib import Path
+import os
+import sys
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -94,7 +93,7 @@ def test_services():
 
         from account_manager import AccountManager
 
-        manager = AccountManager(db)
+        AccountManager(db)
         print("✅ AccountManager service initialized")
 
         return True
@@ -108,7 +107,7 @@ async def test_ai_service():
     try:
         from gemini_service import GeminiService
 
-        service = GeminiService("")
+        GeminiService("")
         print("✅ GeminiService initialized (API key needed for full functionality)")
         return True
     except Exception as e:

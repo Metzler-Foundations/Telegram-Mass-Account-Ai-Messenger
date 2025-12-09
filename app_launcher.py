@@ -3,11 +3,12 @@
 Application Launcher - Handles startup, welcome wizard, and initialization
 """
 
-import sys
 import logging
+import sys
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication, QMessageBox
+
 from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication, QMessageBox
 
 # Import and configure centralized logging with rotation
 from core.setup_logging import setup_logging

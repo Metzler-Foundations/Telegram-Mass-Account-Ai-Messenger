@@ -3,7 +3,7 @@ Configuration validation helpers for critical credentials.
 """
 
 import os
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 from core.config_manager import ConfigurationManager
 

@@ -10,21 +10,21 @@ Features:
 - Automatic log rotation and archival
 """
 
-import json
-import logging
+import getpass
 import hashlib
 import hmac
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timedelta
-from dataclasses import dataclass, asdict
-from threading import Lock
+import json
+import logging
 import os
 import socket
-import getpass
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import rsa, padding
+from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from threading import Lock
+from typing import Any, Dict, List, Optional
+
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,7 @@ class SecurityAuditLogger:
             return ""
 
         try:
-            with open(self.current_log_file, "r") as f:
+            with open(self.current_log_file) as f:
                 lines = f.readlines()
                 if lines:
                     last_line = lines[-1].strip()
@@ -288,7 +288,7 @@ class SecurityAuditLogger:
             return True
 
         try:
-            with open(log_file, "r") as f:
+            with open(log_file) as f:
                 lines = f.readlines()
 
             # Start with empty hash for first entry
@@ -359,7 +359,7 @@ class SecurityAuditLogger:
         # Read events from each file
         for _, file_path in audit_files:
             try:
-                with open(file_path, "r") as f:
+                with open(file_path) as f:
                     for line in f:
                         line = line.strip()
                         if line and not line.startswith("#"):

@@ -10,14 +10,14 @@ Features:
 - Leak detection
 """
 
-import psutil
+import gc
 import logging
 import threading
 import weakref
-from typing import Any, Optional, Dict, Callable, List
 from collections import OrderedDict
-from datetime import datetime
-import gc
+from typing import Any, Callable, Dict, List, Optional
+
+import psutil
 
 logger = logging.getLogger(__name__)
 

@@ -2,8 +2,8 @@
 """Cost tracking reconciliation with actual charges."""
 
 import logging
-from typing import Dict, List, Optional
 from datetime import datetime
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +74,8 @@ class CostReconciliation:
             with pool.get_connection() as conn:
                 conn.execute(
                     """
-                    INSERT INTO cost_reconciliations 
-                    (provider, period, tracked_cost, actual_charge, difference, 
+                    INSERT INTO cost_reconciliations
+                    (provider, period, tracked_cost, actual_charge, difference,
                      variance_percentage, status, reconciled_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,

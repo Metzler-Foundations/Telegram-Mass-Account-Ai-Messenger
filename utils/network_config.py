@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Network configuration - Timeouts and connection settings."""
 
-import aiohttp
 import logging
+
+import aiohttp
 
 logger = logging.getLogger(__name__)
 

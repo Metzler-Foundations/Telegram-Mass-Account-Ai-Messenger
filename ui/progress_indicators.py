@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """UI progress indicators - Prevent freezing during long operations."""
 
-from PyQt6.QtWidgets import QProgressDialog, QApplication
-from PyQt6.QtCore import QThread, pyqtSignal
 import logging
+
+from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtWidgets import QProgressDialog
 
 logger = logging.getLogger(__name__)
 

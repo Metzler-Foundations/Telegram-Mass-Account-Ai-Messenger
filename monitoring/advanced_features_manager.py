@@ -5,25 +5,25 @@ This module provides a single point of integration for all advanced features,
 making it easy to add them to your existing bot.
 """
 
-import logging
-import asyncio
 import json
-from typing import List, Dict, Optional, Any
+import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from ai.competitor_intelligence import CompetitorIntelligence
+from ai.conversation_analyzer import ConversationAnalyzer
 
 # Import all advanced features
 from ai.intelligence_engine import IntelligenceEngine, UserIntelligence
-from campaigns.engagement_automation import EngagementAutomation, EngagementStrategy, EngagementRule
-from scraping.group_discovery_engine import GroupDiscoveryEngine, DiscoveryMethod
-from ai.status_intelligence import StatusIntelligence, OnlineStatus
-from anti_detection.shadowban_detector import ShadowBanDetector, ShadowBanStatus
-from recovery.recovery_protocol import RecoveryProtocol, RecoveryStage
-from ai.network_analytics import NetworkAnalytics
-from ai.competitor_intelligence import CompetitorIntelligence
 from ai.media_intelligence import MediaIntelligence
+from ai.network_analytics import NetworkAnalytics
+from ai.status_intelligence import StatusIntelligence
+from anti_detection.shadowban_detector import ShadowBanDetector
+from campaigns.engagement_automation import EngagementAutomation, EngagementRule, EngagementStrategy
 from campaigns.intelligent_scheduler import IntelligentScheduler
-from ai.conversation_analyzer import ConversationAnalyzer
+from recovery.recovery_protocol import RecoveryProtocol
+from scraping.group_discovery_engine import GroupDiscoveryEngine
 from scraping.relationship_mapper import RelationshipMapper
 
 logger = logging.getLogger(__name__)
@@ -388,7 +388,7 @@ class AdvancedFeaturesManager:
         if not self.shadowban:
             return {"status": "unknown"}
 
-        test = await self.shadowban.test_delivery(client, account_id, canary_user_id)
+        await self.shadowban.test_delivery(client, account_id, canary_user_id)
         status = self.shadowban.get_account_status(account_id)
 
         return {

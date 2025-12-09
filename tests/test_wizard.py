@@ -3,9 +3,7 @@
 Test script for the Setup Wizard functionality
 """
 
-import json
 import sys
-from pathlib import Path
 
 
 # Test the wizard manager logic
@@ -19,7 +17,7 @@ def test_wizard_manager():
     print("\n1. Testing with empty settings...")
     empty_settings = {}
     manager = SetupWizardManager(empty_settings)
-    assert manager.is_wizard_needed() == True, "Wizard should be needed for empty settings"
+    assert manager.is_wizard_needed(), "Wizard should be needed for empty settings"
     assert (
         manager.get_starting_step() == SetupWizardManager.STEP_TELEGRAM
     ), "Should start at Telegram step"
@@ -35,7 +33,7 @@ def test_wizard_manager():
         }
     }
     manager = SetupWizardManager(telegram_only)
-    assert manager.is_wizard_needed() == True, "Wizard should be needed when Gemini is missing"
+    assert manager.is_wizard_needed(), "Wizard should be needed when Gemini is missing"
     assert (
         manager.get_starting_step() == SetupWizardManager.STEP_GEMINI
     ), "Should start at Gemini step"
@@ -52,9 +50,7 @@ def test_wizard_manager():
         "gemini": {"api_key": "AIzaSyABC123XYZ_TEST_KEY_LONG_ENOUGH_TO_PASS"},
     }
     manager = SetupWizardManager(telegram_gemini)
-    assert (
-        manager.is_wizard_needed() == True
-    ), "Wizard should be needed when SMS provider is missing"
+    assert manager.is_wizard_needed(), "Wizard should be needed when SMS provider is missing"
     assert (
         manager.get_starting_step() == SetupWizardManager.STEP_SMS_PROVIDER
     ), "Should start at SMS Provider step"
@@ -83,19 +79,19 @@ def test_wizard_manager():
 
     # Test Telegram step validation
     is_valid, errors = manager.is_step_complete(SetupWizardManager.STEP_TELEGRAM, complete_settings)
-    assert is_valid == True, f"Telegram step should be valid, got errors: {errors}"
+    assert is_valid, f"Telegram step should be valid, got errors: {errors}"
     print("   ✓ Telegram step validation works")
 
     # Test Gemini step validation
     is_valid, errors = manager.is_step_complete(SetupWizardManager.STEP_GEMINI, complete_settings)
-    assert is_valid == True, f"Gemini step should be valid, got errors: {errors}"
+    assert is_valid, f"Gemini step should be valid, got errors: {errors}"
     print("   ✓ Gemini step validation works")
 
     # Test SMS Provider step validation
     is_valid, errors = manager.is_step_complete(
         SetupWizardManager.STEP_SMS_PROVIDER, complete_settings
     )
-    assert is_valid == True, f"SMS Provider step should be valid, got errors: {errors}"
+    assert is_valid, f"SMS Provider step should be valid, got errors: {errors}"
     print("   ✓ SMS Provider step validation works")
 
     # Test invalid settings
@@ -109,7 +105,7 @@ def test_wizard_manager():
     }
     manager = SetupWizardManager(invalid_settings)
     is_valid, errors = manager.is_step_complete(SetupWizardManager.STEP_TELEGRAM, invalid_settings)
-    assert is_valid == False, "Invalid Telegram settings should fail validation"
+    assert not is_valid, "Invalid Telegram settings should fail validation"
     assert len(errors) > 0, "Should have validation errors"
     print(f"   ✓ Invalid settings correctly produce {len(errors)} error(s)")
 
@@ -144,13 +140,13 @@ def test_sms_provider_widget(qapp):
 
     # Test validation
     is_valid, errors = widget.is_step_complete()
-    assert is_valid == True, f"Should be valid, got errors: {errors}"
+    assert is_valid, f"Should be valid, got errors: {errors}"
     print("   ✓ Validation works for complete settings")
 
     # Test empty validation
     widget.api_key_edit.setText("")
     is_valid, errors = widget.is_step_complete()
-    assert is_valid == False, "Should be invalid with empty API key"
+    assert not is_valid, "Should be invalid with empty API key"
     assert len(errors) > 0, "Should have validation errors"
     print("   ✓ Validation correctly fails for incomplete settings")
 

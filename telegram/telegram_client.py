@@ -2,26 +2,25 @@ import asyncio
 import logging
 import random
 import time
-from pathlib import Path
-from typing import Optional, Callable, Any, Dict, Union, Coroutine, List
+from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
+
 from pyrogram import Client
-from pyrogram.types import Message
 from pyrogram.enums import ChatAction
+from pyrogram.types import Message
 
 logger = logging.getLogger(__name__)
 
 # Import randomization utilities and event system
-from utils.utils import (
-    RandomizationUtils,
+from monitoring.performance_monitor import get_resilience_manager  # noqa: E402
+from utils.utils import (  # noqa: E402
     EVENT_MESSAGE_RECEIVED,
     EVENT_MESSAGE_SENT,
-    EVENT_VOICE_MESSAGE_SENT,
-    EVENT_VOICE_MESSAGE_FAILED,
     EVENT_SERVICE_STARTED,
-    EVENT_SERVICE_STOPPED,
+    EVENT_VOICE_MESSAGE_FAILED,
+    EVENT_VOICE_MESSAGE_SENT,
+    RandomizationUtils,
     app_context,
 )
-from monitoring.performance_monitor import get_resilience_manager
 
 _event_system_available = True
 
@@ -122,10 +121,8 @@ class TelegramClient:
             bool: True if initialization successful, False otherwise
         """
         import random
-        import time
 
         for attempt in range(max_retries):
-            client_created = False
             try:
                 # Validate credentials
                 if not self.api_id or not self.api_hash or not self.phone_number:
@@ -159,7 +156,6 @@ class TelegramClient:
                     )
 
                 self.client = Client(**client_kwargs)
-                client_created = True
 
                 # Anti-detection: Add random delay before connecting
                 await asyncio.sleep(
@@ -170,8 +166,6 @@ class TelegramClient:
                 await asyncio.wait_for(self.client.start(), timeout=45.0)
 
                 # Anti-detection: Randomize handler priority
-                from pyrogram.handlers import MessageHandler
-                from pyrogram.filters import private
 
                 priority = random.randint(1, 100)
                 self.client.add_handler(self._create_message_handler(), priority=priority)
@@ -531,8 +525,8 @@ class TelegramClient:
                 # Anti-detection: Variable error delays to avoid patterns
                 await asyncio.sleep(random.uniform(10, 30))
 
-        from pyrogram.handlers import MessageHandler
         from pyrogram.filters import private
+        from pyrogram.handlers import MessageHandler
 
         # Handle messages in private chats (DMs)
         return MessageHandler(handler, filters=private)
@@ -555,7 +549,7 @@ class TelegramClient:
                 chars_typed = 0
                 last_typing_update = 0
 
-                for i, char in enumerate(text):
+                for _i, char in enumerate(text):
                     # Calculate realistic typing speed (varies by character type)
                     if char in " \n\t":
                         # Spaces and newlines are faster
@@ -814,10 +808,11 @@ class TelegramClient:
 
         try:
             # Use platformdirs for cross-platform secure directory
-            import platformdirs
-            from pathlib import Path
-            import os
+            import os  # noqa: F401
             import stat
+            from pathlib import Path
+
+            import platformdirs
 
             # Get secure config directory
             config_dir = Path(platformdirs.user_config_dir("telegram_bot", "telegram_bot"))
@@ -917,8 +912,6 @@ class TelegramClient:
         """Apply human-like delays before responding."""
         import random
 
-        current_time = time.time()
-
         # Base delay (2-8 seconds)
         base_delay = random.uniform(2, 8)
 
@@ -930,7 +923,6 @@ class TelegramClient:
 
         # Time of day simulation (people are slower at night)
         if self.anti_detection["time_based_delays"]:
-            import time
 
             hour = time.localtime().tm_hour
             if hour >= 22 or hour <= 6:  # Night time
@@ -1019,8 +1011,6 @@ class TelegramClient:
             reply_probability *= 0.3  # Reduce probability after burst
 
         # Time-based adjustments
-        import time
-
         current_hour = time.localtime().tm_hour
         if 1 <= current_hour <= 5:  # Very late night
             reply_probability *= 0.4
@@ -1037,7 +1027,7 @@ class TelegramClient:
         """Apply sophisticated delay patterns."""
         import time
 
-        current_time = time.time()
+        time.time()
 
         # Base delay calculation
         base_delay = random.uniform(3, 12)
@@ -1088,9 +1078,9 @@ class TelegramClient:
 
             chars_typed = 0
             last_typing_update = 0
-            start_time = time.time()
+            time.time()
 
-            for i, char in enumerate(text):
+            for _i, char in enumerate(text):
                 # Dynamic typing speed based on message score and context
                 if message_score > 0.8:  # Urgent/high-priority
                     speed_multiplier = 1.3
@@ -1250,19 +1240,6 @@ class TelegramClient:
 
         except Exception as e:
             logger.error(f"Failed to send message to {chat_id}: {e}")
-            return False
-            await self.client.send_message(chat_id, text)
-
-            # Publish message sent event
-            if _event_system_available:
-                app_context.publish_event(
-                    EVENT_MESSAGE_SENT,
-                    {"chat_id": chat_id, "message": text, "timestamp": time.time()},
-                )
-
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send message: {e}")
             return False
 
     # ============== Voice Message Methods ==============

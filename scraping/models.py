@@ -5,12 +5,10 @@ Scraping Data Models - Core data structures for member scraping.
 Contains dataclasses and enums for scraping-related data.
 """
 
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional, Tuple, Set, Any, Union
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
-import statistics
-import math
+from typing import Dict, List, Optional, Tuple
 
 
 @dataclass

@@ -6,30 +6,17 @@ A desktop application that integrates Google Gemini AI with Telegram
 to provide automatic, intelligent responses to messages.
 """
 
-import sys
 import asyncio
-import logging
-import signal
-import time
-import random
-import re
-import fcntl
-import json
-import base64
-import hashlib
-import secrets
-import string
 import functools
-from typing import Optional, Dict, Any, List, Protocol
-from collections.abc import Coroutine
-from abc import ABC, abstractmethod
-from pathlib import Path
-from collections import defaultdict
+import json
+import logging
 import logging.handlers
-from copy import deepcopy
-from datetime import datetime, timedelta
 import os
 import threading
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 try:
     import psutil
@@ -45,91 +32,64 @@ except ImportError:
     MemoryOptimizer = None
     MEMORY_OPTIMIZER_AVAILABLE = False
 
-from PyQt6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
-    QLabel,
-    QPushButton,
-    QTextEdit,
-    QStatusBar,
-    QSplitter,
-    QListWidget,
-    QListWidgetItem,
-    QMessageBox,
-    QSystemTrayIcon,
-    QMenu,
-    QProgressBar,
-    QComboBox,
-    QGroupBox,
-    QTabWidget,
-    QSpinBox,
-    QLineEdit,
-    QCheckBox,
-    QFormLayout,
-    QScrollArea,
-    QInputDialog,
-    QFileDialog,
-    QProgressDialog,
-    QDialog,
-    QFrame,
-    QStackedWidget,
-    QSizePolicy,
-    QGridLayout,
-    QTableWidget,
-    QTableWidgetItem,
-    QHeaderView,
-    QAbstractItemView,
-    QCompleter,
-)
 from PyQt6.QtCore import (
+    Q_ARG,
+    QMetaObject,
     Qt,
     QTimer,
     pyqtSignal,
-    QThread,
-    QObject,
-    QSize,
-    QThreadPool,
-    QRunnable,
-    QMetaObject,
-    Q_ARG,
 )
 from PyQt6.QtGui import (
-    QTextCursor,
-    QIcon,
-    QFont,
     QAction,
     QColor,
-    QPalette,
-    QShortcut,
     QKeySequence,
     QPixmap,
+    QShortcut,
+)
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QComboBox,
+    QCompleter,
+    QDialog,
+    QFileDialog,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSplitter,
+    QStackedWidget,
+    QSystemTrayIcon,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
-from ui.theme_manager import ThemeManager
-
-from telegram.telegram_client import TelegramClient
-from ai.gemini_service import GeminiService
-from scraping.database import MemberDatabase
-from scraping.member_scraper import (
-    MemberScraper,
-    EliteAntiDetectionSystem,
-    ComprehensiveDataExtractor,
-    EliteMemberScraper,
-)
 from accounts.account_creator import AccountCreator
 from accounts.account_manager import AccountManager
-from anti_detection.anti_detection_system import AntiDetectionSystem
-from integrations.api_key_manager import APIKeyManager
 from accounts.account_warmup_service import AccountWarmupService
-from campaigns.dm_campaign_manager import DMCampaignManager, MessageTemplateEngine, CampaignStatus
+from ai.gemini_service import GeminiService
+from campaigns.dm_campaign_manager import DMCampaignManager
+from integrations.api_key_manager import APIKeyManager
+from scraping.database import MemberDatabase
+from telegram.telegram_client import TelegramClient
 from ui.settings_window import SettingsWindow
-from ui.ui_components import CampaignManagerWidget, MessageHistoryWidget, LoadingOverlay
 from ui.theme_manager import ThemeManager
-import sqlite3
-from datetime import datetime, timedelta
+from ui.ui_components import CampaignManagerWidget, LoadingOverlay, MessageHistoryWidget
 
 # Initialize module-level logger
 logger = logging.getLogger(__name__)
@@ -181,40 +141,38 @@ MIN_RETRY_MULTIPLIER = 1
 MAX_RETRY_MULTIPLIER = 3
 
 # Import event types and utilities from utils module to avoid circular imports
-from utils.utils import (
-    EVENT_MESSAGE_RECEIVED,
-    EVENT_MESSAGE_SENT,
-    EVENT_ERROR_OCCURRED,
-    EVENT_SERVICE_STARTED,
-    EVENT_SERVICE_STOPPED,
-    EVENT_STATUS_CHANGED,
-)
-from core.config_manager import ConfigurationManager
-from core.service_container import (
-    ServiceContainer,
-    ServiceFactory,
-    IMessageService,
-    IAIService,
-    IDatabaseService,
-    IAntiDetectionService,
-    EventSystem,
-)
-from telegram.telegram_worker import TelegramWorker
-
-# Import performance monitor
-from monitoring.performance_monitor import (
-    PerformanceMonitor,
-    StructuredLogger,
-    init_resource_manager,
-    shutdown_resource_manager,
-    get_resource_manager,
-)
+from core.config_manager import ConfigurationManager  # noqa: E402
 
 # Import error handler for user-friendly messages
-from core.error_handler import ErrorHandler
+from core.error_handler import ErrorHandler  # noqa: E402
+from core.service_container import (  # noqa: E402
+    EventSystem,
+    IAIService,
+    IAntiDetectionService,
+    IDatabaseService,
+    IMessageService,
+    ServiceContainer,
+    ServiceFactory,
+)
+
+# Import performance monitor
+from monitoring.performance_monitor import (  # noqa: E402
+    PerformanceMonitor,
+    StructuredLogger,
+    get_resource_manager,
+    shutdown_resource_manager,
+)
+from telegram.telegram_worker import TelegramWorker  # noqa: E402
 
 # Import UI controller for clean separation
-from ui.ui_controller import UIController
+from ui.ui_controller import UIController  # noqa: E402
+from utils.utils import (  # noqa: E402
+    EVENT_ERROR_OCCURRED,
+    EVENT_MESSAGE_RECEIVED,
+    EVENT_MESSAGE_SENT,
+    EVENT_SERVICE_STARTED,
+    EVENT_SERVICE_STOPPED,
+)
 
 
 class ThreadSafeUI:
@@ -831,7 +789,6 @@ class MainWindow(QMainWindow):
 
     def _setup_memory_management(self):
         """Set up memory management and garbage collection."""
-        import gc
 
         # Periodic garbage collection (every 5 minutes)
         gc_timer = QTimer(self)
@@ -866,7 +823,7 @@ class MainWindow(QMainWindow):
 
         except (ImportError, AttributeError, RuntimeError) as e:
             logger.warning(f"Memory cleanup failed: {e}")
-        except (psutil.Error, OSError, AttributeError) as e:
+        except (psutil.Error, OSError) as e:
             logger.warning(f"Unexpected error during memory cleanup: {e}")
         except Exception as e:
             logger.error(f"Critical memory cleanup failure: {e}")
@@ -903,7 +860,6 @@ class MainWindow(QMainWindow):
     def _setup_background_task_executor(self):
         """Set up background executor for non-blocking UI operations."""
         from concurrent.futures import ThreadPoolExecutor
-        import functools
 
         # Create thread pool for background tasks
         self._background_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="ui-bg")
@@ -1137,7 +1093,6 @@ class MainWindow(QMainWindow):
                 self.account_manager.warmup_service = self.warmup_service
 
                 # Add account manager status callback for UI updates
-                from accounts.account_manager import AccountStatus
 
                 self.account_manager.add_status_callback(self._on_account_status_changed)
             except Exception as e:
@@ -1284,7 +1239,6 @@ class MainWindow(QMainWindow):
     def _start_background_services(self):
         """Start all background monitoring and cleanup services."""
         # This will be called async after UI is ready
-        import threading
 
         def start_async_services():
             try:
@@ -1370,8 +1324,8 @@ class MainWindow(QMainWindow):
                         and self.campaign_manager
                         and not self.low_power_mode
                     ):
-                        from campaigns.read_receipt_poller import get_read_receipt_poller
                         from campaigns.delivery_analytics import get_delivery_analytics
+                        from campaigns.read_receipt_poller import get_read_receipt_poller
 
                         delivery_analytics = get_delivery_analytics()
                         self.read_receipt_poller = get_read_receipt_poller(
@@ -1391,8 +1345,8 @@ class MainWindow(QMainWindow):
                         and self.campaign_manager
                         and not self.low_power_mode
                     ):
-                        from campaigns.response_tracker import get_response_tracker
                         from campaigns.delivery_analytics import get_delivery_analytics
+                        from campaigns.response_tracker import get_response_tracker
 
                         delivery_analytics = get_delivery_analytics()
                         self.response_tracker = get_response_tracker(
@@ -1646,7 +1600,6 @@ class MainWindow(QMainWindow):
     ):
         """Handle account status change callback and controller signal."""
         try:
-            from accounts.account_manager import AccountStatus
             from accounts.account_manager import AccountStatus
 
             # Signals may send raw strings; normalize when possible
@@ -2058,13 +2011,12 @@ class MainWindow(QMainWindow):
         )
 
         # Add tabs for progress and configuration
-        from PyQt6.QtWidgets import QTabWidget
 
         warmup_tabs = QTabWidget()
 
         try:
-            from ui.warmup_progress_widget import WarmupProgressWidget
             from ui.warmup_config_widget import WarmupConfigWidget
+            from ui.warmup_progress_widget import WarmupProgressWidget
 
             progress_widget = WarmupProgressWidget(
                 self.warmup_service if hasattr(self, "warmup_service") else None
@@ -2611,7 +2563,7 @@ class MainWindow(QMainWindow):
             secrets = get_secrets_manager()
             gemini_key = secrets.get_secret("gemini_api_key", required=False)
             show_banner = not gemini_key
-        except:
+        except Exception:
             show_banner = True
 
         if show_banner:
@@ -2978,7 +2930,7 @@ class MainWindow(QMainWindow):
             (QKeySequence("Ctrl+9"), 8, "Logs"),
         ]
 
-        for key_seq, page_index, name in nav_shortcuts:
+        for key_seq, page_index, _name in nav_shortcuts:
             if page_index < self.content_stack.count():
                 shortcut = QShortcut(key_seq, self)
                 shortcut.activated.connect(lambda idx=page_index: self._navigate_to_page(idx))
@@ -3169,7 +3121,7 @@ class MainWindow(QMainWindow):
             settings_data = {}
 
             if config_path.exists():
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, encoding="utf-8") as f:
                     settings_data = json.load(f)
 
             # Check if wizard is needed
@@ -3255,6 +3207,7 @@ class MainWindow(QMainWindow):
                 # Reinitialize Gemini service with new API key if changed
                 try:
                     from gemini_service import GeminiService
+
                     from core.secrets_manager import get_secrets_manager
 
                     secrets = get_secrets_manager()
@@ -3501,7 +3454,7 @@ class MainWindow(QMainWindow):
             config_path = Path("config.json")
             phone = ""
             if config_path.exists():
-                with open(config_path, "r") as f:
+                with open(config_path) as f:
                     config = json.load(f)
                     phone = config.get("telegram", {}).get("phone_number", "")
 
@@ -3708,9 +3661,9 @@ class MainWindow(QMainWindow):
             # Initialize member scraper with elite systems if needed
             if not hasattr(self, "member_scraper") or not self.member_scraper:
                 from member_scraper import (
-                    MemberScraper,
-                    EliteAntiDetectionSystem,
                     ComprehensiveDataExtractor,
+                    EliteAntiDetectionSystem,
+                    MemberScraper,
                 )
 
                 # Initialize elite anti-detection system
@@ -3778,7 +3731,7 @@ class MainWindow(QMainWindow):
             final_count = results.get("final_member_count", 0)
             stats = results.get("scraping_stats", {})
 
-            status_text = f"✅ Elite scraping complete!\n"
+            status_text = "✅ Elite scraping complete!\n"
             status_text += f"📊 Channel: {channel_info.get('title', 'Unknown')}\n"
             status_text += f"👥 Members found: {final_count}\n"
             status_text += f"🎯 Techniques used: {stats.get('techniques_used', 0)}\n"
@@ -4016,7 +3969,7 @@ class MainWindow(QMainWindow):
             else:
                 try:
                     exported_count = exporter.export_members_to_excel(file_path, filters)
-                except ImportError as e:
+                except ImportError:
                     ErrorHandler.safe_warning(
                         self,
                         "Excel Not Available",

@@ -2,7 +2,7 @@
 """Analytics dashboard with safe missing data handling."""
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 

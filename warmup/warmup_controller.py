@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Warmup service control - cancel and stop functionality."""
 
-import logging
 import asyncio
+import logging
 from typing import Dict, Set
 
 logger = logging.getLogger(__name__)

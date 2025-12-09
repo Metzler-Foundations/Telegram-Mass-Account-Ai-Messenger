@@ -6,13 +6,12 @@ Reuses objects instead of creating/destroying them repeatedly.
 Reduces memory allocations and garbage collection pressure.
 """
 
-import threading
 import logging
+import threading
 import time
-from typing import Generic, TypeVar, Callable, Optional, List, Any
 from collections import deque
 from dataclasses import dataclass
-from datetime import datetime
+from typing import Callable, Generic, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +145,7 @@ class ObjectPool(Generic[T]):
                         remaining = timeout - elapsed
 
                         if remaining <= 0:
-                            raise TimeoutError("Timeout waiting for pool object")
+                            raise TimeoutError("Timeout waiting for pool object") from None
 
                         self.condition.wait(timeout=remaining)
                     else:

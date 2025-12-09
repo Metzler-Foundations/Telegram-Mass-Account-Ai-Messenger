@@ -10,30 +10,30 @@ Features:
 """
 
 import logging
-from typing import Dict, List, Optional
 from datetime import datetime
+from typing import Dict, Optional
+
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget,
-    QVBoxLayout,
+    QCheckBox,
+    QDialog,
+    QDoubleSpinBox,
+    QFormLayout,
+    QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
+    QLineEdit,
+    QListWidget,
+    QMessageBox,
     QPushButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
-    QGroupBox,
-    QCheckBox,
-    QMessageBox,
-    QDialog,
-    QFormLayout,
-    QLineEdit,
-    QSpinBox,
-    QDoubleSpinBox,
-    QComboBox,
-    QListWidget,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QFont
 
 from ui.theme_manager import ThemeManager
 
@@ -512,8 +512,8 @@ class EngagementWidget(QWidget):
 
             try:
                 import uuid
+
                 from campaigns.engagement_automation import EngagementRule
-                from dataclasses import replace
 
                 rule_id = f"rule_{uuid.uuid4().hex[:8]}"
 

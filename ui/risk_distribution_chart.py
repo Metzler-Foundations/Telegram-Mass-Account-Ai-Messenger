@@ -5,9 +5,9 @@ Risk Distribution Chart Widget - Visualizes account risk distribution.
 import logging
 from typing import Dict, Optional
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ui.theme_manager import ThemeManager
 

@@ -2,10 +2,10 @@
 """
 Test all module imports to ensure no import path issues.
 """
-import pytest
-import sys
 import os
-from pathlib import Path
+import sys
+
+import pytest
 
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

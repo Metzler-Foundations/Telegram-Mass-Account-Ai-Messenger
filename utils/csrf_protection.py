@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """CSRF protection for state-changing operations."""
 
-import secrets
-import hmac
 import hashlib
-import time
-from typing import Optional, Dict
+import hmac
+import secrets
 import threading
+import time
+from typing import Dict, Optional
 
 
 class CSRFProtection:

@@ -1,11 +1,8 @@
 """Tests for database connection pool."""
 
-import pytest
-import sqlite3
-import asyncio
 import time
-from pathlib import Path
-from database.connection_pool import ConnectionPool, get_pool, close_all_pools
+
+from database.connection_pool import ConnectionPool, close_all_pools, get_pool
 
 
 class TestConnectionPool:

@@ -5,17 +5,14 @@ Scraping Database Layer - Database operations for member scraping.
 Contains MemberDatabase and EliteDataAccessLayer classes.
 """
 
-import sqlite3
-import logging
-import threading
 import json
-import hashlib
+import logging
+import sqlite3
+import threading
 from contextlib import contextmanager
-from typing import List, Dict, Optional, Tuple, Set, Any, Union
 from datetime import datetime, timedelta
 from pathlib import Path
-from collections import defaultdict
-import time
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

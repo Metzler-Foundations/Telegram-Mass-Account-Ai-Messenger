@@ -4,15 +4,15 @@ Validation script for the warmup system.
 Checks file syntax and basic structure without complex imports.
 """
 
-import os
 import ast
+import os
 import sys
 
 
 def validate_python_file(filepath):
     """Validate that a Python file has correct syntax."""
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             source = f.read()
 
         # Parse the AST to check syntax
