@@ -1666,6 +1666,12 @@ class AccountCreator:
         self.creation_stats['total_failed'] = 0
 
         logger.info(f"Starting bulk creation of {count} accounts")
+        
+        # Fixed: Extract gemini_service from config if provided (for bulk creation)
+        gemini_service_from_config = config.pop('_gemini_service', None)
+        if gemini_service_from_config and not self.cloning_system.gemini_service:
+            # Update cloning system with gemini_service if not already set
+            self.cloning_system = AdvancedCloningSystem(gemini_service_from_config)
 
         inventory_check = self._preflight_number_inventory(count, config)
         if not inventory_check.get('success'):

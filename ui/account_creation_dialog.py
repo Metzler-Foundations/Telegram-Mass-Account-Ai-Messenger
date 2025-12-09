@@ -272,10 +272,14 @@ class AccountCreationDialog(QDialog):
                 
                 # Use account_manager if available (preferred), otherwise account_creator
                 if hasattr(main_window, 'account_manager') and main_window.account_manager:
+                    # Pass gemini_service via config so AccountManager can use it
+                    # Fixed: AccountManager doesn't have direct access to gemini_service
+                    if hasattr(main_window, 'gemini_service') and main_window.gemini_service:
+                        config['_gemini_service'] = main_window.gemini_service
                     # Use account_manager.create_account (handles everything)
                     result = loop.run_until_complete(main_window.account_manager.create_account(config))
                 elif hasattr(main_window, 'account_creator') and main_window.account_creator:
-                    # Fallback to direct account_creator
+                    # Fallback to direct account_creator (already has gemini_service)
                     result = loop.run_until_complete(main_window.account_creator.create_new_account(config))
                 else:
                     raise Exception("Account manager/creator not available")

@@ -925,18 +925,9 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.error(f"Failed to schedule async service initialization: {e}")
 
-        # Initialize Account Creator
+        # Initialize Account Creator (will be re-initialized after services are ready)
+        # Note: gemini_service is not available yet, so we initialize it later
         self.account_creator = None
-        if self.member_db and self.account_manager:
-            try:
-                self.account_creator = AccountCreator(
-                    db=self.member_db,
-                    gemini_service=self.gemini_service,
-                    account_manager=self.account_manager
-                )
-                logger.info("Account Creator initialized")
-            except Exception as e:
-                logger.error(f"Failed to initialize AccountCreator: {e}")
 
         self.setWindowTitle("Telegram Auto-Reply Bot")
         self.setGeometry(100, 100, 1366, 768)  # Laptop-friendly baseline
@@ -997,7 +988,22 @@ class MainWindow(QMainWindow):
         atexit.register(self._cleanup_resources)
 
         # Initialize service container with concrete implementations
+        # This must be called before AccountCreator initialization
         self._initialize_services()
+        
+        # Initialize Account Creator now that services are ready
+        # Fixed: Initialize AccountCreator AFTER gemini_service is available
+        if self.member_db and self.account_manager:
+            try:
+                self.account_creator = AccountCreator(
+                    db=self.member_db,
+                    gemini_service=self.gemini_service,  # Now available after _initialize_services()
+                    account_manager=self.account_manager
+                )
+                logger.info("Account Creator initialized with services")
+            except Exception as e:
+                logger.error(f"Failed to initialize AccountCreator: {e}")
+                self.account_creator = None
 
         # Initialize API key manager and warmup service
         self.api_key_manager = APIKeyManager()

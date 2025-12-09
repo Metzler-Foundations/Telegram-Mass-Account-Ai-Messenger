@@ -1616,13 +1616,15 @@ class AccountManager:
     async def create_account(self, config: Dict) -> Dict[str, Any]:
         """Create a new Telegram account using the account creator."""
         try:
-            # Fixed: Pass gemini_service and account_manager references
-            # Try to get gemini_service from various possible locations
-            gemini_service = None
-            if hasattr(self, 'gemini_service'):
-                gemini_service = self.gemini_service
-            elif hasattr(self, '_gemini_service'):
-                gemini_service = self._gemini_service
+            # Fixed: Get gemini_service from config if passed, or try to find it
+            # AccountManager doesn't have gemini_service - it's on MainWindow
+            # The gemini_service should be passed via config or we use None
+            gemini_service = config.get('_gemini_service')  # Allow passing via config
+            if not gemini_service:
+                # Try to get from warmup_service if available (it has gemini_service)
+                if hasattr(self, 'warmup_service') and self.warmup_service:
+                    if hasattr(self.warmup_service, 'gemini_service'):
+                        gemini_service = self.warmup_service.gemini_service
             
             creator = AccountCreator(
                 self.db,

@@ -3336,6 +3336,10 @@ class SettingsWindow(QDialog):
             asyncio.set_event_loop(loop)
 
             try:
+                # Fixed: Pass gemini_service via config for bulk creation
+                if hasattr(main_window, 'gemini_service') and main_window.gemini_service:
+                    config['_gemini_service'] = main_window.gemini_service
+                
                 # Run the bulk creation
                 results = loop.run_until_complete(
                     main_window.account_creator.start_bulk_creation(count, config)
