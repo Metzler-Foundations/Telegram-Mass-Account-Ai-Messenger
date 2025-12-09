@@ -243,7 +243,8 @@ class WelcomeWizard(QWizard):
             audit_credential_modification('telegram_api_id', 'setup_wizard', success=True)
             audit_credential_modification('telegram_api_hash', 'setup_wizard', success=True)
             audit_credential_modification('gemini_api_key', 'setup_wizard', success=True)
-            if config["sms_providers"]["api_key"]:
+            # Fixed: Use .get() to safely access optional SMS provider API key
+            if sms_api_key:
                 audit_credential_modification('sms_provider_api_key', 'setup_wizard', success=True)
 
             logger.info("Credentials saved to secure secrets manager")
@@ -295,7 +296,8 @@ class WelcomeWizard(QWizard):
                     "validated_at": config["telegram"]["validated_at"]
                 },
                 "sms_providers": {
-                    "provider": config["sms_providers"]["provider"]  # Provider name is not sensitive
+                    # Fixed: Use .get() to safely access optional SMS provider
+                    "provider": config.get("sms_providers", {}).get("provider", "daisysms")
                 },
                 "gemini": {
                     "validated": config["gemini"]["validated"],
