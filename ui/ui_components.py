@@ -433,9 +433,10 @@ class CreateCampaignDialog(QDialog):
             "Only select warmed-up, healthy accounts for best results.\n"
             "Hold Ctrl/Cmd to select multiple accounts."
         )
+        from PyQt6.QtWidgets import QListWidgetItem
+
         for account in self.accounts:
             display = f"{account.get('phone_number')} - {account.get('status', 'Unknown')}"
-            from PyQt6.QtWidgets import QListWidgetItem
 
             item = QListWidgetItem(display)
             item.setData(Qt.ItemDataRole.UserRole, account)

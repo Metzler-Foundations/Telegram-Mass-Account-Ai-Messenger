@@ -907,7 +907,9 @@ class AccountHealthDashboard(QWidget):
         """Pause/quarantine an account."""
         if self.anti_detection:
             try:
-                from anti_detection.anti_detection_system import QuarantineReason
+                from anti_detection.anti_detection_system import (  # noqa: F811
+                    QuarantineReason,
+                )
 
                 self.anti_detection.quarantine_account(phone, QuarantineReason.MANUAL, 60)
                 ErrorHandler.safe_information(
