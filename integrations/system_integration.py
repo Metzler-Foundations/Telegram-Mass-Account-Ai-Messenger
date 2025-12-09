@@ -135,8 +135,6 @@ class SystemIntegration:
         """Check for REAL incomplete operations."""
         return check_for_incomplete_operations()
     
-from typing import Any
-
     def save_checkpoint(self, operation_id: str, operation_type: str,
                        current: int, total: int, details: Any = None):
         """Save REAL operation checkpoint."""

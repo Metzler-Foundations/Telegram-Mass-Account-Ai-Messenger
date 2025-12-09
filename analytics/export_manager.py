@@ -34,9 +34,7 @@ class AnalyticsExporter:
         except Exception as e:
             logger.error(f"CSV export failed: {e}")
             return False
-    
-    @staticmethod
-    from typing import Optional
+
 
 def export_campaign_results(campaign_id: str, output_dir: str = "exports") -> Optional[str]:
         """Export campaign results."""
