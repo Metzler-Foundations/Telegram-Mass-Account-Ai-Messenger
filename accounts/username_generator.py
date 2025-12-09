@@ -387,7 +387,8 @@ class UsernameGenerator:
             attempts += 1
 
         logger.warning(
-            f"Could not find available similar username for {source_username} after {max_attempts} attempts"
+            f"Could not find available similar username for {source_username} "
+            f"after {max_attempts} attempts"
         )
         return None
 

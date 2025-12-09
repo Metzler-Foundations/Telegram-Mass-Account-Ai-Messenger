@@ -217,7 +217,8 @@ class StatusIntelligence:
 
         # Indexes
         cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_status_history_user ON status_history(user_id, timestamp)"
+            "CREATE INDEX IF NOT EXISTS idx_status_history_user ON "
+            "status_history(user_id, timestamp)"
         )
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_receipts_user ON read_receipts(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_response_user ON response_times(user_id)")
@@ -325,7 +326,8 @@ class StatusIntelligence:
             if elapsed < min_gap:
                 sleep_for = min_gap - elapsed
                 logger.info(
-                    f"Throttling bulk status checks for {client_key} by {sleep_for:.2f}s to avoid FloodWait"
+                    f"Throttling bulk status checks for {client_key} by "
+                    f"{sleep_for:.2f}s to avoid FloodWait"
                 )
                 await asyncio.sleep(sleep_for)
         last_bulk[client_key] = datetime.now()
@@ -384,7 +386,8 @@ class StatusIntelligence:
                 if not message:
                     return False
 
-                # Pyrogram exposes read_date for private dialogs; fall back to explicit views for channels
+                # Pyrogram exposes read_date for private dialogs;
+                # fall back to explicit views for channels
                 read_date = getattr(message, "read_date", None)
                 if read_date:
                     self._mark_as_read(message_id)
@@ -455,7 +458,14 @@ class StatusIntelligence:
         cursor.execute(
             """
             INSERT INTO response_times
-            (user_id, our_message_time, their_response_time, response_delay, hour_of_day, day_of_week)
+            (
+                user_id,
+                our_message_time,
+                their_response_time,
+                response_delay,
+                hour_of_day,
+                day_of_week,
+            )
             VALUES (?, ?, ?, ?, ?, ?)
         """,
             (

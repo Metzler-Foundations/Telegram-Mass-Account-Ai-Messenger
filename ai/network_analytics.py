@@ -492,7 +492,8 @@ class NetworkAnalytics:
 
         conn.close()
         logger.info(
-            f"Rebuilt graph: {self.graph.number_of_nodes()} nodes, {self.graph.number_of_edges()} edges"
+            f"Rebuilt graph: {self.graph.number_of_nodes()} nodes, "
+            f"{self.graph.number_of_edges()} edges"
         )
 
     def export_graph_json(self) -> str:

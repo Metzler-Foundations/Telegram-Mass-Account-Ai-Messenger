@@ -40,7 +40,8 @@ class SMSTimeoutHandler:
             elapsed_since_request = (datetime.now() - request_time).total_seconds()
             if elapsed_since_request > self.code_expiry_seconds:
                 logger.error(
-                    f"SMS code expired after {elapsed_since_request:.0f}s (max: {self.code_expiry_seconds}s)"
+                    f"SMS code expired after {elapsed_since_request:.0f}s "
+                    f"(max: {self.code_expiry_seconds}s)"
                 )
                 return None
 
@@ -69,7 +70,8 @@ class SMSTimeoutHandler:
 
             except asyncio.TimeoutError:
                 logger.error(
-                    f"SMS code timeout after {actual_timeout:.0f}s (attempt {attempts + 1}/{self.max_retries})"
+                    f"SMS code timeout after {actual_timeout:.0f}s "
+                    f"(attempt {attempts + 1}/{self.max_retries})"
                 )
                 attempts += 1
 
@@ -94,7 +96,8 @@ class SMSTimeoutHandler:
             del self.code_request_times[phone_number]
 
         logger.error(
-            f"Failed to retrieve SMS code after {attempts} attempts (total time: {elapsed_since_request:.0f}s)"
+            f"Failed to retrieve SMS code after {attempts} attempts "
+            f"(total time: {elapsed_since_request:.0f}s)"
         )
         return None
 

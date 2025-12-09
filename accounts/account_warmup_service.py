@@ -447,7 +447,8 @@ class AccountWarmupService:
                 self._record_activity(job.phone_number, f"stage_start:{job.stage.value}")
 
                 logger.info(
-                    f"🔄 Starting warmup job {job.job_id} for {job.phone_number} (Stage: {job.stage.value})"
+                    f"🔄 Starting warmup job {job.job_id} for {job.phone_number} "
+                    f"(Stage: {job.stage.value})"
                 )
                 self._notify_status_update(job, f"Starting {job.stage.value} stage")
 
@@ -503,7 +504,8 @@ class AccountWarmupService:
                         should_resume = await self._sleep_with_cancellation(delay_hours * 3600)
                         if not should_resume:
                             logger.info(
-                                "Warmup service stopping during backoff; preserving queued retry state"
+                                "Warmup service stopping during backoff; "
+                                "preserving queued retry state"
                             )
 
                 # Remove from active jobs
@@ -1847,7 +1849,8 @@ class WarmupIntelligence:
             return {"account_type": "general", "interests": ["technology", "general"]}
 
         prompt = f"""
-        Based on the phone number {phone_number}, analyze what type of account this might be and suggest profile characteristics:
+        Based on the phone number {phone_number}, analyze what type of account """
+        f"""this might be and suggest profile characteristics:
 
         Consider:
         - Geographic region (from phone number patterns)
@@ -1890,7 +1893,8 @@ class WarmupIntelligence:
 
         # Use Gemini to generate realistic profile content
         prompt = f"""
-        Generate a realistic Telegram profile for a new account based on this analysis: {analysis_str}
+        Generate a realistic Telegram profile for a new account based on """
+        f"""this analysis: {analysis_str}
 
         Include:
         1. First name (appropriate for the region/demographic)
@@ -1957,7 +1961,8 @@ class WarmupIntelligence:
             return None
 
         prompt = f"""
-        Create a natural, engaging bio for a Telegram account with this profile: {json.dumps(profile_data)}
+        Create a natural, engaging bio for a Telegram account with this """
+        f"""profile: {json.dumps(profile_data)}
 
         Requirements:
         - Keep under 70 characters

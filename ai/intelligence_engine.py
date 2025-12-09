@@ -291,19 +291,24 @@ class IntelligenceEngine:
 
             # Create indexes
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_user_value_score ON user_intelligence(value_score DESC)"
+                "CREATE INDEX IF NOT EXISTS idx_user_value_score ON "
+                "user_intelligence(value_score DESC)"
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_user_activity ON user_intelligence(activity_level, last_online)"
+                "CREATE INDEX IF NOT EXISTS idx_user_activity ON "
+                "user_intelligence(activity_level, last_online)"
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_group_quality ON group_intelligence(quality_score DESC)"
+                "CREATE INDEX IF NOT EXISTS idx_group_quality ON "
+                "group_intelligence(quality_score DESC)"
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id, timestamp)"
+                "CREATE INDEX IF NOT EXISTS idx_activity_user ON "
+                "activity_log(user_id, timestamp)"
             )
             cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_interactions_user ON interactions(user_id, timestamp)"
+                "CREATE INDEX IF NOT EXISTS idx_interactions_user ON "
+                "interactions(user_id, timestamp)"
             )
 
             conn.commit()
@@ -388,7 +393,10 @@ class IntelligenceEngine:
             self._log_activity(
                 user_id,
                 "profile_update",
-                {"username": intel.username, "status": str(user.status) if user.status else None},
+                {
+                    "username": intel.username,
+                    "status": str(user.status) if user.status else None,
+                },
             )
 
             logger.info(

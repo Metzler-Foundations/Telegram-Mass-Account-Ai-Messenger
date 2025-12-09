@@ -237,7 +237,8 @@ class ConversationAnalyzer:
             cursor = conn.cursor()
 
             cursor.execute(
-                "SELECT flow_id FROM conversation_flows WHERE ended_at IS NOT NULL AND ended_at < ?",
+                "SELECT flow_id FROM conversation_flows WHERE ended_at IS NOT NULL "
+                "AND ended_at < ?",
                 (cutoff,),
             )
             stale_ids = [row[0] for row in cursor.fetchall()]

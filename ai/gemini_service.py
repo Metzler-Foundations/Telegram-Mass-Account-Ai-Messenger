@@ -269,7 +269,8 @@ class GeminiService:
 
         # Add instruction for response
         context_parts.append(
-            "\nAssistant: Please respond naturally and helpfully based on the system instructions above."
+            "\nAssistant: Please respond naturally and helpfully based on "
+            "the system instructions above."
         )
 
         return "\n\n".join(context_parts)
@@ -305,7 +306,8 @@ class GeminiService:
         Args:
             message: Incoming message text
             chat_id: Chat ID for conversation context
-            max_retries: Maximum number of retry attempts (deprecated - resilience manager handles this)
+            max_retries: Maximum number of retry attempts (deprecated - """
+            """resilience manager handles this)
 
         Returns:
             Optional[str]: Generated reply text, or None if generation failed
@@ -431,9 +433,12 @@ class GeminiService:
                     ) from e
 
                 elif "safety" in error_str or "blocked" in error_str:
-                    logger.warning(f"Gemini content safety block for chat {chat_id}: {e}")
+                    logger.warning(
+                        f"Gemini content safety block for chat {chat_id}: {e}"
+                    )
                     raise Exception(
-                        "Message could not be processed due to content policy. Please rephrase your message."
+                        "Message could not be processed due to content policy. "
+                        "Please rephrase your message."
                     ) from e
 
                 elif "model" in error_str and "not found" in error_str:
@@ -450,7 +455,8 @@ class GeminiService:
                     or "500" in error_str
                 ):
                     logger.warning(
-                        f"Gemini API server error for chat {chat_id} (attempt {attempt + 1}/{max_retries}): {e}"
+                        f"Gemini API server error for chat {chat_id} "
+                        f"(attempt {attempt + 1}/{max_retries}): {e}"
                     )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(retry_delays[attempt])
