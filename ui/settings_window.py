@@ -1213,9 +1213,21 @@ class SettingsWindow(QDialog):
         self.setAccessibleName("Bot Configuration Settings")
         self.setAccessibleDescription("Dialog for configuring Telegram bot settings and preferences")
         
-        # Smaller, more comfortable size
-        self.resize(850, 650)
-        self.setMinimumSize(700, 500)
+        # Responsive sizing based on screen size
+        screen = QApplication.primaryScreen().availableGeometry()
+        screen_width = screen.width()
+        screen_height = screen.height()
+        
+        if screen_width < 1400 or screen_height < 800:
+            # Small screens
+            self.resize(750, 580)
+            self.setMinimumSize(680, 480)
+            self.setMaximumSize(900, 700)
+        else:
+            # Large screens
+            self.resize(850, 650)
+            self.setMinimumSize(700, 500)
+            self.setMaximumSize(1100, 800)
         
         self.settings_data = {}
         self.balance_cache: Dict[tuple[str, str], Dict[str, Any]] = {}

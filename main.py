@@ -1935,6 +1935,23 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Telegram Auto-Reply Bot")
         self.setAccessibleName("Telegram Auto-Reply Bot Main Window")
         self.setAccessibleDescription("Main application window for managing Telegram automation bot")
+        
+        # Responsive window sizing
+        screen = QApplication.primaryScreen().availableGeometry()
+        screen_width = screen.width()
+        screen_height = screen.height()
+        
+        if screen_width < 1400 or screen_height < 800:
+            # Small screens - compact layout
+            self.setMinimumSize(1000, 600)
+            self.resize(1200, 720)
+        else:
+            # Large screens - comfortable layout
+            self.setMinimumSize(1200, 700)
+            self.resize(1400, 900)
+        
+        # Maximum size to prevent awkward stretching on huge monitors
+        self.setMaximumSize(2400, 1600)
 
         # Create main container
         main_container = QWidget()

@@ -48,8 +48,23 @@ class WelcomeWizard(QWizard):
         self.setOption(QWizard.WizardOption.NoBackButtonOnStartPage, True)
         # Ensure navigation buttons are visible
         self.setOption(QWizard.WizardOption.NoCancelButton, False)
-        self.resize(900, 640)  # Elevated, comfortable size
-        self.setMinimumSize(860, 600)
+        
+        # Responsive sizing based on screen size
+        screen = QApplication.primaryScreen().availableGeometry()
+        screen_width = screen.width()
+        screen_height = screen.height()
+        
+        # Adaptive sizing: smaller on small screens, comfortable on large screens
+        if screen_width < 1400 or screen_height < 800:
+            # Small screens (laptops, small monitors)
+            self.resize(800, 580)
+            self.setMinimumSize(720, 520)
+            self.setMaximumSize(1000, 700)
+        else:
+            # Large screens (desktops, large monitors)
+            self.resize(900, 640)
+            self.setMinimumSize(800, 580)
+            self.setMaximumSize(1200, 800)
         
         # Theme applied globally; keep object name for targeted QSS
         self.setObjectName("welcome_wizard")
