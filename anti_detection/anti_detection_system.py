@@ -1357,7 +1357,8 @@ class AccountQuarantineManager:
             )
 
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_quarantine_account ON quarantine_history(account_id)"
+                "CREATE INDEX IF NOT EXISTS idx_quarantine_account ON "
+                "quarantine_history(account_id)"
             )
             conn.commit()
 

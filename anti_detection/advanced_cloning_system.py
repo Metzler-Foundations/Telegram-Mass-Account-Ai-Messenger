@@ -368,7 +368,8 @@ class AdvancedCloningSystem:
                         )
                     except Exception as cleanup_error:
                         logger.warning(
-                            f"Failed to disconnect target client {target_phone_number}: {cleanup_error}"
+                            f"Failed to disconnect target client "
+                            f"{target_phone_number}: {cleanup_error}"
                         )
 
         except Exception as e:
@@ -555,7 +556,8 @@ class AdvancedCloningSystem:
             if available_username:
                 await client.set_username(available_username)
                 logger.info(
-                    f"✅ Set visually similar username: {available_username} (from {source_username})"
+                    f"✅ Set visually similar username: {available_username} "
+                    f"(from {source_username})"
                 )
                 return True
             else:
@@ -580,7 +582,8 @@ class AdvancedCloningSystem:
     async def _create_temp_client_for_scraping(self) -> Tuple[Optional[Client], bool]:
         """Create a temporary client for scraping source data."""
         try:
-            # Prefer using an existing connected account from AccountManager to avoid new session flags
+            # Prefer using an existing connected account from AccountManager
+            # to avoid new session flags
             if self.account_manager:
                 online_accounts = self.account_manager.get_online_accounts()
                 if online_accounts:
@@ -750,7 +753,8 @@ class AdvancedCloningSystem:
             return bio
 
         try:
-            prompt = f"""Modify this Telegram bio to make it unique while keeping the same general meaning and style.
+            prompt = f"""Modify this Telegram bio to make it unique while """
+            f"""keeping the same general meaning and style.
             Keep it under 70 characters. Return only the modified bio, nothing else.
 
             Original bio: {bio}
