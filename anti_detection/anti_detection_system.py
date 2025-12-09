@@ -1613,7 +1613,6 @@ class EnhancedAntiDetectionSystem(AntiDetectionSystem):
                 and not metrics.is_quarantined
                 and metrics.ban_probability >= self.QUARANTINE_THRESHOLD
             ):
-
                 # Determine quarantine duration based on risk
                 if metrics.ban_probability >= 0.8:
                     duration = 240  # 4 hours

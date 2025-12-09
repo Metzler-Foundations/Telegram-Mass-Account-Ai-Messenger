@@ -356,9 +356,9 @@ class ExportManager:
                 row = {col: campaign.get(col, "") for col in columns}
                 # Format active hours
                 if campaign.get("active_hours_start") is not None:
-                    row["active_hours"] = (
-                        f"{campaign.get('active_hours_start', '')}-{campaign.get('active_hours_end', '')}"
-                    )
+                    row[
+                        "active_hours"
+                    ] = f"{campaign.get('active_hours_start', '')}-{campaign.get('active_hours_end', '')}"
                 writer.writerow(row)
 
         # Export messages separately if requested
