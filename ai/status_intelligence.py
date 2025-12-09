@@ -99,7 +99,9 @@ class StatusIntelligence:
         try:
             from database.connection_pool import get_pool
             self._connection_pool = get_pool(self.db_path)
-        except: pass
+        except Exception as e:
+            logger.debug(f"Error initializing status intelligence database (non-critical): {e}")
+            pass
         self._init_database()
     
     def _get_connection(self):

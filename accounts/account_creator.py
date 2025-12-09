@@ -131,7 +131,9 @@ class PhoneNumberProvider:
         try:
             from utils.rate_limiter import get_rate_limiter
             self._rate_limiter = get_rate_limiter()
-        except: pass
+        except Exception as e:
+            logger.debug(f"Error loading phone provider config (non-critical): {e}")
+            pass
         
         # Popular SMS verification services with real API configurations
         self.providers = {
