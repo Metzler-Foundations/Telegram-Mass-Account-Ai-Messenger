@@ -10,20 +10,20 @@ PyQt6-Charts==6.8.0
 # Utilities
 python-dotenv==1.0.1
 psutil==6.1.1
-requests==2.32.3
-cryptography==44.0.0
+requests>=2.32.4
+cryptography>=44.0.1
 
 # Data Export (Excel support)
 openpyxl==3.1.2
 
 # Security
-pycryptodome==3.19.1
+pycryptodome>=3.20.0
 keyring==24.3.0
 platformdirs==4.1.0
 
 # Performance & Monitoring
 aiofiles==24.1.0
-aiohttp==3.11.13
+aiohttp>=3.12.14
 aiohttp-socks==0.9.0
 
 # Voice Messages (ElevenLabs TTS)
@@ -36,7 +36,7 @@ pytest-cov==6.0.0
 
 # Security scanning
 bandit==1.8.0
-safety==3.3.1
+safety>=3.7.0
 
 # Code quality
 flake8==7.1.1
@@ -45,7 +45,7 @@ mypy==1.14.0
 
 # Analysis
 textblob==0.18.0
-nltk==3.8.1
+nltk==3.9.1
 langdetect==1.0.9
 
 # Advanced Features
