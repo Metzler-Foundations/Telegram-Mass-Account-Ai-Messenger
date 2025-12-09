@@ -25,7 +25,7 @@ def _ensure_qapplication():
     if _qt_app is None:
         try:
             from PyQt6.QtWidgets import QApplication
-            
+
             # Get or create QApplication instance
             _qt_app = QApplication.instance()
             if _qt_app is None:
@@ -42,7 +42,7 @@ def _ensure_qapplication():
 
 def pytest_configure(config):
     """Called after command line options have been parsed and all plugins initialized.
-    
+
     This ensures QApplication is created very early, before any test collection or imports.
     """
     # Ensure QApplication exists before any test files are imported
@@ -52,7 +52,7 @@ def pytest_configure(config):
 @pytest.fixture(scope="session", autouse=True)
 def qapplication() -> Generator:
     """Create a QApplication instance for the entire test session.
-    
+
     This fixture ensures a single QApplication instance is created and properly
     cleaned up. It works in both headless (CI) and GUI environments.
     The autouse=True ensures it's created before any tests run.
@@ -63,19 +63,19 @@ def qapplication() -> Generator:
         # If PyQt6 is not available, skip silently - some tests don't need it
         yield None
         return
-    
+
     # Ensure QApplication exists
     app = _ensure_qapplication()
     if app is None:
         app = QApplication.instance()
         if app is None:
             app = QApplication(sys.argv if sys.argv else ["pytest"])
-    
+
     # Process any pending events to ensure initialization is complete
     app.processEvents()
-    
+
     yield app
-    
+
     # Cleanup: close all windows and process final events
     try:
         # Close all top-level widgets
@@ -90,23 +90,23 @@ def qapplication() -> Generator:
 @pytest.fixture(scope="function")
 def qapp(qapplication) -> Generator:
     """Provide QApplication instance for individual test functions.
-    
+
     This is a function-scoped fixture that ensures the QApplication is
     available and processes events between tests.
     """
     from PyQt6.QtWidgets import QApplication
-    
+
     app = QApplication.instance()
     if app is None:
         app = qapplication
         if app is None:
             # Fallback: create if still None
             app = QApplication(sys.argv if sys.argv else ["pytest"])
-    
+
     # Process any pending events
     app.processEvents()
-    
+
     yield app
-    
+
     # Process events after test to ensure cleanup
     app.processEvents()
