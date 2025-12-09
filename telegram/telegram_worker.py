@@ -14,7 +14,7 @@ from monitoring.performance_monitor import NetworkRecoveryManager, RateLimiter
 from telegram.telegram_client import TelegramClient
 
 if TYPE_CHECKING:
-    from monitoring.performance_monitor import NetworkRecoveryManager
+    from monitoring.performance_monitor import NetworkRecoveryManager  # noqa: F811
 
 logger = logging.getLogger(__name__)
 
