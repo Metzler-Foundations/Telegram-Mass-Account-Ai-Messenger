@@ -1,7 +1,6 @@
 """Pytest configuration and fixtures for GUI tests."""
 
 import os
-import sys
 from typing import Generator
 
 import pytest
@@ -19,6 +18,7 @@ os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", "")
 _qt_app = None
 try:
     from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtCore import QEventLoop
 
     # Get or create QApplication instance immediately
     _qt_app = QApplication.instance()
@@ -26,17 +26,43 @@ try:
         # Create with minimal arguments for headless operation
         # Use empty list to avoid issues with sys.argv in CI
         _qt_app = QApplication([])
-        # Process events with limit to avoid blocking in headless mode
-        try:
-            _qt_app.processEvents()
-        except Exception:
-            pass  # Ignore errors during initialization
+        # DO NOT process events at module level - can cause hangs in CI
 except ImportError:
     # PyQt6 not available - some tests don't need it
     pass
 except Exception:
     # Ignore initialization errors - will be handled in fixtures
     pass
+
+
+def _safe_process_events(app, max_events=5):
+    """Safely process Qt events with a limit to prevent blocking.
+    
+    In headless/CI environments, processEvents() can block indefinitely.
+    This function processes a limited number of events to avoid hangs.
+    """
+    if app is None:
+        return
+    try:
+        from PyQt6.QtCore import QEventLoop
+        # In headless/CI mode, minimize event processing to avoid hangs
+        # Only process if there are actually pending events
+        if not app.hasPendingEvents():
+            return
+        
+        # Process only a very limited number of events to prevent blocking
+        # Use AllEvents flag - in PyQt6, processEvents() without timeout
+        # can block, so we limit iterations strictly
+        iterations = 0
+        while iterations < max_events and app.hasPendingEvents():
+            # Process events with AllEvents flag
+            app.processEvents(QEventLoop.ProcessEventsFlag.AllEvents)
+            iterations += 1
+            # Double-check to break early if no more events
+            if not app.hasPendingEvents():
+                break
+    except Exception:
+        pass  # Ignore all errors during event processing - better to skip than hang
 
 
 def _ensure_qapplication():
@@ -51,8 +77,7 @@ def _ensure_qapplication():
             if _qt_app is None:
                 # Create with minimal arguments for headless operation
                 _qt_app = QApplication([])
-                # Process events to complete initialization
-                _qt_app.processEvents()
+                # DO NOT process events here - can cause hangs
         except ImportError:
             pass  # PyQt6 not available
         except Exception:
@@ -87,11 +112,8 @@ def pytest_sessionstart(session):
     # Ensure QApplication exists and is ready
     app = _ensure_qapplication()
     if app is not None:
-        # Process events with a limit to avoid blocking
-        try:
-            app.processEvents()
-        except Exception:
-            pass  # Ignore errors
+        # Minimize event processing to avoid blocking in CI
+        _safe_process_events(app, max_events=2)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -116,8 +138,9 @@ def qapplication() -> Generator:
         if app is None:
             app = QApplication([])
 
-    # Process any pending events to ensure initialization is complete
-    app.processEvents()
+    # Minimize event processing in headless mode to avoid hangs
+    # Only process if absolutely necessary
+    _safe_process_events(app, max_events=2)
 
     yield app
 
@@ -127,7 +150,8 @@ def qapplication() -> Generator:
         for widget in app.allWidgets():
             if widget.isWindow() and widget.isVisible():
                 widget.close()
-        app.processEvents()
+        # Minimize cleanup event processing to avoid hangs
+        _safe_process_events(app, max_events=2)
     except Exception:
         pass  # Ignore cleanup errors
 
@@ -148,10 +172,10 @@ def qapp(qapplication) -> Generator:
             # Fallback: create if still None
             app = QApplication([])
 
-    # Process any pending events
-    app.processEvents()
+    # Minimize event processing before test to avoid hangs
+    _safe_process_events(app, max_events=1)
 
     yield app
 
-    # Process events after test to ensure cleanup
-    app.processEvents()
+    # Minimize event processing after test to avoid hangs
+    _safe_process_events(app, max_events=1)
