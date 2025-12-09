@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QTextEdit, QWizard, QWizardPage, QCheckBox, QMessageBox,
     QFrame, QGroupBox, QSizePolicy, QProgressDialog, QInputDialog, QComboBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QThread, QMetaObject, Q_ARG
 from PyQt6.QtWidgets import QApplication
 from PyQt6.QtCore import QCoreApplication
 from PyQt6.QtGui import QFont, QPixmap
@@ -463,10 +463,28 @@ class WelcomeWizard(QWizard):
         return True, profile, ""
 
     def _prompt_user(self, title: str, label: str, password_mode: bool = False) -> Tuple[str, bool]:
-        """Prompt the user for input without blocking the event loop."""
+        """Prompt the user for input. Thread-safe - marshals to main thread if needed."""
+        app = QApplication.instance()
+        if app and QThread.currentThread() == app.thread():
+            # Already on main thread, call directly
+            echo = QLineEdit.EchoMode.Password if password_mode else QLineEdit.EchoMode.Normal
+            text, ok = QInputDialog.getText(self, title, label, echo)
+            return text, ok
+        else:
+            # Need to marshal to main thread
+            self._prompt_result = None
+            QMetaObject.invokeMethod(
+                self, "_do_prompt_user", 
+                Qt.ConnectionType.BlockingQueuedConnection,
+                Q_ARG(str, title), Q_ARG(str, label), Q_ARG(bool, password_mode)
+            )
+            return self._prompt_result if self._prompt_result else ("", False)
+    
+    def _do_prompt_user(self, title: str, label: str, password_mode: bool = False):
+        """Helper method to run prompt on main thread."""
         echo = QLineEdit.EchoMode.Password if password_mode else QLineEdit.EchoMode.Normal
         text, ok = QInputDialog.getText(self, title, label, echo)
-        return text, ok
+        self._prompt_result = (text, ok)
 
 
 def create_header(title: str, subtitle: str) -> QWidget:
