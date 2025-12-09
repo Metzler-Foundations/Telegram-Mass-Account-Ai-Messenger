@@ -3681,7 +3681,20 @@ class SettingsWindow(QDialog):
                 try:
                     loop.run_until_complete(perform_scrape())
                 finally:
-                    loop.close()
+                    # Fixed: Always close event loop and reset to prevent leaks
+                    try:
+                        # Cancel any pending tasks
+                        pending = asyncio.all_tasks(loop)
+                        for task in pending:
+                            task.cancel()
+                        # Wait for cancellation (with timeout)
+                        if pending:
+                            loop.run_until_complete(asyncio.wait(pending, timeout=1.0))
+                    except Exception:
+                        pass  # Ignore errors during cleanup
+                    finally:
+                        loop.close()
+                        asyncio.set_event_loop(None)
         
         except Exception as e:
             logger.error(f"Failed to start scraping: {e}")

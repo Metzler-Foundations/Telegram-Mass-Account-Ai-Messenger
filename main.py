@@ -3155,14 +3155,27 @@ class MainWindow(QMainWindow):
             # Shutdown resource manager properly
             if self.resource_manager:
                 try:
-                    loop = asyncio.get_event_loop()
-                    if loop.is_running():
-                        asyncio.create_task(shutdown_resource_manager())
-                    else:
-                        loop.run_until_complete(shutdown_resource_manager())
-                except RuntimeError:
-                    # No event loop available during shutdown - that's okay
-                    logger.debug("No event loop for resource manager shutdown")
+                    # Fixed: Try to get existing loop, create new one if needed
+                    try:
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # Running loop - schedule shutdown task
+                            asyncio.create_task(shutdown_resource_manager())
+                        else:
+                            # Existing but not running - use it
+                            loop.run_until_complete(shutdown_resource_manager())
+                    except RuntimeError:
+                        # No event loop exists - create one for shutdown
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        try:
+                            loop.run_until_complete(shutdown_resource_manager())
+                        finally:
+                            loop.close()
+                            asyncio.set_event_loop(None)
+                except Exception as e:
+                    # Any other error - log but don't fail shutdown
+                    logger.debug(f"Resource manager shutdown error (non-critical): {e}")
 
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")

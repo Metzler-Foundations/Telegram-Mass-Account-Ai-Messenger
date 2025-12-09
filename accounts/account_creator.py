@@ -1971,11 +1971,25 @@ class AccountCreator:
             self.creation_active = previous_creation_active
 
             # Disconnect client regardless of outcome
+            # Fixed: Check if client is connected before trying to disconnect
             if client:
                 try:
-                    await client.disconnect()
+                    # Check if client is connected before disconnecting
+                    if hasattr(client, 'is_connected'):
+                        is_connected = client.is_connected() if callable(client.is_connected) else client.is_connected
+                        if is_connected:
+                            await client.disconnect()
+                    else:
+                        # Try disconnect anyway if we can't check connection status
+                        await client.disconnect()
                 except Exception as e:
                     logger.warning(f"Failed to disconnect client: {e}")
+                    # Force clear client reference to prevent leaks
+                    try:
+                        if hasattr(client, 'stop'):
+                            await client.stop()
+                    except Exception:
+                        pass
 
             # Release or mark proxy failures when creation did not complete
             if not creation_success and assigned_proxy:

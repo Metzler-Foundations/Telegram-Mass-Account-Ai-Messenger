@@ -360,8 +360,20 @@ class WelcomeWizard(QWizard):
         try:
             return loop.run_until_complete(coro)
         finally:
-            loop.close()
-            asyncio.set_event_loop(None)
+            # Fixed: Always cancel pending tasks and reset event loop to prevent leaks
+            try:
+                # Cancel any pending tasks
+                pending = asyncio.all_tasks(loop)
+                for task in pending:
+                    task.cancel()
+                # Wait for cancellation (with timeout)
+                if pending:
+                    loop.run_until_complete(asyncio.wait(pending, timeout=1.0))
+            except Exception:
+                pass  # Ignore errors during cleanup
+            finally:
+                loop.close()
+                asyncio.set_event_loop(None)
 
     async def _validate_gemini_key(self, api_key: str) -> Tuple[bool, str]:
         """Validate Gemini API key using the APIKeyManager."""
