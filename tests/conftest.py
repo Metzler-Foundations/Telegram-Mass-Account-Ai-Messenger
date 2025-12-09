@@ -14,9 +14,29 @@ os.environ.setdefault("QT_PLUGIN_PATH", "")
 # Prevent Qt from trying to connect to X server
 os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", "")
 
-
-# Create QApplication early to avoid issues during test collection
+# Create QApplication at module level - this runs BEFORE any test files are imported
+# This is critical to prevent hangs during test collection
 _qt_app = None
+try:
+    from PyQt6.QtWidgets import QApplication
+
+    # Get or create QApplication instance immediately
+    _qt_app = QApplication.instance()
+    if _qt_app is None:
+        # Create with minimal arguments for headless operation
+        # Use empty list to avoid issues with sys.argv in CI
+        _qt_app = QApplication([])
+        # Process events with limit to avoid blocking in headless mode
+        try:
+            _qt_app.processEvents()
+        except Exception:
+            pass  # Ignore errors during initialization
+except ImportError:
+    # PyQt6 not available - some tests don't need it
+    pass
+except Exception:
+    # Ignore initialization errors - will be handled in fixtures
+    pass
 
 
 def _ensure_qapplication():
@@ -30,7 +50,7 @@ def _ensure_qapplication():
             _qt_app = QApplication.instance()
             if _qt_app is None:
                 # Create with minimal arguments for headless operation
-                _qt_app = QApplication(sys.argv if sys.argv else ["pytest"])
+                _qt_app = QApplication([])
                 # Process events to complete initialization
                 _qt_app.processEvents()
         except ImportError:
@@ -40,6 +60,16 @@ def _ensure_qapplication():
     return _qt_app
 
 
+def pytest_load_initial_conftests(early_config, parser, args):
+    """Called very early, before test collection starts.
+
+    This is the earliest hook available - ensures QApplication exists
+    before ANY test files are imported.
+    """
+    # Ensure QApplication exists before any test files are imported
+    _ensure_qapplication()
+
+
 def pytest_configure(config):
     """Called after command line options have been parsed and all plugins initialized.
 
@@ -47,6 +77,21 @@ def pytest_configure(config):
     """
     # Ensure QApplication exists before any test files are imported
     _ensure_qapplication()
+
+
+def pytest_sessionstart(session):
+    """Called after test collection is complete but before tests run.
+
+    This ensures QApplication is ready before any tests execute.
+    """
+    # Ensure QApplication exists and is ready
+    app = _ensure_qapplication()
+    if app is not None:
+        # Process events with a limit to avoid blocking
+        try:
+            app.processEvents()
+        except Exception:
+            pass  # Ignore errors
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -69,7 +114,7 @@ def qapplication() -> Generator:
     if app is None:
         app = QApplication.instance()
         if app is None:
-            app = QApplication(sys.argv if sys.argv else ["pytest"])
+            app = QApplication([])
 
     # Process any pending events to ensure initialization is complete
     app.processEvents()
@@ -101,7 +146,7 @@ def qapp(qapplication) -> Generator:
         app = qapplication
         if app is None:
             # Fallback: create if still None
-            app = QApplication(sys.argv if sys.argv else ["pytest"])
+            app = QApplication([])
 
     # Process any pending events
     app.processEvents()
