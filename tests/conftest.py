@@ -62,7 +62,8 @@ def _safe_process_events(app, max_events=5):
             if not app.hasPendingEvents():
                 break
     except Exception:
-        pass  # Ignore all errors during event processing - better to skip than hang
+        # Ignore all errors during event processing - better to skip than hang
+        pass
 
 
 def _ensure_qapplication():
@@ -98,7 +99,8 @@ def pytest_load_initial_conftests(early_config, parser, args):
 def pytest_configure(config):
     """Called after command line options have been parsed and all plugins initialized.
 
-    This ensures QApplication is created very early, before any test collection or imports.
+    This ensures QApplication is created very early, before any test
+    collection or imports.
     """
     # Ensure QApplication exists before any test files are imported
     _ensure_qapplication()
