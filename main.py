@@ -165,7 +165,7 @@ from monitoring.performance_monitor import (  # noqa: E402
 from telegram.telegram_worker import TelegramWorker  # noqa: E402
 
 # Import UI controller for clean separation
-from ui.ui_controller import UIController  # noqa: E402
+# from ui.ui_controller import UIController  # noqa: E402  # noqa: F401
 from utils.utils import (  # noqa: E402
     EVENT_ERROR_OCCURRED,
     EVENT_MESSAGE_RECEIVED,

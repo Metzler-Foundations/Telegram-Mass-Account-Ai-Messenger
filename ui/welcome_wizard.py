@@ -156,7 +156,10 @@ class WelcomeWizard(QWizard):
             },
             "gemini": {"api_key": self.page(3).gemini_edit.text().strip()},
             "brain": {
-                "prompt": "You are a helpful assistant. Respond naturally and helpfully to user messages.",
+                "prompt": (
+                    "You are a helpful assistant. "
+                    "Respond naturally and helpfully to user messages."
+                ),
                 "auto_reply_enabled": True,
                 "typing_delay": 2,
                 "max_history": 50,
@@ -403,7 +406,8 @@ class WelcomeWizard(QWizard):
             setup_path.write_text("1")
 
             logger.info(
-                f"Configuration saved successfully to {config_path} (credentials in secrets manager only)"
+                f"Configuration saved successfully to {config_path} "
+                f"(credentials in secrets manager only)"
             )
             self.config_completed.emit(clean_config)
 
@@ -525,7 +529,6 @@ class WelcomeWizard(QWizard):
         import asyncio
         max_retries = 3
         base_delay = 1.0
-        last_error = None
         
         for attempt in range(max_retries):
             try:
@@ -534,7 +537,6 @@ class WelcomeWizard(QWizard):
                 await client.invoke(GetNearestDc())
                 break  # Success
             except Exception as exc:
-                last_error = exc
                 try:
                     await client.disconnect()
                 except Exception:
@@ -778,7 +780,10 @@ class IntroPage(QWizardPage):
         right_col.addWidget(
             create_info_card(
                 "Analytics & Insights",
-                "Real-time dashboard with campaign performance metrics and system health monitoring.",
+                (
+                    "Real-time dashboard with campaign performance metrics "
+                    "and system health monitoring."
+                ),
             )
         )
         grid_layout.addLayout(right_col)

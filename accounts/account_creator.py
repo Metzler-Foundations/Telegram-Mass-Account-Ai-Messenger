@@ -1870,7 +1870,11 @@ class AccountCreator:
             if not phone_data:
                 return {
                     "success": False,
-                    "error": f"Failed to get phone number from {provider}. Check: 1) API key is valid 2) You have credit 3) {country} numbers are available",
+                    "error": (
+                        f"Failed to get phone number from {provider}. "
+                        f"Check: 1) API key is valid 2) You have credit "
+                        f"3) {country} numbers are available"
+                    ),
                 }
 
             phone_number = phone_data["number"]
@@ -1917,7 +1921,10 @@ class AccountCreator:
             if not client:
                 return {
                     "success": False,
-                    "error": "Failed to initialize Telegram client. Check your API credentials and internet connection.",
+                    "error": (
+                        "Failed to initialize Telegram client. "
+                        "Check your API credentials and internet connection."
+                    ),
                 }
 
             # 4. Request SMS Code
@@ -1928,7 +1935,10 @@ class AccountCreator:
                 await self._record_proxy_failure(assigned_proxy, phone_number)
                 return {
                     "success": False,
-                    "error": f"⏱️ Rate limit reached. Telegram requires waiting {e.value} seconds. Try again later.",
+                    "error": (
+                        f"⏱️ Rate limit reached. Telegram requires waiting "
+                        f"{e.value} seconds. Try again later."
+                    ),
                 }
             except PhoneNumberInvalid as e:
                 await self._record_proxy_failure(assigned_proxy, phone_number)
@@ -1939,11 +1949,18 @@ class AccountCreator:
 
             # 5. Get SMS Code from Provider
             self._notify_progress(50, 100, get_progress_message("waiting_sms"))
-            sms_code = await self._handle_sms_with_anti_detection(session_name, phone_data, config)
+            sms_code = await self._handle_sms_with_anti_detection(
+                session_name, phone_data, config
+            )
             if not sms_code:
                 return {
                     "success": False,
-                    "error": "SMS code not received. This could mean: 1) Number blacklisted by Telegram 2) SMS delayed 3) Provider issue. Try a different country or provider.",
+                    "error": (
+                        "SMS code not received. This could mean: "
+                        "1) Number blacklisted by Telegram "
+                        "2) SMS delayed 3) Provider issue. "
+                        "Try a different country or provider."
+                    ),
                 }
 
             # 6. Sign In
@@ -2099,7 +2116,8 @@ class AccountCreator:
             import os
 
             # Apply device fingerprint to environment (simulated)
-            # self._apply_device_fingerprint_to_environment(fingerprint) # Legacy method, removing dependency
+            # Legacy method, removing dependency:
+            # self._apply_device_fingerprint_to_environment(fingerprint)
 
             api_id = config.get("api_id") or os.getenv("TELEGRAM_API_ID", "")
             api_hash = config.get("api_hash") or os.getenv("TELEGRAM_API_HASH", "")
@@ -2471,7 +2489,8 @@ class AccountCreator:
                     await client.set_username(candidate)
                     logger.info(
                         f"✓ Username set to {candidate} "
-                        f"(strategy: base+5digits, attempt {attempt}, collisions: {collision_count})"
+                        f"(strategy: base+5digits, attempt {attempt}, "
+                        f"collisions: {collision_count})"
                     )
                     return
                 except UsernameOccupied:
@@ -2492,7 +2511,8 @@ class AccountCreator:
                     await client.set_username(candidate)
                     logger.info(
                         f"✓ Username set to {candidate} "
-                        f"(strategy: base+timestamp, attempt {attempt}, collisions: {collision_count})"
+                        f"(strategy: base+timestamp, attempt {attempt}, "
+                        f"collisions: {collision_count})"
                     )
                     return
                 except (UsernameOccupied, UsernameInvalid) as exc:
@@ -2536,7 +2556,11 @@ class AccountCreator:
 
             # Log to audit if available
             try:
-                from accounts.account_audit_log import AuditEvent, AuditEventType, get_audit_log
+                from accounts.account_audit_log import (  # noqa: F811
+                    AuditEvent,
+                    AuditEventType,
+                    get_audit_log,
+                )
 
                 audit = get_audit_log()
                 audit.log_event(
@@ -2547,7 +2571,10 @@ class AccountCreator:
                         timestamp=datetime.now(),
                         username_attempted=base,
                         username_success=False,
-                        error_message=f"Failed after {max_attempts} attempts, {collision_count} collisions",
+                        error_message=(
+                            f"Failed after {max_attempts} attempts, "
+                            f"{collision_count} collisions"
+                        ),
                         metadata={
                             "collision_count": collision_count,
                             "last_error": str(last_error),
