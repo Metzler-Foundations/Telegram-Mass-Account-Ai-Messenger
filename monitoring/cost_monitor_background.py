@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 
 class CostMonitorBackgroundService:
     """Background service for continuous cost monitoring."""
-    
+
     def __init__(self, check_interval_hours: int = 1):
         """
         Initialize cost monitor background service.
-        
+
         Args:
             check_interval_hours: Hours between cost checks (default: 1 hour)
         """
@@ -30,58 +30,57 @@ class CostMonitorBackgroundService:
         self.is_running = False
         self._monitor_task: Optional[asyncio.Task] = None
         self._cost_alert_system = None
-    
+
     async def start(self):
         """Start the background monitoring service."""
         if self.is_running:
             logger.warning("Cost monitor already running")
             return
-        
+
         # Initialize cost alert system
         try:
             from monitoring.cost_alert_system import get_cost_alert_system
+
             self._cost_alert_system = get_cost_alert_system()
             logger.info("✓ Cost alert system initialized")
         except Exception as e:
             logger.error(f"Failed to initialize cost alert system: {e}")
             return
-        
+
         self.is_running = True
         self._monitor_task = asyncio.create_task(self._monitoring_loop())
         logger.info(f"🚀 Started cost monitoring (checking every {self.check_interval_hours}h)")
-    
+
     async def stop(self):
         """Stop the monitoring service."""
         self.is_running = False
-        
+
         if self._monitor_task:
             self._monitor_task.cancel()
             try:
                 await self._monitor_task
             except asyncio.CancelledError:
                 pass
-        
+
         logger.info("🛑 Stopped cost monitoring")
-    
+
     async def _monitoring_loop(self):
         """Main monitoring loop."""
         while self.is_running:
             try:
                 # Run cost check
                 alerts = self._cost_alert_system.check_costs()
-                
+
                 if alerts:
                     logger.warning(f"💰 Generated {len(alerts)} cost alert(s)")
                     for alert in alerts:
-                        logger.warning(
-                            f"  {alert.alert_level.value.upper()}: {alert.message}"
-                        )
+                        logger.warning(f"  {alert.alert_level.value.upper()}: {alert.message}")
                 else:
                     logger.debug(f"✓ Cost check passed at {datetime.now()}")
-                
+
                 # Wait for next check
                 await asyncio.sleep(self.check_interval_hours * 3600)
-                
+
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -106,11 +105,3 @@ async def start_cost_monitoring(check_interval_hours: int = 1):
     service = get_cost_monitor_service(check_interval_hours)
     await service.start()
     return service
-
-
-
-
-
-
-
-

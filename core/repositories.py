@@ -1,6 +1,7 @@
 """
 Data Access Layer - Repository pattern for clean data access.
 """
+
 import sqlite3
 import logging
 from typing import List, Dict, Any, Optional
@@ -51,7 +52,7 @@ class MemberRepository(BaseRepository):
             LEFT JOIN member_behavioral_insights bi ON m.user_id = bi.user_id
             WHERE m.user_id = ?
             """,
-            (user_id,)
+            (user_id,),
         )
         return results[0] if results else None
 
@@ -68,13 +69,13 @@ class MemberRepository(BaseRepository):
         params = [channel_id]
 
         # Add criteria filters
-        if criteria.get('min_quality'):
+        if criteria.get("min_quality"):
             query += " AND (mp.profile_quality_score >= ? OR mp.profile_quality_score IS NULL)"
-            params.append(criteria['min_quality'])
+            params.append(criteria["min_quality"])
 
-        if criteria.get('max_risk'):
+        if criteria.get("max_risk"):
             query += " AND m.threat_score < ?"
-            params.append(criteria['max_risk'])
+            params.append(criteria["max_risk"])
 
         query += " ORDER BY bi.messaging_potential_score DESC"
 
@@ -90,14 +91,14 @@ class MemberRepository(BaseRepository):
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    member_data['user_id'],
-                    member_data.get('username'),
-                    member_data.get('first_name'),
-                    member_data.get('last_name'),
-                    member_data.get('channel_id'),
-                    member_data.get('status', 'active'),
-                    member_data.get('activity_score', 0)
-                )
+                    member_data["user_id"],
+                    member_data.get("username"),
+                    member_data.get("first_name"),
+                    member_data.get("last_name"),
+                    member_data.get("channel_id"),
+                    member_data.get("status", "active"),
+                    member_data.get("activity_score", 0),
+                ),
             )
             return True
         except Exception as e:
@@ -110,16 +111,11 @@ class CampaignRepository(BaseRepository):
 
     def get_all_campaigns(self) -> List[Dict]:
         """Get all campaigns."""
-        return self.execute_query(
-            "SELECT * FROM campaigns ORDER BY created_at DESC"
-        )
+        return self.execute_query("SELECT * FROM campaigns ORDER BY created_at DESC")
 
     def get_campaign_by_id(self, campaign_id: int) -> Optional[Dict]:
         """Get campaign by ID."""
-        results = self.execute_query(
-            "SELECT * FROM campaigns WHERE id = ?",
-            (campaign_id,)
-        )
+        results = self.execute_query("SELECT * FROM campaigns WHERE id = ?", (campaign_id,))
         return results[0] if results else None
 
     def create_campaign(self, campaign_data: Dict) -> Optional[int]:
@@ -133,14 +129,14 @@ class CampaignRepository(BaseRepository):
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    campaign_data['name'],
-                    campaign_data['template'],
-                    ','.join(map(str, campaign_data['target_member_ids'])),
-                    ','.join(campaign_data['account_ids']),
-                    campaign_data.get('status', 'created'),
-                    str(campaign_data.get('config', {})),
-                    datetime.now().isoformat()
-                )
+                    campaign_data["name"],
+                    campaign_data["template"],
+                    ",".join(map(str, campaign_data["target_member_ids"])),
+                    ",".join(campaign_data["account_ids"]),
+                    campaign_data.get("status", "created"),
+                    str(campaign_data.get("config", {})),
+                    datetime.now().isoformat(),
+                ),
             )
             campaign_id = cursor.lastrowid
             self._get_connection().commit()
@@ -159,12 +155,12 @@ class CampaignRepository(BaseRepository):
                 WHERE id = ?
                 """,
                 (
-                    stats.get('sent_count', 0),
-                    stats.get('failed_count', 0),
-                    stats.get('blocked_count', 0),
+                    stats.get("sent_count", 0),
+                    stats.get("failed_count", 0),
+                    stats.get("blocked_count", 0),
                     datetime.now().isoformat(),
-                    campaign_id
-                )
+                    campaign_id,
+                ),
             )
             return True
         except Exception as e:
@@ -177,15 +173,12 @@ class AccountRepository(BaseRepository):
 
     def get_all_accounts(self) -> List[Dict]:
         """Get all accounts."""
-        return self.execute_query(
-            "SELECT * FROM accounts ORDER BY created_at DESC"
-        )
+        return self.execute_query("SELECT * FROM accounts ORDER BY created_at DESC")
 
     def get_account_by_phone(self, phone_number: str) -> Optional[Dict]:
         """Get account by phone number."""
         results = self.execute_query(
-            "SELECT * FROM accounts WHERE phone_number = ?",
-            (phone_number,)
+            "SELECT * FROM accounts WHERE phone_number = ?", (phone_number,)
         )
         return results[0] if results else None
 
@@ -199,15 +192,15 @@ class AccountRepository(BaseRepository):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    account_data['phone_number'],
-                    account_data.get('username'),
-                    account_data.get('first_name'),
-                    account_data.get('last_name'),
-                    account_data.get('status', 'created'),
-                    str(account_data.get('config', {})),
-                    account_data.get('created_at', datetime.now().isoformat()),
-                    datetime.now().isoformat()
-                )
+                    account_data["phone_number"],
+                    account_data.get("username"),
+                    account_data.get("first_name"),
+                    account_data.get("last_name"),
+                    account_data.get("status", "created"),
+                    str(account_data.get("config", {})),
+                    account_data.get("created_at", datetime.now().isoformat()),
+                    datetime.now().isoformat(),
+                ),
             )
             return True
         except Exception as e:
@@ -224,7 +217,7 @@ class AccountRepository(BaseRepository):
                 SET status = ?, metadata = ?, updated_at = ?
                 WHERE phone_number = ?
                 """,
-                (status, metadata_str, datetime.now().isoformat(), phone_number)
+                (status, metadata_str, datetime.now().isoformat(), phone_number),
             )
             return True
         except Exception as e:

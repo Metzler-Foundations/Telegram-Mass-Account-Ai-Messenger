@@ -9,9 +9,22 @@ import webbrowser
 from typing import Optional, List, Dict, Any, Callable
 
 from PyQt6.QtWidgets import (
-    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextEdit, QMessageBox, QProgressDialog, QFrame, QScrollArea,
-    QGroupBox, QGridLayout, QSizePolicy, QCheckBox, QSpinBox
+    QDialog,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QMessageBox,
+    QProgressDialog,
+    QFrame,
+    QScrollArea,
+    QGroupBox,
+    QGridLayout,
+    QSizePolicy,
+    QCheckBox,
+    QSpinBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QPalette
@@ -23,17 +36,19 @@ logger = logging.getLogger(__name__)
 
 class HelpDialog(QDialog):
     """Generic help dialog for any feature."""
-    
-    def __init__(self, title: str, content: str, links: Optional[Dict[str, str]] = None, parent=None):
+
+    def __init__(
+        self, title: str, content: str, links: Optional[Dict[str, str]] = None, parent=None
+    ):
         super().__init__(parent)
         self.setWindowTitle(f"Help: {title}")
         self.resize(600, 400)
-        
+
         # CRITICAL: Prevent dialog from closing parent window
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-        
+
         layout = QVBoxLayout(self)
-        
+
         # Title
         title_label = QLabel(f"📚 {title}")
         title_font = QFont()
@@ -41,23 +56,23 @@ class HelpDialog(QDialog):
         title_font.setBold(True)
         title_label.setFont(title_font)
         layout.addWidget(title_label)
-        
+
         # Content
         content_area = QScrollArea()
         content_area.setWidgetResizable(True)
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
-        
+
         content_label = QLabel(content)
         content_label.setWordWrap(True)
         content_label.setTextFormat(Qt.TextFormat.RichText)
         content_label.setOpenExternalLinks(True)
         content_layout.addWidget(content_label)
-        
+
         content_layout.addStretch()
         content_area.setWidget(content_widget)
         layout.addWidget(content_area)
-        
+
         # Links
         if links:
             links_layout = QHBoxLayout()
@@ -66,7 +81,7 @@ class HelpDialog(QDialog):
                 link_btn.clicked.connect(lambda checked, u=url: webbrowser.open(u))
                 links_layout.addWidget(link_btn)
             layout.addLayout(links_layout)
-        
+
         # Close button
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
@@ -75,17 +90,17 @@ class HelpDialog(QDialog):
 
 class QuickStartDialog(QDialog):
     """Quick start guide for new users."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Quick Start Guide")
         self.resize(700, 500)
-        
+
         # CRITICAL: Prevent dialog from closing parent window
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-        
+
         layout = QVBoxLayout(self)
-        
+
         # Title
         title = QLabel("Quick Start Guide")
         title_font = QFont()
@@ -93,7 +108,7 @@ class QuickStartDialog(QDialog):
         title_font.setBold(True)
         title.setFont(title_font)
         layout.addWidget(title)
-        
+
         # Content
         content = QLabel(
             "<h3>Welcome! Here's how to get started:</h3>"
@@ -145,16 +160,16 @@ class QuickStartDialog(QDialog):
         content.setWordWrap(True)
         content.setTextFormat(Qt.TextFormat.RichText)
         content.setOpenExternalLinks(True)
-        
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(content)
         layout.addWidget(scroll)
-        
+
         # Checkbox
         self.dont_show_again = QCheckBox("Don't show this again")
         layout.addWidget(self.dont_show_again)
-        
+
         # Button
         close_btn = QPushButton("Get Started!")
         close_btn.clicked.connect(self.accept)
@@ -164,9 +179,9 @@ class QuickStartDialog(QDialog):
 
 class ProgressDialogWithRetry(QProgressDialog):
     """Enhanced progress dialog with retry capability."""
-    
+
     retry_requested = pyqtSignal()
-    
+
     def __init__(self, title: str, cancel_text: str = "Cancel", parent=None):
         super().__init__(title, cancel_text, 0, 100, parent)
         self.setWindowTitle(title)
@@ -174,101 +189,101 @@ class ProgressDialogWithRetry(QProgressDialog):
         self.setAutoClose(False)
         self.setAutoReset(False)
         self.setMinimumDuration(0)
-        
+
         self.error_occurred = False
         self.error_message = ""
         self.retry_btn = None
-    
+
     def show_error(self, error_msg: str, allow_retry: bool = True):
         """Show error with optional retry button."""
         self.error_occurred = True
         self.error_message = error_msg
-        
+
         self.setLabelText(f"Error: {error_msg}")
         self.setValue(self.maximum())
-        
+
         if allow_retry and not self.retry_btn:
             # Add retry button
             self.retry_btn = QPushButton("Retry")
             self.retry_btn.clicked.connect(self._on_retry)
             self.setCancelButtonText("Close")
-    
+
     def _on_retry(self):
         """Handle retry button click."""
         self.error_occurred = False
         self.error_message = ""
         self.setValue(0)
         self.retry_requested.emit()
-    
+
     def update_progress(self, current: int, total: int, message: str = ""):
         """Update progress with message."""
         if total > 0:
             percentage = int((current / total) * 100)
             self.setValue(percentage)
-        
+
         if message:
             self.setLabelText(message)
 
 
 class StatusPanel(QFrame):
     """Status panel showing current operation status."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        
+
         layout = QVBoxLayout(self)
-        
+
         # Status label
         self.status_label = QLabel("Ready")
         status_font = QFont()
         status_font.setBold(True)
         self.status_label.setFont(status_font)
         layout.addWidget(self.status_label)
-        
+
         # Details label
         self.details_label = QLabel("")
         self.details_label.setWordWrap(True)
         layout.addWidget(self.details_label)
-        
+
         # Progress indicator (animated dots)
         self.progress_label = QLabel("")
         layout.addWidget(self.progress_label)
-        
+
         self.animation_timer = QTimer(self)
         self.animation_timer.timeout.connect(self._animate_dots)
         self.dot_count = 0
-    
+
     def set_status(self, status: str, details: str = "", is_working: bool = False):
         """Set status message."""
         self.status_label.setText(status)
         self.details_label.setText(details)
-        
+
         if is_working:
             self.animation_timer.start(500)
         else:
             self.animation_timer.stop()
             self.progress_label.setText("")
-    
+
     def _animate_dots(self):
         """Animate working dots."""
         self.dot_count = (self.dot_count + 1) % 4
         self.progress_label.setText("Working" + "." * self.dot_count)
-    
+
     def set_success(self, message: str):
         """Show success status."""
         self.animation_timer.stop()
         self.status_label.setText("Success")
         self.details_label.setText(message)
         self.progress_label.setText("")
-    
+
     def set_error(self, message: str):
         """Show error status."""
         self.animation_timer.stop()
         self.status_label.setText("Error")
         self.details_label.setText(message)
         self.progress_label.setText("")
-    
+
     def set_warning(self, message: str):
         """Show warning status."""
         self.animation_timer.stop()
@@ -279,23 +294,29 @@ class StatusPanel(QFrame):
 
 class ConfirmationDialog(QDialog):
     """Enhanced confirmation dialog with details."""
-    
-    def __init__(self, title: str, message: str, details: Optional[List[str]] = None, 
-                 warning: Optional[str] = None, parent=None):
+
+    def __init__(
+        self,
+        title: str,
+        message: str,
+        details: Optional[List[str]] = None,
+        warning: Optional[str] = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.setWindowTitle(title)
-        
+
         # Apply dialog styling
         self.setStyleSheet(ThemeManager.get_dialog_style())
-        
+
         # CRITICAL: Prevent dialog from closing parent window
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-        
+
         c = ThemeManager.get_colors()
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
-        
+
         # Main message
         msg_label = QLabel(message)
         msg_label.setWordWrap(True)
@@ -304,57 +325,59 @@ class ConfirmationDialog(QDialog):
         msg_label.setFont(msg_font)
         msg_label.setStyleSheet(f"color: {c['TEXT_PRIMARY']};")
         layout.addWidget(msg_label)
-        
+
         # Details
         if details:
             details_label = QLabel("<ul>" + "".join(f"<li>{d}</li>" for d in details) + "</ul>")
             details_label.setWordWrap(True)
             details_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
             layout.addWidget(details_label)
-        
+
         # Warning
         if warning:
             warning_frame = QFrame()
-            warn_hex = c["ACCENT_WARNING"].lstrip('#')
+            warn_hex = c["ACCENT_WARNING"].lstrip("#")
             warn_r = int(warn_hex[0:2], 16)
             warn_g = int(warn_hex[2:4], 16)
             warn_b = int(warn_hex[4:6], 16)
-            warning_frame.setStyleSheet(f"background-color: rgba({warn_r}, {warn_g}, {warn_b}, 0.15); border: 2px solid {c['ACCENT_WARNING']}; border-radius: 4px; padding: 12px;")
+            warning_frame.setStyleSheet(
+                f"background-color: rgba({warn_r}, {warn_g}, {warn_b}, 0.15); border: 2px solid {c['ACCENT_WARNING']}; border-radius: 4px; padding: 12px;"
+            )
             warning_layout = QVBoxLayout(warning_frame)
             warning_label = QLabel(f"{warning}")
             warning_label.setWordWrap(True)
             warning_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
             warning_layout.addWidget(warning_label)
             layout.addWidget(warning_frame)
-        
+
         # Buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        
+
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setStyleSheet(ThemeManager.get_button_style("default"))
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
-        
+
         self.confirm_btn = QPushButton("Confirm")
         self.confirm_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
         self.confirm_btn.clicked.connect(self.accept)
         self.confirm_btn.setDefault(True)
         button_layout.addWidget(self.confirm_btn)
-        
+
         layout.addLayout(button_layout)
 
 
 class TutorialOverlay(QWidget):
     """Tutorial overlay that highlights UI elements."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool)
-        
+
         layout = QVBoxLayout(self)
-        
+
         self.message_label = QLabel()
         self.message_label.setWordWrap(True)
         c = ThemeManager.get_colors()
@@ -363,41 +386,41 @@ class TutorialOverlay(QWidget):
             "border-radius: 8px; font-size: 14px;"
         )
         layout.addWidget(self.message_label)
-        
+
         button_layout = QHBoxLayout()
-        
+
         self.skip_btn = QPushButton("Skip Tutorial")
         self.skip_btn.clicked.connect(self.close)
         button_layout.addWidget(self.skip_btn)
-        
+
         self.next_btn = QPushButton("Next →")
         self.next_btn.clicked.connect(self._next_step)
         button_layout.addWidget(self.next_btn)
-        
+
         layout.addLayout(button_layout)
-        
+
         self.steps = []
         self.current_step = 0
-    
+
     def set_steps(self, steps: List[str]):
         """Set tutorial steps."""
         self.steps = steps
         self.current_step = 0
         if steps:
             self._show_step(0)
-    
+
     def _show_step(self, step_index: int):
         """Show a tutorial step."""
         if 0 <= step_index < len(self.steps):
             self.message_label.setText(
                 f"📚 Step {step_index + 1}/{len(self.steps)}\n\n{self.steps[step_index]}"
             )
-            
+
             if step_index == len(self.steps) - 1:
                 self.next_btn.setText("Finish")
             else:
                 self.next_btn.setText("Next →")
-    
+
     def _next_step(self):
         """Show next step."""
         self.current_step += 1
@@ -409,9 +432,9 @@ class TutorialOverlay(QWidget):
 
 class FeatureCard(QFrame):
     """Card widget for displaying a feature with icon and description."""
-    
+
     clicked = pyqtSignal()
-    
+
     def __init__(self, icon: str, title: str, description: str, parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
@@ -421,9 +444,9 @@ class FeatureCard(QFrame):
             f"FeatureCard {{ background-color: {c['BG_TERTIARY']}; border-radius: 8px; padding: 15px; }} "
             f"FeatureCard:hover {{ background-color: {c['BG_SECONDARY']}; }}"
         )
-        
+
         layout = QVBoxLayout(self)
-        
+
         # Icon and title
         header_layout = QHBoxLayout()
         icon_label = QLabel(icon)
@@ -431,7 +454,7 @@ class FeatureCard(QFrame):
         icon_font.setPointSize(24)
         icon_label.setFont(icon_font)
         header_layout.addWidget(icon_label)
-        
+
         title_label = QLabel(title)
         title_font = QFont()
         title_font.setPointSize(14)
@@ -439,16 +462,16 @@ class FeatureCard(QFrame):
         title_label.setFont(title_font)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
-        
+
         layout.addLayout(header_layout)
-        
+
         # Description
         desc_label = QLabel(description)
         desc_label.setWordWrap(True)
         c = ThemeManager.get_colors()
         desc_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         layout.addWidget(desc_label)
-    
+
     def mousePressEvent(self, event):
         """Handle click."""
         self.clicked.emit()
@@ -457,42 +480,42 @@ class FeatureCard(QFrame):
 
 class SettingsValidator(QWidget):
     """Widget that shows validation status in real-time."""
-    
+
     validation_changed = pyqtSignal(bool)  # True if valid
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.status_label = QLabel("Validating...")
         layout.addWidget(self.status_label)
-        
+
         self.issues_label = QLabel("")
         self.issues_label.setWordWrap(True)
         c = ThemeManager.get_colors()
         self.issues_label.setStyleSheet(f"color: {c['ACCENT_DANGER']};")
         layout.addWidget(self.issues_label)
-        
+
         self.is_valid = False
-    
+
     def set_validation_result(self, is_valid: bool, errors: List[str]):
         """Set validation result."""
         self.is_valid = is_valid
-        
+
         if is_valid:
             self.status_label.setText("Configuration Valid")
             self.issues_label.setText("")
         else:
             self.status_label.setText(f"{len(errors)} Issue(s) Found")
             self.issues_label.setText("\n".join(f"• {err}" for err in errors[:5]))  # Show first 5
-            
+
             if len(errors) > 5:
                 self.issues_label.setText(
                     self.issues_label.text() + f"\n• ... and {len(errors) - 5} more"
                 )
-        
+
         self.validation_changed.emit(is_valid)
 
 
@@ -509,9 +532,13 @@ def show_quick_start(parent=None) -> bool:
     return not dialog.dont_show_again.isChecked()
 
 
-def confirm_action(title: str, message: str, details: Optional[List[str]] = None,
-                   warning: Optional[str] = None, parent=None) -> bool:
+def confirm_action(
+    title: str,
+    message: str,
+    details: Optional[List[str]] = None,
+    warning: Optional[str] = None,
+    parent=None,
+) -> bool:
     """Show confirmation dialog. Returns True if confirmed."""
     dialog = ConfirmationDialog(title, message, details, warning, parent)
     return dialog.exec() == QDialog.DialogCode.Accepted
-

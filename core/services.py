@@ -1,6 +1,7 @@
 """
 Business Logic Layer - Service classes containing business rules and workflows.
 """
+
 import logging
 from typing import List, Dict, Any, Optional
 from abc import ABC, abstractmethod
@@ -28,13 +29,13 @@ class MemberService(BaseService):
     def validate_member_for_campaign(self, member: Dict, criteria: Dict) -> bool:
         """Validate if member meets campaign criteria."""
         # Business rules for member validation
-        if member.get('threat_score', 0) > criteria.get('max_risk', 50):
+        if member.get("threat_score", 0) > criteria.get("max_risk", 50):
             return False
 
-        if member.get('profile_quality_score', 0) < criteria.get('min_quality', 0.3):
+        if member.get("profile_quality_score", 0) < criteria.get("min_quality", 0.3):
             return False
 
-        if member.get('messaging_potential_score', 0) < criteria.get('min_potential', 0.5):
+        if member.get("messaging_potential_score", 0) < criteria.get("min_potential", 0.5):
             return False
 
         return True
@@ -57,16 +58,20 @@ class MemberService(BaseService):
             return {}
 
         total_members = len(members)
-        avg_quality = sum(m.get('profile_quality_score', 0) for m in members) / total_members
-        avg_potential = sum(m.get('messaging_potential_score', 0) for m in members) / total_members
-        high_potential = sum(1 for m in members if m.get('messaging_potential_score', 0) >= 0.8)
+        avg_quality = sum(m.get("profile_quality_score", 0) for m in members) / total_members
+        avg_potential = sum(m.get("messaging_potential_score", 0) for m in members) / total_members
+        high_potential = sum(1 for m in members if m.get("messaging_potential_score", 0) >= 0.8)
 
         return {
-            'total_members': total_members,
-            'avg_profile_quality': round(avg_quality, 2),  # Round to 2 decimals to avoid floating point issues
-            'avg_messaging_potential': round(avg_potential, 2),
-            'high_potential_count': high_potential,
-            'high_potential_percentage': round((high_potential / total_members) * 100, 2) if total_members > 0 else 0
+            "total_members": total_members,
+            "avg_profile_quality": round(
+                avg_quality, 2
+            ),  # Round to 2 decimals to avoid floating point issues
+            "avg_messaging_potential": round(avg_potential, 2),
+            "high_potential_count": high_potential,
+            "high_potential_percentage": (
+                round((high_potential / total_members) * 100, 2) if total_members > 0 else 0
+            ),
         }
 
 
@@ -82,25 +87,25 @@ class CampaignService(BaseService):
         errors = []
 
         # Business rule validations
-        if not campaign_data.get('name', '').strip():
+        if not campaign_data.get("name", "").strip():
             errors.append("Campaign name is required")
 
-        if len(campaign_data.get('name', '')) > 100:
+        if len(campaign_data.get("name", "")) > 100:
             errors.append("Campaign name must be less than 100 characters")
 
-        if not campaign_data.get('template', '').strip():
+        if not campaign_data.get("template", "").strip():
             errors.append("Message template is required")
 
-        if len(campaign_data.get('target_member_ids', [])) == 0:
+        if len(campaign_data.get("target_member_ids", [])) == 0:
             errors.append("At least one target member is required")
 
-        if len(campaign_data.get('target_member_ids', [])) > 10000:
+        if len(campaign_data.get("target_member_ids", [])) > 10000:
             errors.append("Campaign cannot target more than 10,000 members")
 
-        if len(campaign_data.get('account_ids', [])) == 0:
+        if len(campaign_data.get("account_ids", [])) == 0:
             errors.append("At least one account is required")
 
-        if len(campaign_data.get('account_ids', [])) > 50:
+        if len(campaign_data.get("account_ids", [])) > 50:
             errors.append("Campaign cannot use more than 50 accounts")
 
         return errors
@@ -110,57 +115,58 @@ class CampaignService(BaseService):
         # Validate business rules
         errors = self.validate_campaign_data(campaign_data)
         if errors:
-            return {'success': False, 'errors': errors}
+            return {"success": False, "errors": errors}
 
         # Create campaign
         campaign_id = self.campaign_repo.create_campaign(campaign_data)
         if not campaign_id:
-            return {'success': False, 'errors': ['Failed to create campaign']}
+            return {"success": False, "errors": ["Failed to create campaign"]}
 
         # Calculate initial metrics
-        criteria = campaign_data.get('criteria', {})
+        criteria = campaign_data.get("criteria", {})
         members = self.member_service.filter_members_for_campaign(
-            campaign_data.get('channel_id', ''),
-            criteria
+            campaign_data.get("channel_id", ""), criteria
         )
         metrics = self.member_service.calculate_campaign_metrics(members)
 
         return {
-            'success': True,
-            'campaign_id': campaign_id,
-            'metrics': metrics,
-            'estimated_members': len(members)
+            "success": True,
+            "campaign_id": campaign_id,
+            "metrics": metrics,
+            "estimated_members": len(members),
         }
 
     def optimize_campaign_targeting(self, campaign_id: int) -> Dict[str, Any]:
         """Optimize campaign targeting based on performance data."""
         campaign = self.campaign_repo.get_campaign_by_id(campaign_id)
         if not campaign:
-            return {'success': False, 'error': 'Campaign not found'}
+            return {"success": False, "error": "Campaign not found"}
 
         # Business logic for optimization
         current_stats = {
-            'sent_count': campaign.get('sent_count', 0),
-            'failed_count': campaign.get('failed_count', 0),
-            'blocked_count': campaign.get('blocked_count', 0)
+            "sent_count": campaign.get("sent_count", 0),
+            "failed_count": campaign.get("failed_count", 0),
+            "blocked_count": campaign.get("blocked_count", 0),
         }
 
-        success_rate = current_stats['sent_count'] / max(current_stats['sent_count'] + current_stats['failed_count'], 1)
+        success_rate = current_stats["sent_count"] / max(
+            current_stats["sent_count"] + current_stats["failed_count"], 1
+        )
 
         # Optimization recommendations
         recommendations = []
         if success_rate < 0.5:
             recommendations.append("Consider improving member targeting criteria")
-        if current_stats['blocked_count'] > current_stats['sent_count'] * 0.1:
+        if current_stats["blocked_count"] > current_stats["sent_count"] * 0.1:
             recommendations.append("High block rate detected - reduce message frequency")
         if success_rate > 0.9:
             recommendations.append("Excellent performance - consider scaling up")
 
         return {
-            'success': True,
-            'success_rate': success_rate,
-            'recommendations': recommendations,
-            'optimization_score': success_rate * 100
+            "success": True,
+            "success_rate": success_rate,
+            "recommendations": recommendations,
+            "optimization_score": success_rate * 100,
         }
 
 
@@ -174,18 +180,18 @@ class AccountService(BaseService):
         """Validate account data according to business rules."""
         errors = []
 
-        if not account_data.get('phone_number', '').strip():
+        if not account_data.get("phone_number", "").strip():
             errors.append("Phone number is required")
 
         # Phone number format validation
-        phone = account_data.get('phone_number', '')
-        if phone and not phone.startswith('+'):
+        phone = account_data.get("phone_number", "")
+        if phone and not phone.startswith("+"):
             errors.append("Phone number must start with country code (e.g., +1234567890)")
 
-        if account_data.get('api_id') and not str(account_data['api_id']).isdigit():
+        if account_data.get("api_id") and not str(account_data["api_id"]).isdigit():
             errors.append("API ID must be numeric")
 
-        if account_data.get('api_hash') and len(account_data['api_hash']) != 32:
+        if account_data.get("api_hash") and len(account_data["api_hash"]) != 32:
             errors.append("API Hash must be 32 characters")
 
         return errors
@@ -194,48 +200,51 @@ class AccountService(BaseService):
         """Determine if account can send messages based on business rules."""
         account = self.repository.get_account_by_phone(phone_number)
         if not account:
-            return {'can_send': False, 'reason': 'Account not found'}
+            return {"can_send": False, "reason": "Account not found"}
 
-        status = account.get('status', 'unknown')
+        status = account.get("status", "unknown")
 
         # Business rules for sending capability
-        if status == 'banned':
-            return {'can_send': False, 'reason': 'Account is banned'}
-        elif status == 'limited':
-            return {'can_send': False, 'reason': 'Account is rate limited'}
-        elif status == 'suspended':
-            return {'can_send': False, 'reason': 'Account is temporarily suspended'}
-        elif status in ['active', 'online']:
-            return {'can_send': True, 'reason': 'Account is active'}
+        if status == "banned":
+            return {"can_send": False, "reason": "Account is banned"}
+        elif status == "limited":
+            return {"can_send": False, "reason": "Account is rate limited"}
+        elif status == "suspended":
+            return {"can_send": False, "reason": "Account is temporarily suspended"}
+        elif status in ["active", "online"]:
+            return {"can_send": True, "reason": "Account is active"}
 
-        return {'can_send': False, 'reason': f'Unknown account status: {status}'}
+        return {"can_send": False, "reason": f"Unknown account status: {status}"}
 
     def calculate_account_health_score(self, phone_number: str) -> Dict[str, Any]:
         """Calculate overall health score for an account."""
         account = self.repository.get_account_by_phone(phone_number)
         if not account:
-            return {'health_score': 0, 'issues': ['Account not found']}
+            return {"health_score": 0, "issues": ["Account not found"]}
 
         score = 100
         issues = []
 
         # Business logic for health scoring
-        if account.get('status') != 'active':
+        if account.get("status") != "active":
             score -= 50
             issues.append(f"Account status: {account.get('status')}")
 
-        if account.get('error_count', 0) > 10:
+        if account.get("error_count", 0) > 10:
             score -= 20
             issues.append("High error count")
 
-        if account.get('last_success') and (datetime.now() - datetime.fromisoformat(account['last_success'])).days > 7:
+        if (
+            account.get("last_success")
+            and (datetime.now() - datetime.fromisoformat(account["last_success"])).days > 7
+        ):
             score -= 15
             issues.append("No successful operations recently")
 
         return {
-            'health_score': max(0, score),
-            'issues': issues,
-            'recommendations': self._get_health_recommendations(score, issues)
+            "health_score": max(0, score),
+            "issues": issues,
+            "recommendations": self._get_health_recommendations(score, issues),
         }
 
     def _get_health_recommendations(self, score: int, issues: List[str]) -> List[str]:
@@ -243,18 +252,20 @@ class AccountService(BaseService):
         recommendations = []
 
         if score < 30:
-            recommendations.append("Account requires immediate attention - consider creating a new account")
+            recommendations.append(
+                "Account requires immediate attention - consider creating a new account"
+            )
         elif score < 50:
             recommendations.append("Account has significant issues - review error logs")
         elif score < 70:
             recommendations.append("Account performance is degraded - monitor closely")
 
         for issue in issues:
-            if 'banned' in issue.lower():
+            if "banned" in issue.lower():
                 recommendations.append("Account appears banned - avoid using this account")
-            elif 'error' in issue.lower():
+            elif "error" in issue.lower():
                 recommendations.append("Review recent errors and adjust usage patterns")
-            elif 'recent' in issue.lower():
+            elif "recent" in issue.lower():
                 recommendations.append("Account needs activity - send some test messages")
 
         return recommendations
@@ -282,9 +293,9 @@ class BusinessLogicCoordinator:
 
         # Calculate system metrics
         total_accounts = len(accounts)
-        active_accounts = sum(1 for acc in accounts if acc.get('status') == 'active')
+        active_accounts = sum(1 for acc in accounts if acc.get("status") == "active")
         total_campaigns = len(campaigns)
-        running_campaigns = sum(1 for camp in campaigns if camp.get('status') == 'running')
+        running_campaigns = sum(1 for camp in campaigns if camp.get("status") == "running")
 
         # Overall health score (simplified)
         health_score = 100
@@ -294,17 +305,14 @@ class BusinessLogicCoordinator:
             health_score -= 20
 
         return {
-            'overall_health': health_score,
-            'accounts': {
-                'total': total_accounts,
-                'active': active_accounts,
-                'health_percentage': (active_accounts / max(total_accounts, 1)) * 100
+            "overall_health": health_score,
+            "accounts": {
+                "total": total_accounts,
+                "active": active_accounts,
+                "health_percentage": (active_accounts / max(total_accounts, 1)) * 100,
             },
-            'campaigns': {
-                'total': total_campaigns,
-                'running': running_campaigns
-            },
-            'recommendations': self._get_system_recommendations(health_score)
+            "campaigns": {"total": total_campaigns, "running": running_campaigns},
+            "recommendations": self._get_system_recommendations(health_score),
         }
 
     def _get_system_recommendations(self, health_score: int) -> List[str]:
@@ -312,8 +320,12 @@ class BusinessLogicCoordinator:
         recommendations = []
 
         if health_score < 50:
-            recommendations.append("System health is poor - review account statuses and campaign configurations")
+            recommendations.append(
+                "System health is poor - review account statuses and campaign configurations"
+            )
         elif health_score < 80:
-            recommendations.append("System performance could be improved - consider optimizing campaign targeting")
+            recommendations.append(
+                "System performance could be improved - consider optimizing campaign targeting"
+            )
 
         return recommendations

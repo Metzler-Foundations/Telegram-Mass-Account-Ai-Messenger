@@ -19,23 +19,38 @@ from pyrogram import Client
 from pyrogram.types import ChatMember, Chat, Message, User, Reaction, Poll
 from pyrogram.enums import ChatMemberStatus, ChatMembersFilter, ChatType
 from pyrogram.errors import (
-    FloodWait, UserPrivacyRestricted, UserBlocked, PeerIdInvalid,
-    UserDeactivated, UserBannedInChannel, ChatWriteForbidden,
-    AuthKeyInvalid, SessionPasswordNeeded, PhoneCodeInvalid,
-    PhoneCodeExpired, BadRequest
+    FloodWait,
+    UserPrivacyRestricted,
+    UserBlocked,
+    PeerIdInvalid,
+    UserDeactivated,
+    UserBannedInChannel,
+    ChatWriteForbidden,
+    AuthKeyInvalid,
+    SessionPasswordNeeded,
+    PhoneCodeInvalid,
+    PhoneCodeExpired,
+    BadRequest,
 )
 
 # Import refactored modules
 from .models import (
-    ScrapingRisk, AccountHealth, SessionMetrics, GeographicProfile,
-    ScrapingMethod, JobStatus, ScrapingJob, ScrapingConfig,
-    calculate_risk_score
+    ScrapingRisk,
+    AccountHealth,
+    SessionMetrics,
+    GeographicProfile,
+    ScrapingMethod,
+    JobStatus,
+    ScrapingJob,
+    ScrapingConfig,
+    calculate_risk_score,
 )
 from .database import MemberDatabase
 
 # Import resumable scraping
 try:
     from scraping.resumable_scraper import get_resumable_scraper_manager
+
     RESUMABLE_SCRAPING_AVAILABLE = True
 except ImportError:
     RESUMABLE_SCRAPING_AVAILABLE = False
@@ -47,7 +62,7 @@ def _linear_regression(x, y):
     """
     Calculate simple linear regression slope.
     Compatible fallback for Python < 3.10 (statistics.linear_regression was added in 3.10).
-    
+
     Returns:
         tuple: (slope, intercept)
     """
@@ -59,22 +74,22 @@ def _linear_regression(x, y):
         n = len(x)
         if n < 2:
             return (0.0, 0.0)
-        
+
         x_list = list(x)
         y_list = list(y)
-        
+
         sum_x = sum(x_list)
         sum_y = sum(y_list)
         sum_xy = sum(x_list[i] * y_list[i] for i in range(n))
-        sum_x2 = sum(xi ** 2 for xi in x_list)
-        
-        denominator = n * sum_x2 - sum_x ** 2
+        sum_x2 = sum(xi**2 for xi in x_list)
+
+        denominator = n * sum_x2 - sum_x**2
         if denominator == 0:
             return (0.0, sum_y / n if n > 0 else 0.0)
-        
+
         slope = (n * sum_xy - sum_x * sum_y) / denominator
         intercept = (sum_y - slope * sum_x) / n
-        
+
         return (slope, intercept)
 
 
@@ -93,7 +108,7 @@ class EliteAntiDetectionSystem:
             ScrapingRisk.LOW: 0.25,
             ScrapingRisk.MEDIUM: 0.5,
             ScrapingRisk.HIGH: 0.75,
-            ScrapingRisk.CRITICAL: 0.9
+            ScrapingRisk.CRITICAL: 0.9,
         }
         self._load_geographic_profiles()
         self._init_database()
@@ -102,7 +117,8 @@ class EliteAntiDetectionSystem:
     def _init_database(self):
         """Initialize anti-detection database."""
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS session_metrics (
                     account_id TEXT PRIMARY KEY,
                     requests_per_minute REAL DEFAULT 0,
@@ -114,9 +130,11 @@ class EliteAntiDetectionSystem:
                     ban_probability REAL DEFAULT 0,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
+            """
+            )
 
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS request_history (
                     id INTEGER PRIMARY KEY,
                     account_id TEXT,
@@ -128,9 +146,11 @@ class EliteAntiDetectionSystem:
                     ip_address TEXT,
                     user_agent TEXT
                 )
-            ''')
+            """
+            )
 
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS behavioral_patterns (
                     account_id TEXT,
                     pattern_type TEXT,
@@ -138,42 +158,56 @@ class EliteAntiDetectionSystem:
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (account_id, pattern_type, timestamp)
                 )
-            ''')
+            """
+            )
 
     def _load_geographic_profiles(self):
         """Load geographic profiles for IP rotation."""
         # Predefined profiles for major regions
         profiles = {
             "us_east": GeographicProfile(
-                country_code="US", timezone="UTC-5", language="en_US",
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                country_code="US",
+                timezone="UTC-5",
+                language="en_US",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             ),
             "us_west": GeographicProfile(
-                country_code="US", timezone="UTC-8", language="en_US",
-                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+                country_code="US",
+                timezone="UTC-8",
+                language="en_US",
+                user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             ),
             "eu_central": GeographicProfile(
-                country_code="DE", timezone="UTC+1", language="de_DE",
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0"
+                country_code="DE",
+                timezone="UTC+1",
+                language="de_DE",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0",
             ),
             "eu_west": GeographicProfile(
-                country_code="GB", timezone="UTC+0", language="en_GB",
-                user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+                country_code="GB",
+                timezone="UTC+0",
+                language="en_GB",
+                user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36",
             ),
             "asia_east": GeographicProfile(
-                country_code="JP", timezone="UTC+9", language="ja_JP",
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                country_code="JP",
+                timezone="UTC+9",
+                language="ja_JP",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             ),
             "asia_south": GeographicProfile(
-                country_code="IN", timezone="UTC+5:30", language="hi_IN",
-                user_agent="Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36"
-            )
+                country_code="IN",
+                timezone="UTC+5:30",
+                language="hi_IN",
+                user_agent="Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36",
+            ),
         }
         self.geographic_profiles.update(profiles)
 
     def _start_health_monitoring(self):
         """Start real-time health monitoring."""
         import threading
+
         self.monitoring_active = True
         self.monitor_thread = threading.Thread(target=self._health_monitor_loop, daemon=True)
         self.monitor_thread.start()
@@ -228,22 +262,38 @@ class EliteAntiDetectionSystem:
         """Persist metrics to database."""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute('''
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO session_metrics
                     (account_id, requests_per_minute, error_rate, avg_response_time,
                      last_activity, health_score, risk_level, ban_probability, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    account_id, metrics.requests_per_minute, metrics.error_rate,
-                    metrics.avg_response_time, metrics.last_activity, metrics.health_score,
-                    metrics.risk_level.value, metrics.ban_probability, datetime.now()
-                ))
+                """,
+                    (
+                        account_id,
+                        metrics.requests_per_minute,
+                        metrics.error_rate,
+                        metrics.avg_response_time,
+                        metrics.last_activity,
+                        metrics.health_score,
+                        metrics.risk_level.value,
+                        metrics.ban_probability,
+                        datetime.now(),
+                    ),
+                )
         except Exception as e:
             logger.error(f"Failed to persist metrics for {account_id}: {e}")
 
-    def record_request(self, account_id: str, request_type: str, response_time: float,
-                      success: bool, error_type: str = None, ip_address: str = None,
-                      user_agent: str = None):
+    def record_request(
+        self,
+        account_id: str,
+        request_type: str,
+        response_time: float,
+        success: bool,
+        error_type: str = None,
+        ip_address: str = None,
+        user_agent: str = None,
+    ):
         """Record a request for analytics."""
         timestamp = datetime.now()
 
@@ -256,9 +306,9 @@ class EliteAntiDetectionSystem:
         metrics.last_activity = timestamp
 
         # Update error rate
-        recent_requests = [r for r in self.request_history if r['account_id'] == account_id][-100:]
+        recent_requests = [r for r in self.request_history if r["account_id"] == account_id][-100:]
         if recent_requests:
-            error_count = sum(1 for r in recent_requests if not r['success'])
+            error_count = sum(1 for r in recent_requests if not r["success"])
             metrics.error_rate = error_count / len(recent_requests)
 
         # Update response time (exponential moving average)
@@ -272,25 +322,38 @@ class EliteAntiDetectionSystem:
         self.behavioral_patterns[account_id].append(error_value)
 
         # Store request history
-        self.request_history.append({
-            'account_id': account_id,
-            'timestamp': timestamp,
-            'request_type': request_type,
-            'response_time': response_time,
-            'success': success,
-            'error_type': error_type,
-            'ip_address': ip_address,
-            'user_agent': user_agent
-        })
+        self.request_history.append(
+            {
+                "account_id": account_id,
+                "timestamp": timestamp,
+                "request_type": request_type,
+                "response_time": response_time,
+                "success": success,
+                "error_type": error_type,
+                "ip_address": ip_address,
+                "user_agent": user_agent,
+            }
+        )
 
         # Persist to database
         try:
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute('''
+                conn.execute(
+                    """
                     INSERT INTO request_history
                     (account_id, request_type, response_time, success, error_type, ip_address, user_agent)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (account_id, request_type, response_time, success, error_type, ip_address, user_agent))
+                """,
+                    (
+                        account_id,
+                        request_type,
+                        response_time,
+                        success,
+                        error_type,
+                        ip_address,
+                        user_agent,
+                    ),
+                )
         except Exception as e:
             logger.error(f"Failed to persist request history: {e}")
 
@@ -298,8 +361,9 @@ class EliteAntiDetectionSystem:
         """Calculate requests per minute for an account."""
         cutoff = datetime.now() - timedelta(minutes=1)
         recent_requests = [
-            r for r in self.request_history
-            if r['account_id'] == account_id and r['timestamp'] > cutoff
+            r
+            for r in self.request_history
+            if r["account_id"] == account_id and r["timestamp"] > cutoff
         ]
         return len(recent_requests)
 
@@ -320,7 +384,7 @@ class EliteAntiDetectionSystem:
                 ScrapingRisk.LOW: 1.2,
                 ScrapingRisk.MEDIUM: 1.5,
                 ScrapingRisk.HIGH: 2.0,
-                ScrapingRisk.CRITICAL: 3.0
+                ScrapingRisk.CRITICAL: 3.0,
             }
             base_delay *= risk_multipliers.get(metrics.risk_level, 1.0)
 
@@ -381,8 +445,9 @@ class EliteAntiDetectionSystem:
         """Load metrics from database."""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                row = conn.execute('SELECT * FROM session_metrics WHERE account_id = ?',
-                                 (account_id,)).fetchone()
+                row = conn.execute(
+                    "SELECT * FROM session_metrics WHERE account_id = ?", (account_id,)
+                ).fetchone()
                 if row:
                     metrics = SessionMetrics(
                         account_id=row[0],
@@ -391,7 +456,7 @@ class EliteAntiDetectionSystem:
                         avg_response_time=row[3],
                         last_activity=datetime.fromisoformat(row[4]) if row[4] else None,
                         health_score=row[5],
-                        ban_probability=row[7]
+                        ban_probability=row[7],
                     )
                     metrics.risk_level = ScrapingRisk(row[6]) if row[6] else ScrapingRisk.SAFE
                     self.session_metrics[account_id] = metrics
@@ -401,14 +466,18 @@ class EliteAntiDetectionSystem:
     def shutdown(self):
         """Shutdown the anti-detection system."""
         self.monitoring_active = False
-        if hasattr(self, 'monitor_thread'):
+        if hasattr(self, "monitor_thread"):
             self.monitor_thread.join(timeout=5)
 
 
 class DistributedScrapingCoordinator:
     """Coordinates scraping across multiple accounts and sessions."""
 
-    def __init__(self, anti_detection_system: EliteAntiDetectionSystem, performance_profile: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        anti_detection_system: EliteAntiDetectionSystem,
+        performance_profile: Optional[Dict[str, Any]] = None,
+    ):
         """Initialize the distributed scraping coordinator."""
         self.anti_detection = anti_detection_system
         self.active_sessions: Dict[str, Dict] = {}
@@ -417,7 +486,11 @@ class DistributedScrapingCoordinator:
         self.worker_tasks: Set[asyncio.Task] = set()
         self.performance_profile = performance_profile or {}
         self.low_power = bool(self.performance_profile.get("low_power", False))
-        perf_scraping = self.performance_profile.get("scraping", {}) if isinstance(self.performance_profile, dict) else {}
+        perf_scraping = (
+            self.performance_profile.get("scraping", {})
+            if isinstance(self.performance_profile, dict)
+            else {}
+        )
         base_workers = perf_scraping.get("max_workers", 5)
         if self.low_power:
             base_workers = min(base_workers, perf_scraping.get("max_workers_low_power", 2))
@@ -434,29 +507,40 @@ class DistributedScrapingCoordinator:
                 return
 
             # Get available accounts from the account manager
-            available_accounts = account_manager.get_account_list() if hasattr(account_manager, 'get_account_list') else []
+            available_accounts = (
+                account_manager.get_account_list()
+                if hasattr(account_manager, "get_account_list")
+                else []
+            )
 
             for account in available_accounts:
-                phone_number = account.get('phone_number')
+                phone_number = account.get("phone_number")
                 if phone_number:
                     # Determine geographic region based on phone number
                     region = self._determine_geographic_region(phone_number)
 
                     # Get or create client for this account
-                    if hasattr(account_manager, 'active_clients') and phone_number in account_manager.active_clients:
+                    if (
+                        hasattr(account_manager, "active_clients")
+                        and phone_number in account_manager.active_clients
+                    ):
                         client = account_manager.active_clients[phone_number]
                         # Get the actual Pyrogram client
-                        if hasattr(client, 'client'):
+                        if hasattr(client, "client"):
                             actual_client = client.client
                         else:
                             actual_client = client
                     else:
                         # Try to get client directly from account manager
-                        actual_client = getattr(account_manager, 'get_client', lambda x: None)(phone_number)
+                        actual_client = getattr(account_manager, "get_client", lambda x: None)(
+                            phone_number
+                        )
 
                     if actual_client:
                         self.session_pool[phone_number] = actual_client
-                        logger.info(f"Added account {phone_number} to session pool (region: {region})")
+                        logger.info(
+                            f"Added account {phone_number} to session pool (region: {region})"
+                        )
 
             logger.info(f"Session pool initialized with {len(self.session_pool)} accounts")
 
@@ -465,23 +549,23 @@ class DistributedScrapingCoordinator:
 
     def _determine_geographic_region(self, phone_number: str) -> str:
         """Determine geographic region from phone number."""
-        phone_str = str(phone_number).replace('+', '')
+        phone_str = str(phone_number).replace("+", "")
 
         # Simple region detection based on country codes
-        if phone_str.startswith(('1', '001')):  # US/Canada
-            return 'us_east'  # Default to east coast
-        elif phone_str.startswith(('44', '0044')):  # UK
-            return 'eu_west'
-        elif phone_str.startswith(('49', '0049')):  # Germany
-            return 'eu_central'
-        elif phone_str.startswith(('81', '0081')):  # Japan
-            return 'asia_east'
-        elif phone_str.startswith(('91', '0091')):  # India
-            return 'asia_south'
-        elif phone_str.startswith(('7', '007')):  # Russia
-            return 'eu_east'
+        if phone_str.startswith(("1", "001")):  # US/Canada
+            return "us_east"  # Default to east coast
+        elif phone_str.startswith(("44", "0044")):  # UK
+            return "eu_west"
+        elif phone_str.startswith(("49", "0049")):  # Germany
+            return "eu_central"
+        elif phone_str.startswith(("81", "0081")):  # Japan
+            return "asia_east"
+        elif phone_str.startswith(("91", "0091")):  # India
+            return "asia_south"
+        elif phone_str.startswith(("7", "007")):  # Russia
+            return "eu_east"
         else:
-            return 'us_east'  # Default fallback
+            return "us_east"  # Default fallback
 
     async def distribute_scraping_task(self, task: Dict) -> Dict:
         """Distribute a scraping task across optimal sessions."""
@@ -489,28 +573,27 @@ class DistributedScrapingCoordinator:
         best_account = await self._select_optimal_account(task)
 
         if not best_account:
-            return {'success': False, 'error': 'No suitable accounts available'}
+            return {"success": False, "error": "No suitable accounts available"}
 
         # Queue task for the selected account
-        await self.task_queue.put({
-            'account_id': best_account,
-            'task': task,
-            'priority': task.get('priority', 1)
-        })
+        await self.task_queue.put(
+            {"account_id": best_account, "task": task, "priority": task.get("priority", 1)}
+        )
 
-        return {'success': True, 'account_id': best_account}
+        return {"success": True, "account_id": best_account}
 
     async def _select_optimal_account(self, task: Dict) -> Optional[str]:
         """Select the optimal account for a task."""
-        target_region = task.get('geographic_region', 'us_east')
+        target_region = task.get("geographic_region", "us_east")
 
         # Get accounts for the target region
         candidates = self.session_pool.get(target_region, [])
 
         if not candidates:
             # Fall back to any available account
-            candidates = [acc for region_accounts in self.session_pool.values()
-                         for acc in region_accounts]
+            candidates = [
+                acc for region_accounts in self.session_pool.values() for acc in region_accounts
+            ]
 
         if not candidates:
             return None
@@ -524,8 +607,13 @@ class DistributedScrapingCoordinator:
                 continue
 
             health = self.anti_detection.get_account_health(account_id)
-            current_load = len([t for t in self.worker_tasks
-                              if not t.done() and getattr(t, 'account_id', None) == account_id])
+            current_load = len(
+                [
+                    t
+                    for t in self.worker_tasks
+                    if not t.done() and getattr(t, "account_id", None) == account_id
+                ]
+            )
 
             # Calculate score (higher is better)
             health_score = {
@@ -533,7 +621,7 @@ class DistributedScrapingCoordinator:
                 AccountHealth.GOOD: 75,
                 AccountHealth.FAIR: 50,
                 AccountHealth.POOR: 25,
-                AccountHealth.CRITICAL: 0
+                AccountHealth.CRITICAL: 0,
             }.get(health, 0)
 
             load_penalty = current_load * 20  # Penalize loaded accounts
@@ -562,8 +650,8 @@ class DistributedScrapingCoordinator:
                 except asyncio.TimeoutError:
                     continue
 
-                account_id = task_data['account_id']
-                task = task_data['task']
+                account_id = task_data["account_id"]
+                task = task_data["task"]
 
                 # Execute task
                 result = await self._execute_task(account_id, task)
@@ -580,17 +668,17 @@ class DistributedScrapingCoordinator:
 
     async def _execute_task(self, account_id: str, task: Dict) -> Dict:
         """Execute a scraping task."""
-        task_type = task.get('type')
+        task_type = task.get("type")
         start_time = time.time()
 
         try:
-            if task_type == 'scrape_channel':
+            if task_type == "scrape_channel":
                 # This would call the actual scraping logic
                 result = await self._scrape_channel_task(account_id, task)
-            elif task_type == 'analyze_member':
+            elif task_type == "analyze_member":
                 result = await self._analyze_member_task(account_id, task)
             else:
-                result = {'success': False, 'error': f'Unknown task type: {task_type}'}
+                result = {"success": False, "error": f"Unknown task type: {task_type}"}
 
             # Record metrics
             response_time = time.time() - start_time
@@ -598,8 +686,8 @@ class DistributedScrapingCoordinator:
                 account_id=account_id,
                 request_type=task_type,
                 response_time=response_time,
-                success=result.get('success', False),
-                error_type=result.get('error')
+                success=result.get("success", False),
+                error_type=result.get("error"),
             )
 
             return result
@@ -612,15 +700,15 @@ class DistributedScrapingCoordinator:
                 request_type=task_type,
                 response_time=response_time,
                 success=False,
-                error_type=str(e)
+                error_type=str(e),
             )
-            return {'success': False, 'error': str(e)}
+            return {"success": False, "error": str(e)}
 
     async def _scrape_channel_task(self, account_id: str, task: Dict) -> Dict:
         """Execute channel scraping task."""
-        channel_id = task.get('channel_id')
+        channel_id = task.get("channel_id")
         if not channel_id:
-            return {'success': False, 'error': 'No channel_id provided'}
+            return {"success": False, "error": "No channel_id provided"}
 
         logger.info(f"Scraping channel {channel_id} with account {account_id}")
 
@@ -628,26 +716,28 @@ class DistributedScrapingCoordinator:
         if scraper and hasattr(scraper, "scrape_channel_members"):
             return await scraper.scrape_channel_members(
                 channel_id,
-                analyze_messages=task.get('analyze_messages', True),
-                use_elite_scraping=task.get('use_elite_scraping', False)
+                analyze_messages=task.get("analyze_messages", True),
+                use_elite_scraping=task.get("use_elite_scraping", False),
             )
 
         if hasattr(self, "elite_scraper"):
             return await self.elite_scraper.scrape_channel_comprehensive(
                 channel_id,
-                techniques=['direct_members', 'message_history', 'reaction_analysis']
-                if task.get('analyze_messages', True)
-                else ['direct_members'],
-                max_depth=2
+                techniques=(
+                    ["direct_members", "message_history", "reaction_analysis"]
+                    if task.get("analyze_messages", True)
+                    else ["direct_members"]
+                ),
+                max_depth=2,
             )
 
-        return {'success': False, 'error': 'No scraping backend configured'}
+        return {"success": False, "error": "No scraping backend configured"}
 
     async def _analyze_member_task(self, account_id: str, task: Dict) -> Dict:
         """Execute member analysis task."""
-        user_id = task.get('user_id')
+        user_id = task.get("user_id")
         if not user_id:
-            return {'success': False, 'error': 'No user_id provided'}
+            return {"success": False, "error": "No user_id provided"}
 
         logger.info(f"Analyzing member {user_id} with account {account_id}")
 
@@ -656,14 +746,14 @@ class DistributedScrapingCoordinator:
             profile = analyzer.db.get_member(user_id)
             if profile:
                 return {
-                    'success': True,
-                    'user_id': user_id,
-                    'analysis_complete': True,
-                    'score': profile.get('engagement_score'),
-                    'last_seen': profile.get('last_seen'),
+                    "success": True,
+                    "user_id": user_id,
+                    "analysis_complete": True,
+                    "score": profile.get("engagement_score"),
+                    "last_seen": profile.get("last_seen"),
                 }
 
-        return {'success': False, 'error': 'Member analysis backend not configured'}
+        return {"success": False, "error": "Member analysis backend not configured"}
 
 
 class ThreatDetector:
@@ -672,138 +762,159 @@ class ThreatDetector:
     def __init__(self, tuning: Optional[Dict[str, Any]] = None):
         """Initialize threat detector."""
         self.threat_keywords = [
-            'admin', 'moderator', 'mod', 'owner', 'creator',
-            'security', 'report', 'spam', 'ban', 'kick',
-            'enforcement', 'compliance', 'violation'
+            "admin",
+            "moderator",
+            "mod",
+            "owner",
+            "creator",
+            "security",
+            "report",
+            "spam",
+            "ban",
+            "kick",
+            "enforcement",
+            "compliance",
+            "violation",
         ]
-        
+
         self.suspicious_patterns = [
-            r'admin', r'mod', r'owner', r'creator',
-            r'security', r'enforcement', r'compliance'
+            r"admin",
+            r"mod",
+            r"owner",
+            r"creator",
+            r"security",
+            r"enforcement",
+            r"compliance",
         ]
 
         self.weight_config = {
-            'owner': 100,
-            'admin': 80,
-            'moderator': 60,
-            'very_active': 40,
-            'active': 20,
-            'regular': 10,
-            'very_recent': 30,
-            'recent': 15,
-            'suspicious_pattern': 25,
-            'verified': 20,
-            'premium': 10,
-            'has_photo': 5
+            "owner": 100,
+            "admin": 80,
+            "moderator": 60,
+            "very_active": 40,
+            "active": 20,
+            "regular": 10,
+            "very_recent": 30,
+            "recent": 15,
+            "suspicious_pattern": 25,
+            "verified": 20,
+            "premium": 10,
+            "has_photo": 5,
         }
         if tuning and isinstance(tuning, dict):
-            overrides = tuning.get('weights', {})
+            overrides = tuning.get("weights", {})
             if overrides:
                 logger.info(
                     "Applying threat-detector weight overrides: %s",
-                    {k: overrides[k] for k in sorted(overrides.keys())}
+                    {k: overrides[k] for k in sorted(overrides.keys())},
                 )
             self.weight_config.update(overrides)
 
-        self.safe_threshold = (tuning or {}).get('safe_threshold', 50)
+        self.safe_threshold = (tuning or {}).get("safe_threshold", 50)
         logger.debug(
             "Threat detector initialized with safe_threshold=%s and %d weights",
             self.safe_threshold,
-            len(self.weight_config)
+            len(self.weight_config),
         )
-    
-    def calculate_threat_score(self, member: ChatMember, message_count: int = 0,
-                               is_admin: bool = False, is_moderator: bool = False,
-                               is_owner: bool = False, last_message_days: int = None) -> Tuple[int, List[str]]:
+
+    def calculate_threat_score(
+        self,
+        member: ChatMember,
+        message_count: int = 0,
+        is_admin: bool = False,
+        is_moderator: bool = False,
+        is_owner: bool = False,
+        last_message_days: int = None,
+    ) -> Tuple[int, List[str]]:
         """Calculate threat score for a member.
-        
+
         Returns:
             Tuple of (threat_score, threat_reasons)
         """
         threat_score = 0
         reasons = []
         weights = self.weight_config
-        
+
         # Owner is highest threat
         if is_owner or member.status == ChatMemberStatus.OWNER:
-            threat_score += weights.get('owner', 100)
+            threat_score += weights.get("owner", 100)
             reasons.append("Channel/Group Owner")
-        
+
         # Admin is high threat
         if is_admin or member.status == ChatMemberStatus.ADMINISTRATOR:
-            threat_score += weights.get('admin', 80)
+            threat_score += weights.get("admin", 80)
             reasons.append("Administrator")
-        
+
         # Moderator is medium-high threat
         if is_moderator:
-            threat_score += weights.get('moderator', 60)
+            threat_score += weights.get("moderator", 60)
             reasons.append("Moderator")
-        
+
         # Very active users (likely to report)
         if message_count > 100:
-            threat_score += weights.get('very_active', 40)
+            threat_score += weights.get("very_active", 40)
             reasons.append(f"Very active ({message_count} messages)")
         elif message_count > 50:
-            threat_score += weights.get('active', 20)
+            threat_score += weights.get("active", 20)
             reasons.append(f"Active user ({message_count} messages)")
         elif message_count > 20:
-            threat_score += weights.get('regular', 10)
+            threat_score += weights.get("regular", 10)
             reasons.append(f"Regular poster ({message_count} messages)")
-        
+
         # Recent activity (more likely to notice and report)
         if last_message_days is not None and last_message_days <= 1:
-            threat_score += weights.get('very_recent', 30)
+            threat_score += weights.get("very_recent", 30)
             reasons.append("Very recent activity")
         elif last_message_days is not None and last_message_days <= 7:
-            threat_score += weights.get('recent', 15)
+            threat_score += weights.get("recent", 15)
             reasons.append("Recent activity")
-        
+
         # Check username for suspicious patterns
         username = member.user.username or ""
         first_name = member.user.first_name or ""
         full_name = f"{first_name} {member.user.last_name or ''}".lower()
-        
+
         for pattern in self.suspicious_patterns:
             if re.search(pattern, username.lower()) or re.search(pattern, full_name):
-                threat_score += weights.get('suspicious_pattern', 25)
+                threat_score += weights.get("suspicious_pattern", 25)
                 reasons.append("Suspicious username/name pattern")
                 break
-        
+
         # Verified accounts (more likely to report)
-        if getattr(member.user, 'is_verified', False):
-            threat_score += weights.get('verified', 20)
+        if getattr(member.user, "is_verified", False):
+            threat_score += weights.get("verified", 20)
             reasons.append("Verified account")
-        
+
         # Premium users (more engaged, more likely to report)
-        if getattr(member.user, 'is_premium', False):
-            threat_score += weights.get('premium', 10)
+        if getattr(member.user, "is_premium", False):
+            threat_score += weights.get("premium", 10)
             reasons.append("Premium user")
-        
+
         # Accounts with profile photos (more engaged)
-        if getattr(member.user, 'photo', None):
-            threat_score += weights.get('has_photo', 5)
+        if getattr(member.user, "photo", None):
+            threat_score += weights.get("has_photo", 5)
 
         return threat_score, reasons
-    
+
     def is_safe_target(self, threat_score: int, reasons: List[str]) -> bool:
         """Determine if member is safe to target.
-        
+
         Args:
             threat_score: Calculated threat score
             reasons: List of threat reasons
-            
+
         Returns:
             True if safe to target, False otherwise
         """
         # High threat score = not safe
         if threat_score >= self.safe_threshold:
             return False
-        
+
         # Has admin/mod/owner status = not safe
-        admin_keywords = ['owner', 'administrator', 'moderator']
-        if any(keyword in ' '.join(reasons).lower() for keyword in admin_keywords):
+        admin_keywords = ["owner", "administrator", "moderator"]
+        if any(keyword in " ".join(reasons).lower() for keyword in admin_keywords):
             return False
-        
+
         return True
 
 
@@ -825,31 +936,36 @@ class ComprehensiveDataExtractor:
             import pytesseract
             from PIL import Image
             import numpy as np
-            self.profile_analyzers['ocr'] = self._analyze_profile_photo_ocr
-            self.profile_analyzers['metadata'] = self._analyze_profile_photo_metadata
+
+            self.profile_analyzers["ocr"] = self._analyze_profile_photo_ocr
+            self.profile_analyzers["metadata"] = self._analyze_profile_photo_metadata
         except ImportError:
-            logger.warning("Profile photo analysis not available - install opencv-python, pytesseract, pillow")
+            logger.warning(
+                "Profile photo analysis not available - install opencv-python, pytesseract, pillow"
+            )
 
         # Bio analysis
         try:
             import nltk
             from textblob import TextBlob
-            self.profile_analyzers['sentiment'] = self._analyze_bio_sentiment
-            self.profile_analyzers['keywords'] = self._analyze_bio_keywords
+
+            self.profile_analyzers["sentiment"] = self._analyze_bio_sentiment
+            self.profile_analyzers["keywords"] = self._analyze_bio_keywords
         except ImportError:
             logger.warning("Bio analysis not available - install nltk, textblob")
 
         # Activity pattern recognition
-        self.activity_analyzers['temporal'] = self._analyze_temporal_patterns
-        self.activity_analyzers['frequency'] = self._analyze_message_frequency
-        self.activity_analyzers['engagement'] = self._analyze_engagement_patterns
+        self.activity_analyzers["temporal"] = self._analyze_temporal_patterns
+        self.activity_analyzers["frequency"] = self._analyze_message_frequency
+        self.activity_analyzers["engagement"] = self._analyze_engagement_patterns
 
         # Network analysis
-        self.network_analyzers['connections'] = self._analyze_connection_network
-        self.network_analyzers['influence'] = self._analyze_influence_score
+        self.network_analyzers["connections"] = self._analyze_connection_network
+        self.network_analyzers["influence"] = self._analyze_influence_score
 
-    async def extract_comprehensive_member_data(self, client: Client, user: User,
-                                               channel_context: Dict = None) -> Dict[str, Any]:
+    async def extract_comprehensive_member_data(
+        self, client: Client, user: User, channel_context: Dict = None
+    ) -> Dict[str, Any]:
         """Extract ALL available data about a member.
 
         Returns comprehensive member profile with advanced analysis.
@@ -858,21 +974,25 @@ class ComprehensiveDataExtractor:
 
         # Enhanced data extraction
         enhanced_data = {
-            'profile_analysis': await self._analyze_profile_comprehensive(client, user),
-            'activity_patterns': await self._analyze_activity_patterns(client, user, channel_context),
-            'network_analysis': await self._analyze_network_connections(client, user),
-            'behavioral_insights': await self._analyze_behavioral_patterns(client, user),
-            'risk_assessment': await self._assess_member_risks(client, user),
-            'messaging_potential': await self._assess_messaging_potential(client, user),
-            'extraction_timestamp': datetime.now(),
-            'data_completeness_score': 0.0  # Will be calculated
+            "profile_analysis": await self._analyze_profile_comprehensive(client, user),
+            "activity_patterns": await self._analyze_activity_patterns(
+                client, user, channel_context
+            ),
+            "network_analysis": await self._analyze_network_connections(client, user),
+            "behavioral_insights": await self._analyze_behavioral_patterns(client, user),
+            "risk_assessment": await self._assess_member_risks(client, user),
+            "messaging_potential": await self._assess_messaging_potential(client, user),
+            "extraction_timestamp": datetime.now(),
+            "data_completeness_score": 0.0,  # Will be calculated
         }
 
         # Merge all data
         comprehensive_profile = {**base_data, **enhanced_data}
 
         # Calculate data completeness
-        comprehensive_profile['data_completeness_score'] = self._calculate_completeness_score(comprehensive_profile)
+        comprehensive_profile["data_completeness_score"] = self._calculate_completeness_score(
+            comprehensive_profile
+        )
 
         return comprehensive_profile
 
@@ -880,40 +1000,48 @@ class ComprehensiveDataExtractor:
         """Extract all basic Telegram API data fields."""
         # Extract all available User fields
         user_data = {
-            'user_id': user.id,
-            'is_bot': user.is_bot,
-            'is_deleted': getattr(user, 'is_deleted', False),
-            'is_verified': getattr(user, 'is_verified', False),
-            'is_restricted': getattr(user, 'is_restricted', False),
-            'is_scam': getattr(user, 'is_scam', False),
-            'is_fake': getattr(user, 'is_fake', False),
-            'is_premium': getattr(user, 'is_premium', False),
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'username': user.username,
-            'phone_number': getattr(user, 'phone_number', None),
-            'profile_photo_id': getattr(getattr(user, 'photo', None), 'big_file_id', None) if hasattr(user, 'photo') else None,
-            'photo_small_id': getattr(getattr(user, 'photo', ''), 'small_file_id', None) if hasattr(user, 'photo') else None,
-            'status': str(getattr(user, 'status', 'unknown')),
-            'last_online_date': getattr(user, 'last_online_date', None),
-            'next_offline_date': getattr(user, 'next_offline_date', None),
-            'language_code': getattr(user, 'language_code', None),
-            'region_code': getattr(user, 'region_code', None),
-            'dc_id': getattr(user, 'dc_id', None),
-            'emoji_status': getattr(getattr(user, 'emoji_status', None), 'custom_emoji_id', None),
-            'bio': getattr(user, 'bio', None),
-            'restrictions': getattr(user, 'restrictions', []),
-            'mention': user.mention if hasattr(user, 'mention') else None,
+            "user_id": user.id,
+            "is_bot": user.is_bot,
+            "is_deleted": getattr(user, "is_deleted", False),
+            "is_verified": getattr(user, "is_verified", False),
+            "is_restricted": getattr(user, "is_restricted", False),
+            "is_scam": getattr(user, "is_scam", False),
+            "is_fake": getattr(user, "is_fake", False),
+            "is_premium": getattr(user, "is_premium", False),
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "username": user.username,
+            "phone_number": getattr(user, "phone_number", None),
+            "profile_photo_id": (
+                getattr(getattr(user, "photo", None), "big_file_id", None)
+                if hasattr(user, "photo")
+                else None
+            ),
+            "photo_small_id": (
+                getattr(getattr(user, "photo", ""), "small_file_id", None)
+                if hasattr(user, "photo")
+                else None
+            ),
+            "status": str(getattr(user, "status", "unknown")),
+            "last_online_date": getattr(user, "last_online_date", None),
+            "next_offline_date": getattr(user, "next_offline_date", None),
+            "language_code": getattr(user, "language_code", None),
+            "region_code": getattr(user, "region_code", None),
+            "dc_id": getattr(user, "dc_id", None),
+            "emoji_status": getattr(getattr(user, "emoji_status", None), "custom_emoji_id", None),
+            "bio": getattr(user, "bio", None),
+            "restrictions": getattr(user, "restrictions", []),
+            "mention": user.mention if hasattr(user, "mention") else None,
         }
 
         # Extract additional fields that might be available
         try:
             # Try to get full user profile
             full_user = await client.get_users(user.id)
-            if full_user and hasattr(full_user, 'bio'):
-                user_data['bio'] = full_user.bio
-            if full_user and hasattr(full_user, 'common_chats_count'):
-                user_data['common_chats_count'] = full_user.common_chats_count
+            if full_user and hasattr(full_user, "bio"):
+                user_data["bio"] = full_user.bio
+            if full_user and hasattr(full_user, "common_chats_count"):
+                user_data["common_chats_count"] = full_user.common_chats_count
         except Exception as e:
             logger.debug(f"Could not get extended user data for {user.id}: {e}")
 
@@ -922,59 +1050,62 @@ class ComprehensiveDataExtractor:
     async def _analyze_profile_comprehensive(self, client: Client, user: User) -> Dict[str, Any]:
         """Comprehensive profile analysis."""
         analysis = {
-            'photo_analysis': {},
-            'bio_analysis': {},
-            'name_analysis': {},
-            'username_analysis': {},
-            'account_age_analysis': {}
+            "photo_analysis": {},
+            "bio_analysis": {},
+            "name_analysis": {},
+            "username_analysis": {},
+            "account_age_analysis": {},
         }
 
         # Profile photo analysis
-        if hasattr(user, 'photo') and user.photo:
-            analysis['photo_analysis'] = await self._analyze_profile_photo(client, user.photo)
+        if hasattr(user, "photo") and user.photo:
+            analysis["photo_analysis"] = await self._analyze_profile_photo(client, user.photo)
 
         # Bio analysis
-        if hasattr(user, 'bio') and user.bio:
-            analysis['bio_analysis'] = self._analyze_bio_comprehensive(user.bio)
+        if hasattr(user, "bio") and user.bio:
+            analysis["bio_analysis"] = self._analyze_bio_comprehensive(user.bio)
 
         # Name analysis
-        analysis['name_analysis'] = self._analyze_name_patterns(user.first_name, user.last_name)
+        analysis["name_analysis"] = self._analyze_name_patterns(user.first_name, user.last_name)
 
         # Username analysis
         if user.username:
-            analysis['username_analysis'] = self._analyze_username_patterns(user.username)
+            analysis["username_analysis"] = self._analyze_username_patterns(user.username)
 
         # Account age estimation
-        analysis['account_age_analysis'] = self._estimate_account_age(user.id)
+        analysis["account_age_analysis"] = self._estimate_account_age(user.id)
 
         return analysis
 
     async def _analyze_profile_photo(self, client: Client, photo) -> Dict[str, Any]:
         """Advanced profile photo analysis."""
         analysis = {
-            'has_photo': True,
-            'photo_metadata': {},
-            'ocr_text': '',
-            'visual_features': {},
-            'quality_score': 0.0
+            "has_photo": True,
+            "photo_metadata": {},
+            "ocr_text": "",
+            "visual_features": {},
+            "quality_score": 0.0,
         }
 
         try:
             # Download photo for analysis
-            photo_path = await client.download_media(photo.big_file_id, file_name=f"temp_{photo.big_file_id}.jpg")
+            photo_path = await client.download_media(
+                photo.big_file_id, file_name=f"temp_{photo.big_file_id}.jpg"
+            )
 
-            if photo_path and 'ocr' in self.profile_analyzers:
-                analysis['ocr_text'] = self.profile_analyzers['ocr'](photo_path)
+            if photo_path and "ocr" in self.profile_analyzers:
+                analysis["ocr_text"] = self.profile_analyzers["ocr"](photo_path)
 
-            if photo_path and 'metadata' in self.profile_analyzers:
-                analysis['photo_metadata'] = self.profile_analyzers['metadata'](photo_path)
+            if photo_path and "metadata" in self.profile_analyzers:
+                analysis["photo_metadata"] = self.profile_analyzers["metadata"](photo_path)
 
             # Calculate quality score
-            analysis['quality_score'] = self._calculate_photo_quality_score(analysis)
+            analysis["quality_score"] = self._calculate_photo_quality_score(analysis)
 
             # Clean up
             if photo_path:
                 import os
+
                 try:
                     os.remove(photo_path)
                 except (OSError, FileNotFoundError):
@@ -983,7 +1114,7 @@ class ComprehensiveDataExtractor:
 
         except Exception as e:
             logger.debug(f"Photo analysis failed: {e}")
-            analysis['has_photo'] = False
+            analysis["has_photo"] = False
 
         return analysis
 
@@ -1005,10 +1136,10 @@ class ComprehensiveDataExtractor:
             _, threshold = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
             # OCR
-            text = pytesseract.image_to_string(threshold, lang='eng')
+            text = pytesseract.image_to_string(threshold, lang="eng")
 
             # Clean up text
-            text = ' '.join(text.split())  # Remove extra whitespace
+            text = " ".join(text.split())  # Remove extra whitespace
 
             return text[:500]  # Limit length
 
@@ -1025,27 +1156,27 @@ class ComprehensiveDataExtractor:
             import os
 
             # Get file size
-            metadata['file_size'] = os.path.getsize(photo_path)
+            metadata["file_size"] = os.path.getsize(photo_path)
 
             # Open image and get dimensions
             with Image.open(photo_path) as img:
-                metadata['width'] = img.width
-                metadata['height'] = img.height
-                metadata['format'] = img.format
-                metadata['mode'] = img.mode
+                metadata["width"] = img.width
+                metadata["height"] = img.height
+                metadata["format"] = img.format
+                metadata["mode"] = img.mode
 
                 # Check if it's animated
-                metadata['is_animated'] = hasattr(img, 'is_animated') and img.is_animated
+                metadata["is_animated"] = hasattr(img, "is_animated") and img.is_animated
 
                 # Color analysis
-                if img.mode in ['RGB', 'RGBA']:
+                if img.mode in ["RGB", "RGBA"]:
                     # Get dominant colors
                     img.thumbnail((100, 100))
                     colors = img.getcolors(100 * 100)
                     if colors:
                         # Sort by frequency and get top 5
                         colors.sort(key=lambda x: x[0], reverse=True)
-                        metadata['dominant_colors'] = colors[:5]
+                        metadata["dominant_colors"] = colors[:5]
 
         except Exception as e:
             logger.debug(f"Metadata analysis failed: {e}")
@@ -1057,16 +1188,16 @@ class ComprehensiveDataExtractor:
         score = 0.5  # Base score
 
         # Higher score for having OCR text (suggests text/logos)
-        if analysis.get('ocr_text', '').strip():
+        if analysis.get("ocr_text", "").strip():
             score += 0.2
 
         # Higher score for larger images
-        metadata = analysis.get('photo_metadata', {})
-        if metadata.get('width', 0) > 200 and metadata.get('height', 0) > 200:
+        metadata = analysis.get("photo_metadata", {})
+        if metadata.get("width", 0) > 200 and metadata.get("height", 0) > 200:
             score += 0.1
 
         # Lower score for very small files (likely default/empty photos)
-        if metadata.get('file_size', 0) < 1000:
+        if metadata.get("file_size", 0) < 1000:
             score -= 0.3
 
         return max(0.0, min(1.0, score))
@@ -1074,37 +1205,40 @@ class ComprehensiveDataExtractor:
     def _analyze_bio_comprehensive(self, bio: str) -> Dict[str, Any]:
         """Comprehensive bio analysis."""
         analysis = {
-            'length': len(bio),
-            'word_count': len(bio.split()),
-            'language': 'unknown',
-            'sentiment': {'polarity': 0.0, 'subjectivity': 0.0},
-            'keywords': [],
-            'hashtags': [],
-            'mentions': [],
-            'urls': [],
-            'emojis': [],
-            'categories': []
+            "length": len(bio),
+            "word_count": len(bio.split()),
+            "language": "unknown",
+            "sentiment": {"polarity": 0.0, "subjectivity": 0.0},
+            "keywords": [],
+            "hashtags": [],
+            "mentions": [],
+            "urls": [],
+            "emojis": [],
+            "categories": [],
         }
 
         # Extract patterns
-        analysis['hashtags'] = re.findall(r'#\w+', bio)
-        analysis['mentions'] = re.findall(r'@\w+', bio)
-        analysis['urls'] = re.findall(r'https?://[^\s]+', bio)
-        analysis['emojis'] = re.findall(r'[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF]', bio)
+        analysis["hashtags"] = re.findall(r"#\w+", bio)
+        analysis["mentions"] = re.findall(r"@\w+", bio)
+        analysis["urls"] = re.findall(r"https?://[^\s]+", bio)
+        analysis["emojis"] = re.findall(
+            r"[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF]",
+            bio,
+        )
 
         # Sentiment analysis
-        if 'sentiment' in self.profile_analyzers:
-            analysis['sentiment'] = self.profile_analyzers['sentiment'](bio)
+        if "sentiment" in self.profile_analyzers:
+            analysis["sentiment"] = self.profile_analyzers["sentiment"](bio)
 
         # Keyword extraction
-        if 'keywords' in self.profile_analyzers:
-            analysis['keywords'] = self.profile_analyzers['keywords'](bio)
+        if "keywords" in self.profile_analyzers:
+            analysis["keywords"] = self.profile_analyzers["keywords"](bio)
 
         # Language detection
-        analysis['language'] = self._detect_language(bio)
+        analysis["language"] = self._detect_language(bio)
 
         # Categorization
-        analysis['categories'] = self._categorize_bio(bio)
+        analysis["categories"] = self._categorize_bio(bio)
 
         return analysis
 
@@ -1115,12 +1249,12 @@ class ComprehensiveDataExtractor:
 
             blob = TextBlob(bio)
             return {
-                'polarity': blob.sentiment.polarity,  # -1 to 1
-                'subjectivity': blob.sentiment.subjectivity  # 0 to 1
+                "polarity": blob.sentiment.polarity,  # -1 to 1
+                "subjectivity": blob.sentiment.subjectivity,  # 0 to 1
             }
         except (ImportError, AttributeError, Exception) as e:
             logger.debug(f"Bio sentiment analysis failed: {e}")
-            return {'polarity': 0.0, 'subjectivity': 0.5}
+            return {"polarity": 0.0, "subjectivity": 0.5}
 
     def _analyze_bio_keywords(self, bio: str) -> List[str]:
         """Extract keywords from bio."""
@@ -1131,31 +1265,37 @@ class ComprehensiveDataExtractor:
 
             # Download required NLTK data if needed
             try:
-                stopwords.words('english')
+                stopwords.words("english")
             except LookupError:
-                nltk.download('stopwords')
-                nltk.download('punkt')
+                nltk.download("stopwords")
+                nltk.download("punkt")
 
             # Tokenize and clean
             tokens = word_tokenize(bio.lower())
-            stop_words = set(stopwords.words('english'))
-            keywords = [word for word in tokens if word.isalnum() and word not in stop_words and len(word) > 2]
+            stop_words = set(stopwords.words("english"))
+            keywords = [
+                word
+                for word in tokens
+                if word.isalnum() and word not in stop_words and len(word) > 2
+            ]
 
             # Get most common keywords
             from collections import Counter
+
             counter = Counter(keywords)
             return [word for word, count in counter.most_common(10)]
 
         except (ImportError, LookupError, AttributeError, Exception) as e:
             # Fallback: simple word extraction
             logger.debug(f"Advanced keyword analysis failed: {e}")
-            words = re.findall(r'\b\w{3,}\b', bio.lower())
+            words = re.findall(r"\b\w{3,}\b", bio.lower())
             return list(set(words))[:10]
 
     def _detect_language(self, text: str) -> str:
         """Detect language of text."""
         try:
             from langdetect import detect
+
             return detect(text)
         except (ImportError, Exception) as e:
             # Fallback based on common patterns
@@ -1170,86 +1310,100 @@ class ComprehensiveDataExtractor:
         bio_lower = bio.lower()
 
         # Business/professional
-        if any(word in bio_lower for word in ['business', 'company', 'entrepreneur', 'professional', 'ceo', 'founder']):
-            categories.append('business')
+        if any(
+            word in bio_lower
+            for word in ["business", "company", "entrepreneur", "professional", "ceo", "founder"]
+        ):
+            categories.append("business")
 
         # Technology
-        if any(word in bio_lower for word in ['tech', 'developer', 'programmer', 'coder', 'software', 'engineer']):
-            categories.append('technology')
+        if any(
+            word in bio_lower
+            for word in ["tech", "developer", "programmer", "coder", "software", "engineer"]
+        ):
+            categories.append("technology")
 
         # Creative
-        if any(word in bio_lower for word in ['artist', 'designer', 'creative', 'photographer', 'musician']):
-            categories.append('creative')
+        if any(
+            word in bio_lower
+            for word in ["artist", "designer", "creative", "photographer", "musician"]
+        ):
+            categories.append("creative")
 
         # Gaming
-        if any(word in bio_lower for word in ['gamer', 'gaming', 'game', 'player']):
-            categories.append('gaming')
+        if any(word in bio_lower for word in ["gamer", "gaming", "game", "player"]):
+            categories.append("gaming")
 
         # Sports
-        if any(word in bio_lower for word in ['football', 'basketball', 'soccer', 'sport', 'fitness']):
-            categories.append('sports')
+        if any(
+            word in bio_lower for word in ["football", "basketball", "soccer", "sport", "fitness"]
+        ):
+            categories.append("sports")
 
         # Education
-        if any(word in bio_lower for word in ['student', 'teacher', 'professor', 'university', 'school']):
-            categories.append('education')
+        if any(
+            word in bio_lower
+            for word in ["student", "teacher", "professor", "university", "school"]
+        ):
+            categories.append("education")
 
-        return categories if categories else ['general']
+        return categories if categories else ["general"]
 
     def _analyze_name_patterns(self, first_name: str, last_name: str) -> Dict[str, Any]:
         """Analyze name patterns."""
         analysis = {
-            'name_length': len((first_name or '') + (last_name or '')),
-            'has_last_name': bool(last_name),
-            'name_complexity': 0,
-            'likely_gender': 'unknown',
-            'cultural_origin': 'unknown'
+            "name_length": len((first_name or "") + (last_name or "")),
+            "has_last_name": bool(last_name),
+            "name_complexity": 0,
+            "likely_gender": "unknown",
+            "cultural_origin": "unknown",
         }
 
         full_name = f"{first_name or ''} {last_name or ''}".strip()
 
         # Name complexity (more unique characters = more complex)
         unique_chars = len(set(full_name.lower()))
-        analysis['name_complexity'] = unique_chars / max(len(full_name), 1)
+        analysis["name_complexity"] = unique_chars / max(len(full_name), 1)
 
         # Simple gender detection based on common patterns
         if first_name:
             first_lower = first_name.lower()
-            if first_lower.endswith(('a', 'e', 'i', 'y')) and len(first_name) > 2:
-                analysis['likely_gender'] = 'female'
-            elif first_lower.endswith(('o', 'r', 'k', 'd')) and len(first_name) > 2:
-                analysis['likely_gender'] = 'male'
+            if first_lower.endswith(("a", "e", "i", "y")) and len(first_name) > 2:
+                analysis["likely_gender"] = "female"
+            elif first_lower.endswith(("o", "r", "k", "d")) and len(first_name) > 2:
+                analysis["likely_gender"] = "male"
 
         return analysis
 
     def _analyze_username_patterns(self, username: str) -> Dict[str, Any]:
         """Analyze username patterns."""
         analysis = {
-            'length': len(username),
-            'has_numbers': bool(re.search(r'\d', username)),
-            'has_underscores': '_' in username,
-            'has_dots': '.' in username,
-            'pattern_type': 'unknown',
-            'likely_category': 'personal'
+            "length": len(username),
+            "has_numbers": bool(re.search(r"\d", username)),
+            "has_underscores": "_" in username,
+            "has_dots": "." in username,
+            "pattern_type": "unknown",
+            "likely_category": "personal",
         }
 
         # Pattern recognition
-        if re.match(r'^\w{1,8}\d{1,4}$', username):
-            analysis['pattern_type'] = 'name_with_numbers'
-        elif re.match(r'^\w+_\w+$', username):
-            analysis['pattern_type'] = 'two_words_underscore'
-        elif re.match(r'^\w+\.\w+$', username):
-            analysis['pattern_type'] = 'two_words_dot'
-        elif re.match(r'^\d+', username):
-            analysis['pattern_type'] = 'starts_with_number'
+        if re.match(r"^\w{1,8}\d{1,4}$", username):
+            analysis["pattern_type"] = "name_with_numbers"
+        elif re.match(r"^\w+_\w+$", username):
+            analysis["pattern_type"] = "two_words_underscore"
+        elif re.match(r"^\w+\.\w+$", username):
+            analysis["pattern_type"] = "two_words_dot"
+        elif re.match(r"^\d+", username):
+            analysis["pattern_type"] = "starts_with_number"
 
         # Category detection
         username_lower = username.lower()
-        if any(word in username_lower for word in ['bot', 'admin', 'support', 'official']):
-            analysis['likely_category'] = 'official'
-        elif any(word in username_lower for word in ['news', 'media', 'press']):
-            analysis['likely_category'] = 'media'
-        elif any(word in username_lower for word in ['store', 'shop', 'sell', 'buy']):
-            analysis['likely_category'] = 'business'
+        if any(word in username_lower for word in ["bot", "admin", "support", "official"]):
+            analysis["likely_category"] = "official"
+        elif any(word in username_lower for word in ["news", "media", "press"]):
+            analysis["likely_category"] = "media"
+        elif any(word in username_lower for word in ["store", "shop", "sell", "buy"]):
+            analysis["likely_category"] = "business"
 
         return analysis
 
@@ -1268,54 +1422,55 @@ class ComprehensiveDataExtractor:
             creation_date = datetime(2015, 1, 1) + timedelta(days=days_since_base)
 
         return {
-            'estimated_creation_date': creation_date,
-            'account_age_days': (datetime.now() - creation_date).days,
-            'account_age_years': (datetime.now() - creation_date).days / 365,
-            'confidence': 'low'  # This is a very rough estimation
+            "estimated_creation_date": creation_date,
+            "account_age_days": (datetime.now() - creation_date).days,
+            "account_age_years": (datetime.now() - creation_date).days / 365,
+            "confidence": "low",  # This is a very rough estimation
         }
 
-    async def _analyze_activity_patterns(self, client: Client, user: User,
-                                       channel_context: Dict = None) -> Dict[str, Any]:
+    async def _analyze_activity_patterns(
+        self, client: Client, user: User, channel_context: Dict = None
+    ) -> Dict[str, Any]:
         """Analyze user's activity patterns with real data processing."""
         patterns = {
-            'message_frequency': {},
-            'temporal_patterns': {},
-            'engagement_patterns': {},
-            'channel_participation': {}
+            "message_frequency": {},
+            "temporal_patterns": {},
+            "engagement_patterns": {},
+            "channel_participation": {},
         }
 
         # Get message history for analysis
         message_timestamps = []
         message_types = []
         engagement_metrics = {
-            'replies_received': 0,
-            'reactions_received': 0,
-            'forwards': 0,
-            'media_shares': 0
+            "replies_received": 0,
+            "reactions_received": 0,
+            "forwards": 0,
+            "media_shares": 0,
         }
 
         try:
             # Analyze recent messages (limit for performance)
-            async for message in client.get_chat_history(channel_context['id'], limit=200):
+            async for message in client.get_chat_history(channel_context["id"], limit=200):
                 if message.from_user and message.from_user.id == user.id:
                     message_timestamps.append(message.date)
 
                     # Categorize message types
                     if message.reply_to_message:
-                        message_types.append('reply')
-                        engagement_metrics['replies_received'] += 1
+                        message_types.append("reply")
+                        engagement_metrics["replies_received"] += 1
                     elif message.photo or message.video or message.document:
-                        message_types.append('media')
-                        engagement_metrics['media_shares'] += 1
+                        message_types.append("media")
+                        engagement_metrics["media_shares"] += 1
                     elif message.forward_date:
-                        message_types.append('forward')
-                        engagement_metrics['forwards'] += 1
+                        message_types.append("forward")
+                        engagement_metrics["forwards"] += 1
                     else:
-                        message_types.append('text')
+                        message_types.append("text")
 
                     # Count reactions (if available)
-                    if hasattr(message, 'reactions') and message.reactions:
-                        engagement_metrics['reactions_received'] += sum(
+                    if hasattr(message, "reactions") and message.reactions:
+                        engagement_metrics["reactions_received"] += sum(
                             reaction.count for reaction in message.reactions.reactions
                         )
 
@@ -1323,13 +1478,17 @@ class ComprehensiveDataExtractor:
             logger.debug(f"Could not analyze message history for activity patterns: {e}")
 
         # Analyze temporal patterns
-        patterns['temporal_patterns'] = self._analyze_temporal_patterns_real(message_timestamps)
+        patterns["temporal_patterns"] = self._analyze_temporal_patterns_real(message_timestamps)
 
         # Analyze message frequency
-        patterns['message_frequency'] = self._analyze_message_frequency_real(message_timestamps, len(message_types))
+        patterns["message_frequency"] = self._analyze_message_frequency_real(
+            message_timestamps, len(message_types)
+        )
 
         # Analyze engagement patterns
-        patterns['engagement_patterns'] = self._analyze_engagement_patterns_real(engagement_metrics, len(message_types))
+        patterns["engagement_patterns"] = self._analyze_engagement_patterns_real(
+            engagement_metrics, len(message_types)
+        )
 
         return patterns
 
@@ -1337,10 +1496,10 @@ class ComprehensiveDataExtractor:
         """Analyze real temporal activity patterns."""
         if not timestamps:
             return {
-                'active_hours': [],
-                'active_days': [],
-                'timezone_estimate': 'unknown',
-                'activity_consistency': 0.0
+                "active_hours": [],
+                "active_days": [],
+                "timezone_estimate": "unknown",
+                "activity_consistency": 0.0,
             }
 
         # Extract hour and day patterns
@@ -1378,7 +1537,10 @@ class ComprehensiveDataExtractor:
         if len(timestamps) > 1:
             # Sort timestamps and calculate gaps
             sorted_ts = sorted(timestamps)
-            gaps = [(sorted_ts[i+1] - sorted_ts[i]).total_seconds() / 3600 for i in range(len(sorted_ts)-1)]
+            gaps = [
+                (sorted_ts[i + 1] - sorted_ts[i]).total_seconds() / 3600
+                for i in range(len(sorted_ts) - 1)
+            ]
             if gaps:
                 avg_gap = sum(gaps) / len(gaps)
                 std_gap = statistics.stdev(gaps) if len(gaps) > 1 else 0
@@ -1389,21 +1551,23 @@ class ComprehensiveDataExtractor:
             consistency = 0.0
 
         return {
-            'active_hours': active_hours,
-            'active_days': active_days,
-            'timezone_estimate': timezone_estimate,
-            'activity_consistency': min(1.0, consistency),
-            'total_messages_analyzed': len(timestamps)
+            "active_hours": active_hours,
+            "active_days": active_days,
+            "timezone_estimate": timezone_estimate,
+            "activity_consistency": min(1.0, consistency),
+            "total_messages_analyzed": len(timestamps),
         }
 
-    def _analyze_message_frequency_real(self, timestamps: List[datetime], total_messages: int) -> Dict[str, Any]:
+    def _analyze_message_frequency_real(
+        self, timestamps: List[datetime], total_messages: int
+    ) -> Dict[str, Any]:
         """Analyze real message frequency patterns."""
         if not timestamps:
             return {
-                'messages_per_day': 0,
-                'messages_per_week': 0,
-                'burst_patterns': False,
-                'consistency_score': 0.0
+                "messages_per_day": 0,
+                "messages_per_week": 0,
+                "burst_patterns": False,
+                "consistency_score": 0.0,
             }
 
         # Calculate time span
@@ -1423,8 +1587,9 @@ class ComprehensiveDataExtractor:
             sorted_ts = sorted(timestamps)
             # Check for messages within 5-minute windows
             for i in range(len(sorted_ts) - 2):
-                window_messages = [ts for ts in sorted_ts[i:i+5]
-                                 if (ts - sorted_ts[i]).total_seconds() < 300]  # 5 minutes
+                window_messages = [
+                    ts for ts in sorted_ts[i : i + 5] if (ts - sorted_ts[i]).total_seconds() < 300
+                ]  # 5 minutes
                 if len(window_messages) >= 3:
                     burst_patterns = True
                     break
@@ -1432,12 +1597,13 @@ class ComprehensiveDataExtractor:
         # Calculate consistency (coefficient of variation of inter-message times)
         if len(timestamps) > 2:
             sorted_ts = sorted(timestamps)
-            intervals = [(sorted_ts[i+1] - sorted_ts[i]).total_seconds()
-                        for i in range(len(sorted_ts)-1)]
+            intervals = [
+                (sorted_ts[i + 1] - sorted_ts[i]).total_seconds() for i in range(len(sorted_ts) - 1)
+            ]
             if intervals:
                 mean_interval = sum(intervals) / len(intervals)
                 variance = sum((i - mean_interval) ** 2 for i in intervals) / len(intervals)
-                std_dev = variance ** 0.5
+                std_dev = variance**0.5
                 consistency_score = 1 / (1 + (std_dev / max(mean_interval, 1)))
             else:
                 consistency_score = 0.5
@@ -1445,49 +1611,51 @@ class ComprehensiveDataExtractor:
             consistency_score = 0.0
 
         return {
-            'messages_per_day': messages_per_day,
-            'messages_per_week': messages_per_week,
-            'burst_patterns': burst_patterns,
-            'consistency_score': consistency_score,
-            'time_span_days': time_span_days
+            "messages_per_day": messages_per_day,
+            "messages_per_week": messages_per_week,
+            "burst_patterns": burst_patterns,
+            "consistency_score": consistency_score,
+            "time_span_days": time_span_days,
         }
 
-    def _analyze_engagement_patterns_real(self, engagement_metrics: Dict, total_messages: int) -> Dict[str, Any]:
+    def _analyze_engagement_patterns_real(
+        self, engagement_metrics: Dict, total_messages: int
+    ) -> Dict[str, Any]:
         """Analyze real engagement patterns."""
         if total_messages == 0:
             return {
-                'response_rate': 0.0,
-                'conversation_length': 0,
-                'interaction_types': [],
-                'engagement_score': 0.0
+                "response_rate": 0.0,
+                "conversation_length": 0,
+                "interaction_types": [],
+                "engagement_score": 0.0,
             }
 
         # Calculate engagement rates
-        reply_rate = engagement_metrics.get('replies_received', 0) / total_messages
-        reaction_rate = engagement_metrics.get('reactions_received', 0) / total_messages
-        forward_rate = engagement_metrics.get('forwards', 0) / total_messages
-        media_rate = engagement_metrics.get('media_shares', 0) / total_messages
+        reply_rate = engagement_metrics.get("replies_received", 0) / total_messages
+        reaction_rate = engagement_metrics.get("reactions_received", 0) / total_messages
+        forward_rate = engagement_metrics.get("forwards", 0) / total_messages
+        media_rate = engagement_metrics.get("media_shares", 0) / total_messages
 
         # Determine interaction types
         interaction_types = []
         if reply_rate > 0.1:
-            interaction_types.append('conversational')
+            interaction_types.append("conversational")
         if reaction_rate > 0.2:
-            interaction_types.append('reaction-prone')
+            interaction_types.append("reaction-prone")
         if forward_rate > 0.1:
-            interaction_types.append('content_sharer')
+            interaction_types.append("content_sharer")
         if media_rate > 0.3:
-            interaction_types.append('visual_content_creator')
+            interaction_types.append("visual_content_creator")
 
         if not interaction_types:
-            interaction_types = ['neutral']
+            interaction_types = ["neutral"]
 
         # Calculate engagement score (weighted combination)
         engagement_score = (
-            reply_rate * 0.4 +      # Conversations are most valuable
-            reaction_rate * 0.3 +   # Reactions show engagement
-            media_rate * 0.2 +      # Media sharing shows activity
-            forward_rate * 0.1      # Forwarding shows network activity
+            reply_rate * 0.4  # Conversations are most valuable
+            + reaction_rate * 0.3  # Reactions show engagement
+            + media_rate * 0.2  # Media sharing shows activity
+            + forward_rate * 0.1  # Forwarding shows network activity
         )
 
         # Estimate conversation length based on reply patterns
@@ -1501,16 +1669,16 @@ class ComprehensiveDataExtractor:
             conversation_length = "minimal"
 
         return {
-            'response_rate': reply_rate,
-            'conversation_length': conversation_length,
-            'interaction_types': interaction_types,
-            'engagement_score': min(1.0, engagement_score),
-            'detailed_metrics': {
-                'reply_rate': reply_rate,
-                'reaction_rate': reaction_rate,
-                'forward_rate': forward_rate,
-                'media_rate': media_rate
-            }
+            "response_rate": reply_rate,
+            "conversation_length": conversation_length,
+            "interaction_types": interaction_types,
+            "engagement_score": min(1.0, engagement_score),
+            "detailed_metrics": {
+                "reply_rate": reply_rate,
+                "reaction_rate": reaction_rate,
+                "forward_rate": forward_rate,
+                "media_rate": media_rate,
+            },
         }
 
     def _analyze_temporal_patterns(self, user: User) -> Dict[str, Any]:
@@ -1518,39 +1686,39 @@ class ComprehensiveDataExtractor:
         # This would require historical message data
         # For now, return basic structure
         return {
-            'active_hours': [],  # Hours when most active
-            'active_days': [],   # Days when most active
-            'timezone_estimate': 'unknown',
-            'activity_consistency': 0.0  # 0-1 scale
+            "active_hours": [],  # Hours when most active
+            "active_days": [],  # Days when most active
+            "timezone_estimate": "unknown",
+            "activity_consistency": 0.0,  # 0-1 scale
         }
 
     def _analyze_message_frequency(self, user: User) -> Dict[str, Any]:
         """Analyze message frequency patterns."""
         return {
-            'messages_per_day': 0,
-            'messages_per_week': 0,
-            'burst_patterns': False,
-            'consistency_score': 0.0
+            "messages_per_day": 0,
+            "messages_per_week": 0,
+            "burst_patterns": False,
+            "consistency_score": 0.0,
         }
 
     def _analyze_engagement_patterns(self, user: User) -> Dict[str, Any]:
         """Analyze engagement patterns."""
         return {
-            'response_rate': 0.0,
-            'conversation_length': 0,
-            'interaction_types': [],
-            'engagement_score': 0.0
+            "response_rate": 0.0,
+            "conversation_length": 0,
+            "interaction_types": [],
+            "engagement_score": 0.0,
         }
 
     async def _analyze_network_connections(self, client: Client, user: User) -> Dict[str, Any]:
         """Analyze user's network connections with real data."""
         connections = {
-            'common_chats_count': getattr(user, 'common_chats_count', 0),
-            'mutual_contacts': [],
-            'group_memberships': [],
-            'influence_score': 0.0,
-            'network_centrality': 0.0,
-            'community_membership': []
+            "common_chats_count": getattr(user, "common_chats_count", 0),
+            "mutual_contacts": [],
+            "group_memberships": [],
+            "influence_score": 0.0,
+            "network_centrality": 0.0,
+            "community_membership": [],
         }
 
         try:
@@ -1558,59 +1726,66 @@ class ComprehensiveDataExtractor:
             common_chats = []
             async for chat in client.get_common_chats(user.id):
                 chat_info = {
-                    'id': chat.id,
-                    'title': chat.title,
-                    'type': chat.type.value if hasattr(chat.type, 'value') else str(chat.type),
-                    'member_count': getattr(chat, 'members_count', 0),
-                    'is_admin': False  # Would need to check permissions
+                    "id": chat.id,
+                    "title": chat.title,
+                    "type": chat.type.value if hasattr(chat.type, "value") else str(chat.type),
+                    "member_count": getattr(chat, "members_count", 0),
+                    "is_admin": False,  # Would need to check permissions
                 }
                 common_chats.append(chat_info)
 
-            connections['common_chats_count'] = len(common_chats)
-            connections['group_memberships'] = common_chats
+            connections["common_chats_count"] = len(common_chats)
+            connections["group_memberships"] = common_chats
 
             # Analyze network centrality (how connected they are)
-            total_members = sum(chat.get('member_count', 0) for chat in common_chats)
+            total_members = sum(chat.get("member_count", 0) for chat in common_chats)
             avg_group_size = total_members / max(len(common_chats), 1)
 
             # Centrality score based on group count and sizes
             centrality_score = min(1.0, (len(common_chats) * 0.3 + avg_group_size * 0.001))
 
-            connections['network_centrality'] = centrality_score
+            connections["network_centrality"] = centrality_score
 
             # Calculate influence score based on network position
             influence_factors = {
-                'group_count': len(common_chats),
-                'avg_group_size': avg_group_size,
-                'admin_positions': sum(1 for chat in common_chats if chat.get('is_admin', False)),
-                'large_groups': sum(1 for chat in common_chats if chat.get('member_count', 0) > 1000)
+                "group_count": len(common_chats),
+                "avg_group_size": avg_group_size,
+                "admin_positions": sum(1 for chat in common_chats if chat.get("is_admin", False)),
+                "large_groups": sum(
+                    1 for chat in common_chats if chat.get("member_count", 0) > 1000
+                ),
             }
 
             # Influence formula: weighted combination of network factors
             influence_score = (
-                min(1.0, influence_factors['group_count'] / 10) * 0.4 +  # Group diversity
-                min(1.0, influence_factors['avg_group_size'] / 10000) * 0.3 +  # Group size influence
-                min(1.0, influence_factors['admin_positions'] / 5) * 0.2 +  # Leadership positions
-                min(1.0, influence_factors['large_groups'] / 3) * 0.1   # Large community presence
+                min(1.0, influence_factors["group_count"] / 10) * 0.4  # Group diversity
+                + min(1.0, influence_factors["avg_group_size"] / 10000)
+                * 0.3  # Group size influence
+                + min(1.0, influence_factors["admin_positions"] / 5) * 0.2  # Leadership positions
+                + min(1.0, influence_factors["large_groups"] / 3) * 0.1  # Large community presence
             )
 
-            connections['influence_score'] = influence_score
+            connections["influence_score"] = influence_score
 
             # Determine community membership categories
             communities = []
-            if any(chat.get('member_count', 0) > 50000 for chat in common_chats):
-                communities.append('mass_community')
-            if any('tech' in chat.get('title', '').lower() for chat in common_chats):
-                communities.append('technology')
-            if any('business' in chat.get('title', '').lower() or 'entrepreneur' in chat.get('title', '').lower() for chat in common_chats):
-                communities.append('business')
-            if any('gaming' in chat.get('title', '').lower() for chat in common_chats):
-                communities.append('gaming')
+            if any(chat.get("member_count", 0) > 50000 for chat in common_chats):
+                communities.append("mass_community")
+            if any("tech" in chat.get("title", "").lower() for chat in common_chats):
+                communities.append("technology")
+            if any(
+                "business" in chat.get("title", "").lower()
+                or "entrepreneur" in chat.get("title", "").lower()
+                for chat in common_chats
+            ):
+                communities.append("business")
+            if any("gaming" in chat.get("title", "").lower() for chat in common_chats):
+                communities.append("gaming")
 
             if not communities:
-                communities = ['general']
+                communities = ["general"]
 
-            connections['community_membership'] = communities
+            connections["community_membership"] = communities
 
         except Exception as e:
             logger.debug(f"Network analysis failed for user {user.id}: {e}")
@@ -1620,9 +1795,9 @@ class ComprehensiveDataExtractor:
     def _analyze_connection_network(self, user: User) -> Dict[str, Any]:
         """Analyze connection network."""
         return {
-            'estimated_network_size': 0,
-            'connection_quality_score': 0.0,
-            'network_diversity': 0.0
+            "estimated_network_size": 0,
+            "connection_quality_score": 0.0,
+            "network_diversity": 0.0,
         }
 
     def _analyze_influence_score(self, user: User) -> float:
@@ -1630,11 +1805,11 @@ class ComprehensiveDataExtractor:
         score = 0.0
 
         # Premium users have higher influence
-        if getattr(user, 'is_premium', False):
+        if getattr(user, "is_premium", False):
             score += 0.3
 
         # Verified users have high influence
-        if getattr(user, 'is_verified', False):
+        if getattr(user, "is_verified", False):
             score += 0.4
 
         # Username indicates professionalism
@@ -1642,11 +1817,11 @@ class ComprehensiveDataExtractor:
             score += 0.1
 
         # Bio length suggests engagement
-        if hasattr(user, 'bio') and user.bio and len(user.bio) > 20:
+        if hasattr(user, "bio") and user.bio and len(user.bio) > 20:
             score += 0.1
 
         # Profile photo suggests active account
-        if hasattr(user, 'photo'):
+        if hasattr(user, "photo"):
             score += 0.1
 
         return min(1.0, score)
@@ -1655,14 +1830,14 @@ class ComprehensiveDataExtractor:
         """Analyze behavioral patterns with real data processing."""
         # Gather data for analysis
         user_data = {
-            'has_username': bool(user.username),
-            'has_bio': bool(getattr(user, 'bio', None)),
-            'is_verified': getattr(user, 'is_verified', False),
-            'is_premium': getattr(user, 'is_premium', False),
-            'has_photo': bool(getattr(user, 'photo', None)),
-            'first_name': user.first_name or '',
-            'last_name': user.last_name or '',
-            'username': user.username or ''
+            "has_username": bool(user.username),
+            "has_bio": bool(getattr(user, "bio", None)),
+            "is_verified": getattr(user, "is_verified", False),
+            "is_premium": getattr(user, "is_premium", False),
+            "has_photo": bool(getattr(user, "photo", None)),
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "username": user.username or "",
         }
 
         # Analyze account type
@@ -1681,12 +1856,12 @@ class ComprehensiveDataExtractor:
         behavioral_score = self._calculate_behavioral_score(user_data, account_type, activity_level)
 
         return {
-            'account_type_prediction': account_type,
-            'activity_level': activity_level,
-            'engagement_style': engagement_style,
-            'communication_preferences': communication_preferences,
-            'behavioral_score': behavioral_score,
-            'analysis_factors': user_data
+            "account_type_prediction": account_type,
+            "activity_level": activity_level,
+            "engagement_style": engagement_style,
+            "communication_preferences": communication_preferences,
+            "behavioral_score": behavioral_score,
+            "analysis_factors": user_data,
         }
 
     def _predict_account_type(self, user_data: Dict) -> str:
@@ -1696,42 +1871,41 @@ class ComprehensiveDataExtractor:
         score_personal = 0
 
         # Business indicators
-        if user_data['is_verified']:
+        if user_data["is_verified"]:
             score_business += 3
-        if user_data['has_bio'] and len(user_data['has_bio']) > 50:
+        if user_data["has_bio"] and len(user_data["has_bio"]) > 50:
             score_business += 2
-        if 'company' in (user_data['bio'] or '').lower() or 'business' in (user_data['bio'] or '').lower():
+        if (
+            "company" in (user_data["bio"] or "").lower()
+            or "business" in (user_data["bio"] or "").lower()
+        ):
             score_business += 3
-        if user_data['is_premium']:
+        if user_data["is_premium"]:
             score_business += 1
-        if len((user_data['first_name'] + user_data['last_name']).strip()) > 20:
+        if len((user_data["first_name"] + user_data["last_name"]).strip()) > 20:
             score_business += 1  # Company names tend to be longer
 
         # Bot indicators
-        if 'bot' in user_data['username'].lower():
+        if "bot" in user_data["username"].lower():
             score_bot += 5
-        if not user_data['has_photo']:
+        if not user_data["has_photo"]:
             score_bot += 2
-        if not user_data['first_name'] and not user_data['last_name']:
+        if not user_data["first_name"] and not user_data["last_name"]:
             score_bot += 3
-        if len(user_data['username']) < 5:
+        if len(user_data["username"]) < 5:
             score_bot += 1
 
         # Personal indicators (default)
         score_personal = 5  # Base personal score
-        if user_data['has_photo']:
+        if user_data["has_photo"]:
             score_personal += 1
-        if user_data['first_name'] or user_data['last_name']:
+        if user_data["first_name"] or user_data["last_name"]:
             score_personal += 2
-        if user_data['has_bio'] and len(user_data['has_bio']) < 100:
+        if user_data["has_bio"] and len(user_data["has_bio"]) < 100:
             score_personal += 1
 
         # Determine winner
-        scores = {
-            'business': score_business,
-            'bot': score_bot,
-            'personal': score_personal
-        }
+        scores = {"business": score_business, "bot": score_bot, "personal": score_personal}
 
         return max(scores.items(), key=lambda x: x[1])[0]
 
@@ -1740,103 +1914,98 @@ class ComprehensiveDataExtractor:
         activity_score = 0
 
         # Profile completeness indicators
-        if user_data['has_username']:
+        if user_data["has_username"]:
             activity_score += 2
-        if user_data['has_photo']:
+        if user_data["has_photo"]:
             activity_score += 2
-        if user_data['has_bio']:
+        if user_data["has_bio"]:
             activity_score += 2
-        if user_data['first_name'] or user_data['last_name']:
+        if user_data["first_name"] or user_data["last_name"]:
             activity_score += 1
-        if user_data['is_premium']:
+        if user_data["is_premium"]:
             activity_score += 1
-        if user_data['is_verified']:
+        if user_data["is_verified"]:
             activity_score += 1
 
         # Categorize
         if activity_score >= 7:
-            return 'high'
+            return "high"
         elif activity_score >= 4:
-            return 'medium'
+            return "medium"
         else:
-            return 'low'
+            return "low"
 
     def _predict_engagement_style(self, user_data: Dict) -> str:
         """Predict engagement style based on profile characteristics."""
         # This would be enhanced with message analysis, but for now use profile indicators
-        if user_data['is_verified'] or user_data['is_premium']:
-            return 'active'  # Verified/premium users tend to be more engaged
-        elif user_data['has_bio'] and len(user_data['has_bio']) > 30:
-            return 'interactive'  # Detailed bio suggests communicative personality
-        elif user_data['has_photo'] and user_data['has_username']:
-            return 'active'  # Complete profile suggests active user
+        if user_data["is_verified"] or user_data["is_premium"]:
+            return "active"  # Verified/premium users tend to be more engaged
+        elif user_data["has_bio"] and len(user_data["has_bio"]) > 30:
+            return "interactive"  # Detailed bio suggests communicative personality
+        elif user_data["has_photo"] and user_data["has_username"]:
+            return "active"  # Complete profile suggests active user
         else:
-            return 'passive'
+            return "passive"
 
     def _analyze_communication_preferences(self, user_data: Dict) -> List[str]:
         """Analyze communication preferences based on profile."""
         preferences = []
 
         # Language preferences (would be enhanced with actual language detection)
-        if user_data.get('language_code'):
+        if user_data.get("language_code"):
             preferences.append(f"language:{user_data['language_code']}")
 
         # Content type preferences based on bio keywords
-        bio_text = (user_data.get('bio') or '').lower()
-        if any(word in bio_text for word in ['tech', 'developer', 'programmer', 'coder']):
-            preferences.append('technical_content')
-        if any(word in bio_text for word in ['business', 'entrepreneur', 'startup']):
-            preferences.append('business_content')
-        if any(word in bio_text for word in ['art', 'design', 'creative', 'photography']):
-            preferences.append('creative_content')
-        if any(word in bio_text for word in ['gaming', 'gamer', 'game']):
-            preferences.append('gaming_content')
+        bio_text = (user_data.get("bio") or "").lower()
+        if any(word in bio_text for word in ["tech", "developer", "programmer", "coder"]):
+            preferences.append("technical_content")
+        if any(word in bio_text for word in ["business", "entrepreneur", "startup"]):
+            preferences.append("business_content")
+        if any(word in bio_text for word in ["art", "design", "creative", "photography"]):
+            preferences.append("creative_content")
+        if any(word in bio_text for word in ["gaming", "gamer", "game"]):
+            preferences.append("gaming_content")
 
         # Communication style preferences
-        if user_data['is_verified']:
-            preferences.append('professional_communication')
-        if user_data['has_photo']:
-            preferences.append('visual_communication')
-        if len(user_data.get('bio') or '') > 50:
-            preferences.append('detailed_communication')
+        if user_data["is_verified"]:
+            preferences.append("professional_communication")
+        if user_data["has_photo"]:
+            preferences.append("visual_communication")
+        if len(user_data.get("bio") or "") > 50:
+            preferences.append("detailed_communication")
 
-        return preferences if preferences else ['general_communication']
+        return preferences if preferences else ["general_communication"]
 
-    def _calculate_behavioral_score(self, user_data: Dict, account_type: str,
-                                  activity_level: str) -> float:
+    def _calculate_behavioral_score(
+        self, user_data: Dict, account_type: str, activity_level: str
+    ) -> float:
         """Calculate overall behavioral score."""
         score = 0.5  # Base score
 
         # Account type weighting
-        type_weights = {
-            'personal': 1.0,
-            'business': 1.2,
-            'bot': 0.3
-        }
+        type_weights = {"personal": 1.0, "business": 1.2, "bot": 0.3}
         score *= type_weights.get(account_type, 1.0)
 
         # Activity level weighting
-        activity_weights = {
-            'high': 1.3,
-            'medium': 1.0,
-            'low': 0.7
-        }
+        activity_weights = {"high": 1.3, "medium": 1.0, "low": 0.7}
         score *= activity_weights.get(activity_level, 1.0)
 
         # Profile completeness bonus
-        completeness_factors = sum([
-            user_data['has_username'],
-            user_data['has_photo'],
-            user_data['has_bio'],
-            bool(user_data['first_name'] or user_data['last_name'])
-        ])
+        completeness_factors = sum(
+            [
+                user_data["has_username"],
+                user_data["has_photo"],
+                user_data["has_bio"],
+                bool(user_data["first_name"] or user_data["last_name"]),
+            ]
+        )
         completeness_bonus = completeness_factors * 0.1
         score += completeness_bonus
 
         # Premium/verified bonus
-        if user_data['is_premium']:
+        if user_data["is_premium"]:
             score += 0.1
-        if user_data['is_verified']:
+        if user_data["is_verified"]:
             score += 0.2
 
         return min(1.0, max(0.0, score))
@@ -1844,140 +2013,145 @@ class ComprehensiveDataExtractor:
     async def _assess_member_risks(self, client: Client, user: User) -> Dict[str, Any]:
         """Assess various risks associated with the member using comprehensive analysis."""
         risk_factors = []
-        risk_scores = {
-            'ban_risk': 0.0,
-            'spam_risk': 0.0,
-            'bot_risk': 0.0,
-            'scam_risk': 0.0
-        }
+        risk_scores = {"ban_risk": 0.0, "spam_risk": 0.0, "bot_risk": 0.0, "scam_risk": 0.0}
 
         # Analyze user characteristics for different risk types
         user_chars = {
-            'is_verified': getattr(user, 'is_verified', False),
-            'is_premium': getattr(user, 'is_premium', False),
-            'has_photo': bool(getattr(user, 'photo', None)),
-            'has_bio': bool(getattr(user, 'bio', None)),
-            'has_username': bool(user.username),
-            'username_length': len(user.username or ''),
-            'bio_length': len(getattr(user, 'bio', '') or ''),
-            'first_name': user.first_name or '',
-            'last_name': user.last_name or '',
-            'is_bot': user.is_bot
+            "is_verified": getattr(user, "is_verified", False),
+            "is_premium": getattr(user, "is_premium", False),
+            "has_photo": bool(getattr(user, "photo", None)),
+            "has_bio": bool(getattr(user, "bio", None)),
+            "has_username": bool(user.username),
+            "username_length": len(user.username or ""),
+            "bio_length": len(getattr(user, "bio", "") or ""),
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "is_bot": user.is_bot,
         }
 
         # Bot risk assessment
-        if user_chars['is_bot']:
-            risk_scores['bot_risk'] = 1.0
-            risk_factors.append('confirmed_bot_account')
+        if user_chars["is_bot"]:
+            risk_scores["bot_risk"] = 1.0
+            risk_factors.append("confirmed_bot_account")
 
-        if not user_chars['has_photo']:
-            risk_scores['bot_risk'] += 0.3
-            risk_factors.append('no_profile_photo')
+        if not user_chars["has_photo"]:
+            risk_scores["bot_risk"] += 0.3
+            risk_factors.append("no_profile_photo")
 
-        if not user_chars['first_name'] and not user_chars['last_name']:
-            risk_scores['bot_risk'] += 0.4
-            risk_factors.append('no_name_provided')
+        if not user_chars["first_name"] and not user_chars["last_name"]:
+            risk_scores["bot_risk"] += 0.4
+            risk_factors.append("no_name_provided")
 
-        if 'bot' in (user.username or '').lower():
-            risk_scores['bot_risk'] += 0.8
-            risk_factors.append('bot_in_username')
+        if "bot" in (user.username or "").lower():
+            risk_scores["bot_risk"] += 0.8
+            risk_factors.append("bot_in_username")
 
         # Spam risk assessment
-        if user_chars['bio_length'] > 200:
-            risk_scores['spam_risk'] += 0.2
-            risk_factors.append('excessively_long_bio')
+        if user_chars["bio_length"] > 200:
+            risk_scores["spam_risk"] += 0.2
+            risk_factors.append("excessively_long_bio")
 
-        if user_chars['username_length'] < 4:
-            risk_scores['spam_risk'] += 0.3
-            risk_factors.append('suspiciously_short_username')
+        if user_chars["username_length"] < 4:
+            risk_scores["spam_risk"] += 0.3
+            risk_factors.append("suspiciously_short_username")
 
-        spam_keywords = ['free', 'earn', 'money', 'cash', 'bitcoin', 'crypto', 'investment', 'guaranteed']
-        bio_text = (getattr(user, 'bio', '') or '').lower()
+        spam_keywords = [
+            "free",
+            "earn",
+            "money",
+            "cash",
+            "bitcoin",
+            "crypto",
+            "investment",
+            "guaranteed",
+        ]
+        bio_text = (getattr(user, "bio", "") or "").lower()
         if any(keyword in bio_text for keyword in spam_keywords):
-            risk_scores['spam_risk'] += 0.4
-            risk_factors.append('spam_keywords_in_bio')
+            risk_scores["spam_risk"] += 0.4
+            risk_factors.append("spam_keywords_in_bio")
 
         # Scam risk assessment
-        scam_indicators = ['invest', 'trading', 'forex', 'binary', 'options', 'guarantee', 'profit']
+        scam_indicators = ["invest", "trading", "forex", "binary", "options", "guarantee", "profit"]
         if any(indicator in bio_text for indicator in scam_indicators):
-            risk_scores['scam_risk'] += 0.5
-            risk_factors.append('investment_scam_indicators')
+            risk_scores["scam_risk"] += 0.5
+            risk_factors.append("investment_scam_indicators")
 
         # Check for suspicious links in bio
         import re
-        urls = re.findall(r'https?://[^\s]+', bio_text)
+
+        urls = re.findall(r"https?://[^\s]+", bio_text)
         if len(urls) > 2:
-            risk_scores['scam_risk'] += 0.3
-            risk_factors.append('multiple_links_in_bio')
+            risk_scores["scam_risk"] += 0.3
+            risk_factors.append("multiple_links_in_bio")
 
         # Ban risk assessment (users likely to report)
-        if user_chars['is_verified']:
-            risk_scores['ban_risk'] += 0.4
-            risk_factors.append('verified_account')
+        if user_chars["is_verified"]:
+            risk_scores["ban_risk"] += 0.4
+            risk_factors.append("verified_account")
 
-        if user_chars['is_premium']:
-            risk_scores['ban_risk'] += 0.2
-            risk_factors.append('premium_account')
+        if user_chars["is_premium"]:
+            risk_scores["ban_risk"] += 0.2
+            risk_factors.append("premium_account")
 
-        if user_chars['bio_length'] > 100:
-            risk_scores['ban_risk'] += 0.1
-            risk_factors.append('detailed_bio')
+        if user_chars["bio_length"] > 100:
+            risk_scores["ban_risk"] += 0.1
+            risk_factors.append("detailed_bio")
 
         # Overall risk score (weighted average)
         weights = {
-            'ban_risk': 0.5,    # Most important - can get you banned
-            'spam_risk': 0.3,   # Important - spam reports
-            'bot_risk': 0.15,   # Less important but suspicious
-            'scam_risk': 0.05   # Least important but still relevant
+            "ban_risk": 0.5,  # Most important - can get you banned
+            "spam_risk": 0.3,  # Important - spam reports
+            "bot_risk": 0.15,  # Less important but suspicious
+            "scam_risk": 0.05,  # Least important but still relevant
         }
 
         overall_risk = sum(risk_scores[risk_type] * weights[risk_type] for risk_type in risk_scores)
 
         return {
-            'ban_risk': min(1.0, risk_scores['ban_risk']),
-            'spam_risk': min(1.0, risk_scores['spam_risk']),
-            'bot_risk': min(1.0, risk_scores['bot_risk']),
-            'scam_risk': min(1.0, risk_scores['scam_risk']),
-            'overall_risk_score': min(1.0, overall_risk),
-            'risk_factors': risk_factors,
-            'risk_level': self._categorize_risk_level(overall_risk)
+            "ban_risk": min(1.0, risk_scores["ban_risk"]),
+            "spam_risk": min(1.0, risk_scores["spam_risk"]),
+            "bot_risk": min(1.0, risk_scores["bot_risk"]),
+            "scam_risk": min(1.0, risk_scores["scam_risk"]),
+            "overall_risk_score": min(1.0, overall_risk),
+            "risk_factors": risk_factors,
+            "risk_level": self._categorize_risk_level(overall_risk),
         }
 
     def _categorize_risk_level(self, risk_score: float) -> str:
         """Categorize risk level based on score."""
         if risk_score >= 0.7:
-            return 'critical'
+            return "critical"
         elif risk_score >= 0.5:
-            return 'high'
+            return "high"
         elif risk_score >= 0.3:
-            return 'medium'
+            return "medium"
         elif risk_score >= 0.1:
-            return 'low'
+            return "low"
         else:
-            return 'safe'
+            return "safe"
 
     async def _assess_messaging_potential(self, client: Client, user: User) -> Dict[str, Any]:
         """Assess how suitable this member is for messaging with comprehensive analysis."""
         # Gather all relevant data for assessment
         user_data = {
-            'user_id': user.id,
-            'has_username': bool(user.username),
-            'has_bio': bool(getattr(user, 'bio', None)),
-            'is_verified': getattr(user, 'is_verified', False),
-            'is_premium': getattr(user, 'is_premium', False),
-            'has_photo': bool(getattr(user, 'photo', None)),
-            'bio_length': len(getattr(user, 'bio', '') or ''),
-            'profile_completeness': 0.0  # Will be calculated
+            "user_id": user.id,
+            "has_username": bool(user.username),
+            "has_bio": bool(getattr(user, "bio", None)),
+            "is_verified": getattr(user, "is_verified", False),
+            "is_premium": getattr(user, "is_premium", False),
+            "has_photo": bool(getattr(user, "photo", None)),
+            "bio_length": len(getattr(user, "bio", "") or ""),
+            "profile_completeness": 0.0,  # Will be calculated
         }
 
         # Calculate profile completeness
         completeness_factors = [
-            user_data['has_username'],
-            user_data['has_photo'],
-            user_data['has_bio'] and user_data['bio_length'] > 10,
-            bool(user.first_name or user.last_name)
+            user_data["has_username"],
+            user_data["has_photo"],
+            user_data["has_bio"] and user_data["bio_length"] > 10,
+            bool(user.first_name or user.last_name),
         ]
-        user_data['profile_completeness'] = sum(completeness_factors) / len(completeness_factors)
+        user_data["profile_completeness"] = sum(completeness_factors) / len(completeness_factors)
 
         # Assess openness to messaging (response likelihood)
         openness_score = self._calculate_openness_score(user_data)
@@ -1989,32 +2163,32 @@ class ComprehensiveDataExtractor:
         value_score = self._calculate_value_score(user_data)
 
         # Combined messaging potential score
-        messaging_potential = (openness_score * 0.4 + engagement_score * 0.4 + value_score * 0.2)
+        messaging_potential = openness_score * 0.4 + engagement_score * 0.4 + value_score * 0.2
 
         # Determine recommendation category
         if messaging_potential >= 0.7:
-            recommendation = 'high'
+            recommendation = "high"
         elif messaging_potential >= 0.4:
-            recommendation = 'medium'
+            recommendation = "medium"
         else:
-            recommendation = 'low'
+            recommendation = "low"
 
         # Estimate best contact time (would be enhanced with activity pattern analysis)
         best_contact_time = self._estimate_best_contact_time(user_data)
 
         return {
-            'openness_score': openness_score,
-            'engagement_score': engagement_score,
-            'value_score': value_score,
-            'messaging_potential_score': messaging_potential,
-            'messaging_recommendation': recommendation,
-            'best_contact_time': best_contact_time,
-            'assessment_factors': {
-                'profile_completeness': user_data['profile_completeness'],
-                'verification_status': user_data['is_verified'],
-                'premium_status': user_data['is_premium'],
-                'bio_engagement': user_data['bio_length'] > 20
-            }
+            "openness_score": openness_score,
+            "engagement_score": engagement_score,
+            "value_score": value_score,
+            "messaging_potential_score": messaging_potential,
+            "messaging_recommendation": recommendation,
+            "best_contact_time": best_contact_time,
+            "assessment_factors": {
+                "profile_completeness": user_data["profile_completeness"],
+                "verification_status": user_data["is_verified"],
+                "premium_status": user_data["is_premium"],
+                "bio_engagement": user_data["bio_length"] > 20,
+            },
         }
 
     def _calculate_openness_score(self, user_data: Dict) -> float:
@@ -2022,23 +2196,23 @@ class ComprehensiveDataExtractor:
         score = 0.5  # Base score
 
         # Premium users are more likely to respond
-        if user_data['is_premium']:
+        if user_data["is_premium"]:
             score += 0.2
 
         # Verified users are more professional and responsive
-        if user_data['is_verified']:
+        if user_data["is_verified"]:
             score += 0.3
 
         # Users with detailed bios are more likely to be communicative
-        if user_data['bio_length'] > 50:
+        if user_data["bio_length"] > 50:
             score += 0.1
 
         # Complete profiles suggest active, responsive users
-        if user_data['profile_completeness'] > 0.75:
+        if user_data["profile_completeness"] > 0.75:
             score += 0.1
 
         # Users with photos are more engaged
-        if user_data['has_photo']:
+        if user_data["has_photo"]:
             score += 0.1
 
         return min(1.0, score)
@@ -2048,18 +2222,18 @@ class ComprehensiveDataExtractor:
         score = 0.3  # Base score
 
         # Profile completeness indicates engagement
-        score += user_data['profile_completeness'] * 0.3
+        score += user_data["profile_completeness"] * 0.3
 
         # Premium users are more engaged
-        if user_data['is_premium']:
+        if user_data["is_premium"]:
             score += 0.2
 
         # Verified users show higher engagement
-        if user_data['is_verified']:
+        if user_data["is_verified"]:
             score += 0.2
 
         # Bio length suggests content creation engagement
-        if user_data['bio_length'] > 20:
+        if user_data["bio_length"] > 20:
             score += 0.1
 
         return min(1.0, score)
@@ -2069,19 +2243,19 @@ class ComprehensiveDataExtractor:
         score = 0.2  # Base score
 
         # Verified accounts have higher value
-        if user_data['is_verified']:
+        if user_data["is_verified"]:
             score += 0.4
 
         # Premium users have higher value
-        if user_data['is_premium']:
+        if user_data["is_premium"]:
             score += 0.2
 
         # Complete profiles suggest higher quality contacts
-        if user_data['profile_completeness'] > 0.75:
+        if user_data["profile_completeness"] > 0.75:
             score += 0.2
 
         # Users with detailed bios may have more value
-        if user_data['bio_length'] > 30:
+        if user_data["bio_length"] > 30:
             score += 0.1
 
         return min(1.0, score)
@@ -2091,13 +2265,13 @@ class ComprehensiveDataExtractor:
         # This is a simplified estimation - would be enhanced with activity pattern data
         # For now, make educated guesses based on profile characteristics
 
-        if user_data['is_verified']:
+        if user_data["is_verified"]:
             # Verified/professional accounts might prefer business hours
             return "business_hours"  # 9 AM - 6 PM in their timezone
-        elif user_data['is_premium']:
+        elif user_data["is_premium"]:
             # Premium users might be more active
             return "evening_hours"  # 6 PM - 10 PM in their timezone
-        elif user_data['profile_completeness'] > 0.75:
+        elif user_data["profile_completeness"] > 0.75:
             # Highly complete profiles suggest active users
             return "peak_hours"  # 10 AM - 9 PM in their timezone
         else:
@@ -2138,7 +2312,8 @@ class EliteDataAccessLayer:
         """Initialize extended database schema for comprehensive data."""
         with self.db.connection() as conn:
             # Extended member profiles table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS member_profiles (
                     user_id INTEGER PRIMARY KEY,
                     comprehensive_data TEXT,  -- JSON blob of full profile
@@ -2146,10 +2321,12 @@ class EliteDataAccessLayer:
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     data_version INTEGER DEFAULT 1
                 )
-            ''')
+            """
+            )
 
             # Activity patterns table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS member_activity_patterns (
                     id INTEGER PRIMARY KEY,
                     user_id INTEGER,
@@ -2159,10 +2336,12 @@ class EliteDataAccessLayer:
                     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(user_id) REFERENCES members(user_id)
                 )
-            ''')
+            """
+            )
 
             # Network connections table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS member_network (
                     id INTEGER PRIMARY KEY,
                     user_id INTEGER,
@@ -2173,10 +2352,12 @@ class EliteDataAccessLayer:
                     discovered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(user_id) REFERENCES members(user_id)
                 )
-            ''')
+            """
+            )
 
             # Behavioral insights table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS member_behavioral_insights (
                     user_id INTEGER PRIMARY KEY,
                     account_type_prediction TEXT,
@@ -2192,10 +2373,12 @@ class EliteDataAccessLayer:
                     last_analyzed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(user_id) REFERENCES members(user_id)
                 )
-            ''')
+            """
+            )
 
             # Scraping analytics table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS scraping_analytics (
                     id INTEGER PRIMARY KEY,
                     channel_id TEXT,
@@ -2206,30 +2389,37 @@ class EliteDataAccessLayer:
                     duration_seconds REAL,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
+            """
+            )
 
     def store_comprehensive_profile(self, user_id: int, comprehensive_data: Dict):
         """Store comprehensive member profile data."""
         import json
 
-        profile_quality = comprehensive_data.get('data_completeness_score', 0)
+        profile_quality = comprehensive_data.get("data_completeness_score", 0)
 
         with self.db.connection() as conn:
-            conn.execute('''
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO member_profiles
                 (user_id, comprehensive_data, profile_quality_score, data_version)
                 VALUES (?, ?, ?, 1)
-            ''', (user_id, json.dumps(comprehensive_data), profile_quality))
+            """,
+                (user_id, json.dumps(comprehensive_data), profile_quality),
+            )
 
     def get_comprehensive_profile(self, user_id: int) -> Optional[Dict]:
         """Retrieve comprehensive member profile."""
         import json
 
         with self.db.connection() as conn:
-            cursor = conn.execute('''
+            cursor = conn.execute(
+                """
                 SELECT comprehensive_data FROM member_profiles
                 WHERE user_id = ?
-            ''', (user_id,))
+            """,
+                (user_id,),
+            )
 
             row = cursor.fetchone()
             if row:
@@ -2243,12 +2433,15 @@ class EliteDataAccessLayer:
 
         with self.db.connection() as conn:
             for pattern_type, pattern_data in patterns.items():
-                confidence = pattern_data.get('confidence', 0.5)
-                conn.execute('''
+                confidence = pattern_data.get("confidence", 0.5)
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO member_activity_patterns
                     (user_id, pattern_type, pattern_data, confidence_score)
                     VALUES (?, ?, ?, ?)
-                ''', (user_id, pattern_type, json.dumps(pattern_data), confidence))
+                """,
+                    (user_id, pattern_type, json.dumps(pattern_data), confidence),
+                )
 
     def get_activity_patterns(self, user_id: int) -> Dict[str, Dict]:
         """Retrieve activity patterns for a member."""
@@ -2256,15 +2449,18 @@ class EliteDataAccessLayer:
 
         patterns = {}
         with self.db.connection() as conn:
-            cursor = conn.execute('''
+            cursor = conn.execute(
+                """
                 SELECT pattern_type, pattern_data, confidence_score
                 FROM member_activity_patterns
                 WHERE user_id = ?
-            ''', (user_id,))
+            """,
+                (user_id,),
+            )
 
             for row in cursor.fetchall():
                 patterns[row[0]] = json.loads(row[1])
-                patterns[row[0]]['confidence'] = row[2]
+                patterns[row[0]]["confidence"] = row[2]
 
         return patterns
 
@@ -2274,17 +2470,20 @@ class EliteDataAccessLayer:
 
         with self.db.connection() as conn:
             for connection in connections:
-                conn.execute('''
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO member_network
                     (user_id, connection_type, connected_user_id, connection_strength, metadata)
                     VALUES (?, ?, ?, ?, ?)
-                ''', (
-                    user_id,
-                    connection.get('type', 'unknown'),
-                    connection.get('connected_user_id'),
-                    connection.get('strength', 0.5),
-                    json.dumps(connection.get('metadata', {}))
-                ))
+                """,
+                    (
+                        user_id,
+                        connection.get("type", "unknown"),
+                        connection.get("connected_user_id"),
+                        connection.get("strength", 0.5),
+                        json.dumps(connection.get("metadata", {})),
+                    ),
+                )
 
     def get_network_connections(self, user_id: int) -> List[Dict]:
         """Retrieve network connections for a member."""
@@ -2292,19 +2491,22 @@ class EliteDataAccessLayer:
 
         connections = []
         with self.db.connection() as conn:
-            cursor = conn.execute('''
+            cursor = conn.execute(
+                """
                 SELECT connection_type, connected_user_id, connection_strength, metadata
                 FROM member_network
                 WHERE user_id = ?
                 ORDER BY connection_strength DESC
-            ''', (user_id,))
+            """,
+                (user_id,),
+            )
 
             for row in cursor.fetchall():
                 connection = {
-                    'type': row[0],
-                    'connected_user_id': row[1],
-                    'strength': row[2],
-                    'metadata': json.loads(row[3]) if row[3] else {}
+                    "type": row[0],
+                    "connected_user_id": row[1],
+                    "strength": row[2],
+                    "metadata": json.loads(row[3]) if row[3] else {},
                 }
                 connections.append(connection)
 
@@ -2315,69 +2517,74 @@ class EliteDataAccessLayer:
         import json
 
         with self.db.connection() as conn:
-            conn.execute('''
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO member_behavioral_insights
                 (user_id, account_type_prediction, activity_level, engagement_style,
                  communication_preferences, behavioral_score, messaging_potential_score,
                  messaging_potential_category, best_contact_time, timezone_estimate, language_prediction)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                user_id,
-                insights.get('account_type_prediction'),
-                insights.get('activity_level'),
-                insights.get('engagement_style'),
-                json.dumps(insights.get('communication_preferences', [])),
-                insights.get('behavioral_score', 0),
-                insights.get('messaging_potential', {}).get('score', 0),
-                insights.get('messaging_potential', {}).get('category'),
-                insights.get('best_contact_time'),
-                insights.get('timezone_estimate'),
-                insights.get('language_prediction')
-            ))
+            """,
+                (
+                    user_id,
+                    insights.get("account_type_prediction"),
+                    insights.get("activity_level"),
+                    insights.get("engagement_style"),
+                    json.dumps(insights.get("communication_preferences", [])),
+                    insights.get("behavioral_score", 0),
+                    insights.get("messaging_potential", {}).get("score", 0),
+                    insights.get("messaging_potential", {}).get("category"),
+                    insights.get("best_contact_time"),
+                    insights.get("timezone_estimate"),
+                    insights.get("language_prediction"),
+                ),
+            )
 
     def get_behavioral_insights(self, user_id: int) -> Optional[Dict]:
         """Retrieve behavioral insights for a member."""
         import json
 
         with self.db.connection() as conn:
-            cursor = conn.execute('''
+            cursor = conn.execute(
+                """
                 SELECT account_type_prediction, activity_level, engagement_style,
                        communication_preferences, behavioral_score, messaging_potential_score,
                        messaging_potential_category, best_contact_time, timezone_estimate, language_prediction
                 FROM member_behavioral_insights
                 WHERE user_id = ?
-            ''', (user_id,))
+            """,
+                (user_id,),
+            )
 
             row = cursor.fetchone()
             if row:
                 return {
-                    'account_type_prediction': row[0],
-                    'activity_level': row[1],
-                    'engagement_style': row[2],
-                    'communication_preferences': json.loads(row[3]) if row[3] else [],
-                    'behavioral_score': row[4],
-                    'messaging_potential': {
-                        'score': row[5],
-                        'category': row[6]
-                    },
-                    'best_contact_time': row[7],
-                    'timezone_estimate': row[8],
-                    'language_prediction': row[9]
+                    "account_type_prediction": row[0],
+                    "activity_level": row[1],
+                    "engagement_style": row[2],
+                    "communication_preferences": json.loads(row[3]) if row[3] else [],
+                    "behavioral_score": row[4],
+                    "messaging_potential": {"score": row[5], "category": row[6]},
+                    "best_contact_time": row[7],
+                    "timezone_estimate": row[8],
+                    "language_prediction": row[9],
                 }
 
         return None
 
-    def get_members_for_messaging(self, channel_id: str, criteria: Dict = None, limit: int = None, offset: int = 0) -> List[Dict]:
+    def get_members_for_messaging(
+        self, channel_id: str, criteria: Dict = None, limit: int = None, offset: int = 0
+    ) -> List[Dict]:
         """Get members optimized for messaging based on comprehensive data. Supports pagination for large datasets."""
         criteria = criteria or {}
 
-        min_quality = criteria.get('min_profile_quality', 0.3)
-        min_messaging_potential = criteria.get('min_messaging_potential', 0.5)
-        max_risk = criteria.get('max_risk_score', 50)
-        preferred_timezone = criteria.get('preferred_timezone')
+        min_quality = criteria.get("min_profile_quality", 0.3)
+        min_messaging_potential = criteria.get("min_messaging_potential", 0.5)
+        max_risk = criteria.get("max_risk_score", 50)
+        preferred_timezone = criteria.get("preferred_timezone")
 
         with self.db.connection() as conn:
-            query = '''
+            query = """
                 SELECT
                     m.user_id, m.username, m.first_name, m.last_name,
                     mp.profile_quality_score,
@@ -2392,7 +2599,7 @@ class EliteDataAccessLayer:
                 AND m.threat_score < ?
                 AND (mp.profile_quality_score IS NULL OR mp.profile_quality_score >= ?)
                 AND (bi.messaging_potential_score IS NULL OR bi.messaging_potential_score >= ?)
-            '''
+            """
 
             params = [channel_id, max_risk, min_quality, min_messaging_potential]
 
@@ -2412,17 +2619,17 @@ class EliteDataAccessLayer:
             members = []
             for row in cursor.fetchall():
                 member = {
-                    'user_id': row[0],
-                    'username': row[1],
-                    'first_name': row[2],
-                    'last_name': row[3],
-                    'profile_quality': row[4] or 0,
-                    'messaging_potential_score': row[5] or 0,
-                    'messaging_potential_category': row[6] or 'unknown',
-                    'best_contact_time': row[7],
-                    'timezone_estimate': row[8],
-                    'threat_score': row[9],
-                    'is_safe_target': bool(row[10])
+                    "user_id": row[0],
+                    "username": row[1],
+                    "first_name": row[2],
+                    "last_name": row[3],
+                    "profile_quality": row[4] or 0,
+                    "messaging_potential_score": row[5] or 0,
+                    "messaging_potential_category": row[6] or "unknown",
+                    "best_contact_time": row[7],
+                    "timezone_estimate": row[8],
+                    "threat_score": row[9],
+                    "is_safe_target": bool(row[10]),
                 }
                 members.append(member)
 
@@ -2432,7 +2639,8 @@ class EliteDataAccessLayer:
         """Get comprehensive analytics for a channel."""
         with self.db.connection() as conn:
             # Get member statistics
-            cursor = conn.execute('''
+            cursor = conn.execute(
+                """
                 SELECT
                     COUNT(*) as total_members,
                     AVG(mp.profile_quality_score) as avg_quality,
@@ -2444,12 +2652,15 @@ class EliteDataAccessLayer:
                 LEFT JOIN member_profiles mp ON m.user_id = mp.user_id
                 LEFT JOIN member_behavioral_insights bi ON m.user_id = bi.user_id
                 WHERE m.channel_id = ?
-            ''', (channel_id,))
+            """,
+                (channel_id,),
+            )
 
             row = cursor.fetchone()
 
             # Get scraping session stats
-            cursor = conn.execute('''
+            cursor = conn.execute(
+                """
                 SELECT
                     COUNT(DISTINCT scrape_session_id) as total_sessions,
                     AVG(members_found) as avg_members_per_session,
@@ -2457,47 +2668,63 @@ class EliteDataAccessLayer:
                     MAX(timestamp) as last_scraped
                 FROM scraping_analytics
                 WHERE channel_id = ?
-            ''', (channel_id,))
+            """,
+                (channel_id,),
+            )
 
             scrape_row = cursor.fetchone()
 
             return {
-                'member_stats': {
-                    'total_members': row[0] or 0,
-                    'avg_profile_quality': row[1] or 0,
-                    'avg_messaging_potential': row[2] or 0,
-                    'high_potential_count': row[3] or 0,
-                    'avg_threat_score': row[4] or 0,
-                    'safe_targets_count': row[5] or 0
+                "member_stats": {
+                    "total_members": row[0] or 0,
+                    "avg_profile_quality": row[1] or 0,
+                    "avg_messaging_potential": row[2] or 0,
+                    "high_potential_count": row[3] or 0,
+                    "avg_threat_score": row[4] or 0,
+                    "safe_targets_count": row[5] or 0,
                 },
-                'scraping_stats': {
-                    'total_sessions': scrape_row[0] or 0,
-                    'avg_members_per_session': scrape_row[1] or 0,
-                    'avg_session_quality': scrape_row[2] or 0,
-                    'last_scraped': scrape_row[3]
-                }
+                "scraping_stats": {
+                    "total_sessions": scrape_row[0] or 0,
+                    "avg_members_per_session": scrape_row[1] or 0,
+                    "avg_session_quality": scrape_row[2] or 0,
+                    "last_scraped": scrape_row[3],
+                },
             }
 
-    def store_scraping_analytics(self, channel_id: str, session_id: str,
-                                technique: str, members_found: int,
-                                avg_quality: float, duration: float):
+    def store_scraping_analytics(
+        self,
+        channel_id: str,
+        session_id: str,
+        technique: str,
+        members_found: int,
+        avg_quality: float,
+        duration: float,
+    ):
         """Store scraping session analytics."""
         with self.db.connection() as conn:
-            conn.execute('''
+            conn.execute(
+                """
                 INSERT INTO scraping_analytics
                 (channel_id, scrape_session_id, technique_used, members_found,
                  data_quality_avg, duration_seconds)
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (channel_id, session_id, technique, members_found, avg_quality, duration))
+            """,
+                (channel_id, session_id, technique, members_found, avg_quality, duration),
+            )
 
 
 class EliteMemberScraper:
     """Elite member scraper with comprehensive data extraction and zero-risk operation."""
 
-    def __init__(self, db: MemberDatabase, anti_detection: EliteAntiDetectionSystem,
-                 data_extractor: ComprehensiveDataExtractor, client: Client = None):
+    def __init__(
+        self,
+        db: MemberDatabase,
+        anti_detection: EliteAntiDetectionSystem,
+        data_extractor: ComprehensiveDataExtractor,
+        client: Client = None,
+    ):
         """Initialize the elite member scraper.
-        
+
         Args:
             db: Member database instance
             anti_detection: Elite anti-detection system
@@ -2521,29 +2748,40 @@ class EliteMemberScraper:
                 return
 
             # Get available accounts from the account manager
-            available_accounts = account_manager.get_account_list() if hasattr(account_manager, 'get_account_list') else []
+            available_accounts = (
+                account_manager.get_account_list()
+                if hasattr(account_manager, "get_account_list")
+                else []
+            )
 
             for account in available_accounts:
-                phone_number = account.get('phone_number')
+                phone_number = account.get("phone_number")
                 if phone_number:
                     # Determine geographic region based on phone number
                     region = self._determine_geographic_region(phone_number)
 
                     # Get or create client for this account
-                    if hasattr(account_manager, 'active_clients') and phone_number in account_manager.active_clients:
+                    if (
+                        hasattr(account_manager, "active_clients")
+                        and phone_number in account_manager.active_clients
+                    ):
                         client = account_manager.active_clients[phone_number]
                         # Get the actual Pyrogram client
-                        if hasattr(client, 'client'):
+                        if hasattr(client, "client"):
                             actual_client = client.client
                         else:
                             actual_client = client
                     else:
                         # Try to get client directly from account manager
-                        actual_client = getattr(account_manager, 'get_client', lambda x: None)(phone_number)
+                        actual_client = getattr(account_manager, "get_client", lambda x: None)(
+                            phone_number
+                        )
 
                     if actual_client:
                         self.session_pool[phone_number] = actual_client
-                        logger.info(f"Added account {phone_number} to session pool (region: {region})")
+                        logger.info(
+                            f"Added account {phone_number} to session pool (region: {region})"
+                        )
 
             logger.info(f"Session pool initialized with {len(self.session_pool)} accounts")
 
@@ -2552,39 +2790,39 @@ class EliteMemberScraper:
 
     def _determine_geographic_region(self, phone_number: str) -> str:
         """Determine geographic region from phone number."""
-        phone_str = str(phone_number).replace('+', '')
+        phone_str = str(phone_number).replace("+", "")
 
         # Simple region detection based on country codes
-        if phone_str.startswith(('1', '001')):  # US/Canada
-            return 'us_east'  # Default to east coast
-        elif phone_str.startswith(('44', '0044')):  # UK
-            return 'eu_west'
-        elif phone_str.startswith(('49', '0049')):  # Germany
-            return 'eu_central'
-        elif phone_str.startswith(('81', '0081')):  # Japan
-            return 'asia_east'
-        elif phone_str.startswith(('91', '0091')):  # India
-            return 'asia_south'
-        elif phone_str.startswith(('7', '007')):  # Russia
-            return 'eu_east'
+        if phone_str.startswith(("1", "001")):  # US/Canada
+            return "us_east"  # Default to east coast
+        elif phone_str.startswith(("44", "0044")):  # UK
+            return "eu_west"
+        elif phone_str.startswith(("49", "0049")):  # Germany
+            return "eu_central"
+        elif phone_str.startswith(("81", "0081")):  # Japan
+            return "asia_east"
+        elif phone_str.startswith(("91", "0091")):  # India
+            return "asia_south"
+        elif phone_str.startswith(("7", "007")):  # Russia
+            return "eu_east"
         else:
-            return 'us_east'  # Default fallback
+            return "us_east"  # Default fallback
 
     def _init_advanced_scraping(self):
         """Initialize advanced scraping capabilities."""
         self.scraping_techniques = {
-            'direct_members': self._scrape_direct_members,
-            'message_history': self._scrape_via_message_history,
-            'reaction_analysis': self._scrape_via_reactions,
-            'poll_participants': self._scrape_via_polls,
-            'media_analysis': self._scrape_via_media,
-            'forward_analysis': self._scrape_via_forwards,
-            'contact_analysis': self._scrape_via_contacts
+            "direct_members": self._scrape_direct_members,
+            "message_history": self._scrape_via_message_history,
+            "reaction_analysis": self._scrape_via_reactions,
+            "poll_participants": self._scrape_via_polls,
+            "media_analysis": self._scrape_via_media,
+            "forward_analysis": self._scrape_via_forwards,
+            "contact_analysis": self._scrape_via_contacts,
         }
 
-    async def scrape_channel_comprehensive(self, channel_identifier: str,
-                                         techniques: List[str] = None,
-                                         max_depth: int = 3) -> Dict[str, Any]:
+    async def scrape_channel_comprehensive(
+        self, channel_identifier: str, techniques: List[str] = None, max_depth: int = 3
+    ) -> Dict[str, Any]:
         """Comprehensive channel scraping using multiple techniques."""
 
         # Validate inputs
@@ -2607,38 +2845,47 @@ class EliteMemberScraper:
             if techniques is not None:
                 if not isinstance(techniques, list):
                     raise ValueError("techniques must be a list or None")
-                valid_techniques = ['direct_members', 'message_history', 'reaction_analysis',
-                                  'poll_participants', 'media_shares', 'forward_sources', 'contact_sync']
+                valid_techniques = [
+                    "direct_members",
+                    "message_history",
+                    "reaction_analysis",
+                    "poll_participants",
+                    "media_shares",
+                    "forward_sources",
+                    "contact_sync",
+                ]
                 for technique in techniques:
                     if technique not in valid_techniques:
-                        raise ValueError(f"Invalid technique: {technique}. Valid options: {valid_techniques}")
+                        raise ValueError(
+                            f"Invalid technique: {technique}. Valid options: {valid_techniques}"
+                        )
 
         except ImportError:
             # Skip validation if ValidationHelper not available
             logger.warning("ValidationHelper not available, skipping input validation")
         except Exception as e:
             logger.error(f"Input validation failed: {e}")
-            return {'success': False, 'error': f'Invalid input: {e}'}
+            return {"success": False, "error": f"Invalid input: {e}"}
 
         if techniques is None:
-            techniques = ['direct_members', 'message_history', 'reaction_analysis']
+            techniques = ["direct_members", "message_history", "reaction_analysis"]
 
         self.scraping_active = True
         results = {
-            'channel_info': {},
-            'members_found': {},
-            'scraping_stats': {},
-            'success': False,
-            'error': None
+            "channel_info": {},
+            "members_found": {},
+            "scraping_stats": {},
+            "success": False,
+            "error": None,
         }
 
         try:
             # Get channel information safely
             channel_info = await self._get_channel_info_safe(channel_identifier)
             if not channel_info:
-                return {'success': False, 'error': 'Cannot access channel'}
+                return {"success": False, "error": "Cannot access channel"}
 
-            results['channel_info'] = channel_info
+            results["channel_info"] = channel_info
 
             # Execute scraping techniques
             for technique in techniques:
@@ -2647,26 +2894,30 @@ class EliteMemberScraper:
 
                 if technique in self.scraping_techniques:
                     logger.info(f"🔍 Executing {technique} scraping...")
-                    technique_results = await self.scraping_techniques[technique](channel_info, max_depth)
-                    results['members_found'][technique] = technique_results
+                    technique_results = await self.scraping_techniques[technique](
+                        channel_info, max_depth
+                    )
+                    results["members_found"][technique] = technique_results
 
                     # Apply optimal delay based on anti-detection system
                     await self._apply_intelligent_delay()
 
             # Consolidate and deduplicate results
-            all_members = self._consolidate_member_data(results['members_found'])
-            results['final_member_count'] = len(all_members)
+            all_members = self._consolidate_member_data(results["members_found"])
+            results["final_member_count"] = len(all_members)
 
             # Store comprehensive data
-            await self._store_comprehensive_member_data(all_members, channel_info['id'])
+            await self._store_comprehensive_member_data(all_members, channel_info["id"])
 
             # Calculate statistics
-            results['scraping_stats'] = self._calculate_scraping_statistics(results['members_found'])
-            results['success'] = True
+            results["scraping_stats"] = self._calculate_scraping_statistics(
+                results["members_found"]
+            )
+            results["success"] = True
 
         except Exception as e:
             logger.error(f"Comprehensive scraping failed: {e}")
-            results['error'] = str(e)
+            results["error"] = str(e)
         finally:
             self.scraping_active = False
 
@@ -2692,15 +2943,15 @@ class EliteMemberScraper:
                 return None
 
             channel_info = {
-                'id': chat.id,
-                'title': chat.title,
-                'type': chat.type.value,
-                'member_count': getattr(chat, 'members_count', 0),
-                'is_private': not chat.username,
-                'username': chat.username,
-                'description': getattr(chat, 'description', ''),
-                'permissions': getattr(chat, 'permissions', {}),
-                'linked_chat_id': getattr(chat, 'linked_chat', None)
+                "id": chat.id,
+                "title": chat.title,
+                "type": chat.type.value,
+                "member_count": getattr(chat, "members_count", 0),
+                "is_private": not chat.username,
+                "username": chat.username,
+                "description": getattr(chat, "description", ""),
+                "permissions": getattr(chat, "permissions", {}),
+                "linked_chat_id": getattr(chat, "linked_chat", None),
             }
 
             success = True
@@ -2714,13 +2965,13 @@ class EliteMemberScraper:
         finally:
             # Record request metrics
             response_time = time.time() - start_time
-            account_id = getattr(client, '_account_id', 'unknown')
+            account_id = getattr(client, "_account_id", "unknown")
             self.anti_detection.record_request(
                 account_id=account_id,
-                request_type='get_channel_info',
+                request_type="get_channel_info",
                 response_time=response_time,
                 success=success,
-                error_type=error_type
+                error_type=error_type,
             )
 
     async def _get_optimal_client(self) -> Optional[Client]:
@@ -2740,7 +2991,7 @@ class EliteMemberScraper:
                 return self.session_pool[best_account]
 
         # Fallback: Use the main client from the base scraper
-        if hasattr(self, 'client') and self.client:
+        if hasattr(self, "client") and self.client:
             return self.client
 
         return None
@@ -2758,7 +3009,7 @@ class EliteMemberScraper:
                 (ChatMembersFilter.SEARCH, None),
                 (ChatMembersFilter.ADMINISTRATORS, None),
                 (ChatMembersFilter.BANNED, None),
-                (ChatMembersFilter.RESTRICTED, None)
+                (ChatMembersFilter.RESTRICTED, None),
             ]
 
             for filter_type, query in access_methods:
@@ -2766,7 +3017,9 @@ class EliteMemberScraper:
                     break
 
                 try:
-                    async for member in client.get_chat_members(channel_info['id'], filter=filter_type, query=query):
+                    async for member in client.get_chat_members(
+                        channel_info["id"], filter=filter_type, query=query
+                    ):
                         if not self.scraping_active:
                             break
 
@@ -2776,9 +3029,13 @@ class EliteMemberScraper:
                         )
 
                         # Add channel context
-                        member_data['channel_id'] = channel_info['id']
-                        member_data['member_status'] = member.status.value if hasattr(member.status, 'value') else str(member.status)
-                        member_data['joined_date'] = getattr(member, 'joined_date', None)
+                        member_data["channel_id"] = channel_info["id"]
+                        member_data["member_status"] = (
+                            member.status.value
+                            if hasattr(member.status, "value")
+                            else str(member.status)
+                        )
+                        member_data["joined_date"] = getattr(member, "joined_date", None)
 
                         members.append(member_data)
 
@@ -2797,7 +3054,9 @@ class EliteMemberScraper:
 
         return members
 
-    async def _scrape_via_message_history(self, channel_info: Dict, max_messages: int = 10000) -> List[Dict]:
+    async def _scrape_via_message_history(
+        self, channel_info: Dict, max_messages: int = 10000
+    ) -> List[Dict]:
         """Scrape members by analyzing message history."""
         members = {}
         client = await self._get_optimal_client()
@@ -2807,7 +3066,7 @@ class EliteMemberScraper:
         try:
             messages_analyzed = 0
 
-            async for message in client.get_chat_history(channel_info['id'], limit=max_messages):
+            async for message in client.get_chat_history(channel_info["id"], limit=max_messages):
                 if not self.scraping_active:
                     break
 
@@ -2822,18 +3081,18 @@ class EliteMemberScraper:
                         )
 
                         # Add message context
-                        member_data['first_message_date'] = message.date
-                        member_data['message_count'] = 0
-                        member_data['last_message_date'] = message.date
-                        member_data['channel_id'] = channel_info['id']
+                        member_data["first_message_date"] = message.date
+                        member_data["message_count"] = 0
+                        member_data["last_message_date"] = message.date
+                        member_data["channel_id"] = channel_info["id"]
 
                         members[user_id] = member_data
                     else:
                         # Update existing member data
                         member = members[user_id]
-                        member['message_count'] += 1
-                        if message.date > member['last_message_date']:
-                            member['last_message_date'] = message.date
+                        member["message_count"] += 1
+                        if message.date > member["last_message_date"]:
+                            member["last_message_date"] = message.date
 
                 messages_analyzed += 1
 
@@ -2846,7 +3105,9 @@ class EliteMemberScraper:
 
         return list(members.values())
 
-    async def _scrape_via_reactions(self, channel_info: Dict, max_messages: int = 5000) -> List[Dict]:
+    async def _scrape_via_reactions(
+        self, channel_info: Dict, max_messages: int = 5000
+    ) -> List[Dict]:
         """Scrape members who have reacted to messages."""
         members = {}
         client = await self._get_optimal_client()
@@ -2855,17 +3116,17 @@ class EliteMemberScraper:
 
         try:
             messages_processed = 0
-            async for message in client.get_chat_history(channel_info['id'], limit=max_messages):
+            async for message in client.get_chat_history(channel_info["id"], limit=max_messages):
                 if not self.scraping_active:
                     break
 
-                if hasattr(message, 'reactions') and message.reactions:
+                if hasattr(message, "reactions") and message.reactions:
                     # Process each reaction type
                     for reaction in message.reactions.reactions:
-                        if hasattr(reaction, 'recent_reactions') and reaction.recent_reactions:
+                        if hasattr(reaction, "recent_reactions") and reaction.recent_reactions:
                             # Recent reactions include user information
                             for recent_reaction in reaction.recent_reactions:
-                                if hasattr(recent_reaction, 'user') and recent_reaction.user:
+                                if hasattr(recent_reaction, "user") and recent_reaction.user:
                                     user = recent_reaction.user
                                     user_id = user.id
 
@@ -2874,13 +3135,13 @@ class EliteMemberScraper:
                                         member_data = await self.data_extractor.extract_comprehensive_member_data(
                                             client, user, channel_info
                                         )
-                                        member_data['channel_id'] = channel_info['id']
-                                        member_data['discovered_via'] = 'reactions'
-                                        member_data['reaction_count'] = 1
+                                        member_data["channel_id"] = channel_info["id"]
+                                        member_data["discovered_via"] = "reactions"
+                                        member_data["reaction_count"] = 1
                                         members[user_id] = member_data
                                     else:
                                         # Increment reaction count
-                                        members[user_id]['reaction_count'] += 1
+                                        members[user_id]["reaction_count"] += 1
 
                 messages_processed += 1
                 if messages_processed % 50 == 0:
@@ -2899,28 +3160,30 @@ class EliteMemberScraper:
             return []
 
         try:
-            async for message in client.get_chat_history(channel_info['id'], limit=max_messages):
+            async for message in client.get_chat_history(channel_info["id"], limit=max_messages):
                 if not self.scraping_active:
                     break
 
-                if hasattr(message, 'poll') and message.poll:
+                if hasattr(message, "poll") and message.poll:
                     # Try to get poll voters (requires admin permissions)
                     try:
-                        poll_results = await client.get_poll_vote_count(message.id, channel_info['id'])
-                        if poll_results and hasattr(poll_results, 'voters'):
+                        poll_results = await client.get_poll_vote_count(
+                            message.id, channel_info["id"]
+                        )
+                        if poll_results and hasattr(poll_results, "voters"):
                             for voter in poll_results.voters:
-                                if hasattr(voter, 'user') and voter.user:
+                                if hasattr(voter, "user") and voter.user:
                                     user_id = voter.user.id
                                     if user_id not in members:
                                         member_data = await self.data_extractor.extract_comprehensive_member_data(
                                             client, voter.user, channel_info
                                         )
-                                        member_data['channel_id'] = channel_info['id']
-                                        member_data['discovered_via'] = 'polls'
-                                        member_data['poll_votes'] = 1
+                                        member_data["channel_id"] = channel_info["id"]
+                                        member_data["discovered_via"] = "polls"
+                                        member_data["poll_votes"] = 1
                                         members[user_id] = member_data
                                     else:
-                                        members[user_id]['poll_votes'] += 1
+                                        members[user_id]["poll_votes"] += 1
                     except Exception as e:
                         # Poll voting data might not be accessible
                         logger.debug(f"Could not get poll voters: {e}")
@@ -2940,28 +3203,28 @@ class EliteMemberScraper:
             return []
 
         try:
-            media_types = {'photo': 0, 'video': 0, 'document': 0, 'audio': 0, 'voice': 0}
+            media_types = {"photo": 0, "video": 0, "document": 0, "audio": 0, "voice": 0}
 
-            async for message in client.get_chat_history(channel_info['id'], limit=max_messages):
+            async for message in client.get_chat_history(channel_info["id"], limit=max_messages):
                 if not self.scraping_active:
                     break
 
                 # Look for media messages
                 if message.photo:
-                    media_types['photo'] += 1
-                    media_type = 'photo'
+                    media_types["photo"] += 1
+                    media_type = "photo"
                 elif message.video:
-                    media_types['video'] += 1
-                    media_type = 'video'
+                    media_types["video"] += 1
+                    media_type = "video"
                 elif message.document:
-                    media_types['document'] += 1
-                    media_type = 'document'
+                    media_types["document"] += 1
+                    media_type = "document"
                 elif message.audio:
-                    media_types['audio'] += 1
-                    media_type = 'audio'
-                elif hasattr(message, 'voice') and message.voice:
-                    media_types['voice'] += 1
-                    media_type = 'voice'
+                    media_types["audio"] += 1
+                    media_type = "audio"
+                elif hasattr(message, "voice") and message.voice:
+                    media_types["voice"] += 1
+                    media_type = "voice"
                 else:
                     continue
 
@@ -2971,19 +3234,19 @@ class EliteMemberScraper:
                         member_data = await self.data_extractor.extract_comprehensive_member_data(
                             client, message.from_user, channel_info
                         )
-                        member_data['channel_id'] = channel_info['id']
-                        member_data['discovered_via'] = 'media'
-                        member_data['media_types_shared'] = {media_type: 1}
-                        member_data['total_media_shared'] = 1
+                        member_data["channel_id"] = channel_info["id"]
+                        member_data["discovered_via"] = "media"
+                        member_data["media_types_shared"] = {media_type: 1}
+                        member_data["total_media_shared"] = 1
                         members[user_id] = member_data
                     else:
                         # Update media sharing stats
-                        if 'media_types_shared' not in members[user_id]:
-                            members[user_id]['media_types_shared'] = {}
-                        if media_type not in members[user_id]['media_types_shared']:
-                            members[user_id]['media_types_shared'][media_type] = 0
-                        members[user_id]['media_types_shared'][media_type] += 1
-                        members[user_id]['total_media_shared'] += 1
+                        if "media_types_shared" not in members[user_id]:
+                            members[user_id]["media_types_shared"] = {}
+                        if media_type not in members[user_id]["media_types_shared"]:
+                            members[user_id]["media_types_shared"][media_type] = 0
+                        members[user_id]["media_types_shared"][media_type] += 1
+                        members[user_id]["total_media_shared"] += 1
 
                 await self._apply_intelligent_delay()
 
@@ -2992,7 +3255,9 @@ class EliteMemberScraper:
 
         return list(members.values())
 
-    async def _scrape_via_forwards(self, channel_info: Dict, max_messages: int = 3000) -> List[Dict]:
+    async def _scrape_via_forwards(
+        self, channel_info: Dict, max_messages: int = 3000
+    ) -> List[Dict]:
         """Scrape members by analyzing forwarded messages."""
         members = {}
         client = await self._get_optimal_client()
@@ -3002,38 +3267,38 @@ class EliteMemberScraper:
         try:
             forward_sources = {}  # Track where forwards come from
 
-            async for message in client.get_chat_history(channel_info['id'], limit=max_messages):
+            async for message in client.get_chat_history(channel_info["id"], limit=max_messages):
                 if not self.scraping_active:
                     break
 
                 # Check for forwarded messages
-                if hasattr(message, 'forward_from') and message.forward_from:
+                if hasattr(message, "forward_from") and message.forward_from:
                     user_id = message.forward_from.id
                     if user_id not in members:
                         member_data = await self.data_extractor.extract_comprehensive_member_data(
                             client, message.forward_from, channel_info
                         )
-                        member_data['channel_id'] = channel_info['id']
-                        member_data['discovered_via'] = 'forwards'
-                        member_data['forward_count'] = 1
-                        member_data['forward_sources'] = [channel_info['id']]  # Simplified
+                        member_data["channel_id"] = channel_info["id"]
+                        member_data["discovered_via"] = "forwards"
+                        member_data["forward_count"] = 1
+                        member_data["forward_sources"] = [channel_info["id"]]  # Simplified
                         members[user_id] = member_data
                     else:
-                        members[user_id]['forward_count'] += 1
-                        if channel_info['id'] not in members[user_id]['forward_sources']:
-                            members[user_id]['forward_sources'].append(channel_info['id'])
+                        members[user_id]["forward_count"] += 1
+                        if channel_info["id"] not in members[user_id]["forward_sources"]:
+                            members[user_id]["forward_sources"].append(channel_info["id"])
 
                 # Also check for forwarded from channels
-                elif hasattr(message, 'forward_from_chat') and message.forward_from_chat:
+                elif hasattr(message, "forward_from_chat") and message.forward_from_chat:
                     # This is forwarded from a channel, could be useful for network analysis
                     forward_chat_id = message.forward_from_chat.id
                     if forward_chat_id not in forward_sources:
                         forward_sources[forward_chat_id] = {
-                            'title': getattr(message.forward_from_chat, 'title', 'Unknown'),
-                            'count': 1
+                            "title": getattr(message.forward_from_chat, "title", "Unknown"),
+                            "count": 1,
                         }
                     else:
-                        forward_sources[forward_chat_id]['count'] += 1
+                        forward_sources[forward_chat_id]["count"] += 1
 
                 await self._apply_intelligent_delay()
 
@@ -3042,7 +3307,9 @@ class EliteMemberScraper:
 
         return list(members.values())
 
-    async def _scrape_via_contacts(self, channel_info: Dict, max_messages: int = 1000) -> List[Dict]:
+    async def _scrape_via_contacts(
+        self, channel_info: Dict, max_messages: int = 1000
+    ) -> List[Dict]:
         """Scrape members by analyzing shared contacts and mentions."""
         members = {}
         client = await self._get_optimal_client()
@@ -3050,38 +3317,45 @@ class EliteMemberScraper:
             return []
 
         try:
-            async for message in client.get_chat_history(channel_info['id'], limit=max_messages):
+            async for message in client.get_chat_history(channel_info["id"], limit=max_messages):
                 if not self.scraping_active:
                     break
 
                 # Check for contact shares
-                if hasattr(message, 'contact') and message.contact:
+                if hasattr(message, "contact") and message.contact:
                     # Shared contact reveals another member
-                    if hasattr(message.contact, 'user_id') and message.contact.user_id:
+                    if hasattr(message.contact, "user_id") and message.contact.user_id:
                         contact_user_id = message.contact.user_id
                         if contact_user_id not in members:
                             # Create a minimal user object from contact info
-                            fake_user = type('User', (), {
-                                'id': contact_user_id,
-                                'first_name': getattr(message.contact, 'first_name', ''),
-                                'last_name': getattr(message.contact, 'last_name', ''),
-                                'username': getattr(message.contact, 'username', None),
-                                'phone_number': getattr(message.contact, 'phone_number', None)
-                            })()
+                            fake_user = type(
+                                "User",
+                                (),
+                                {
+                                    "id": contact_user_id,
+                                    "first_name": getattr(message.contact, "first_name", ""),
+                                    "last_name": getattr(message.contact, "last_name", ""),
+                                    "username": getattr(message.contact, "username", None),
+                                    "phone_number": getattr(message.contact, "phone_number", None),
+                                },
+                            )()
 
-                            member_data = await self.data_extractor.extract_comprehensive_member_data(
-                                client, fake_user, channel_info
+                            member_data = (
+                                await self.data_extractor.extract_comprehensive_member_data(
+                                    client, fake_user, channel_info
+                                )
                             )
-                            member_data['channel_id'] = channel_info['id']
-                            member_data['discovered_via'] = 'contacts'
-                            member_data['contact_shared'] = True
+                            member_data["channel_id"] = channel_info["id"]
+                            member_data["discovered_via"] = "contacts"
+                            member_data["contact_shared"] = True
                             members[contact_user_id] = member_data
 
                 # Check for user mentions in text
-                if hasattr(message, 'text') and message.text:
+                if hasattr(message, "text") and message.text:
                     # Extract mentioned usernames
                     import re
-                    mentions = re.findall(r'@(\w+)', message.text)
+
+                    mentions = re.findall(r"@(\w+)", message.text)
                     for username in mentions:
                         # Note: This doesn't give us user IDs directly
                         # Would need additional API calls to resolve usernames
@@ -3097,7 +3371,7 @@ class EliteMemberScraper:
     async def _apply_intelligent_delay(self):
         """Apply intelligent delay based on anti-detection system."""
         # Get optimal delay for current account
-        account_id = 'default'  # Would be set properly in real implementation
+        account_id = "default"  # Would be set properly in real implementation
         delay = self.anti_detection.get_optimal_delay(account_id)
 
         # Add randomization
@@ -3114,35 +3388,39 @@ class EliteMemberScraper:
             technique_stats[technique] = len(members)
 
             for member in members:
-                user_id = member['user_id']
+                user_id = member["user_id"]
 
                 if user_id not in all_members:
                     # First time seeing this member
                     all_members[user_id] = member
-                    all_members[user_id]['discovery_techniques'] = [technique]
+                    all_members[user_id]["discovery_techniques"] = [technique]
                 else:
                     # Merge data from multiple techniques
                     existing = all_members[user_id]
 
                     # Merge discovery techniques
-                    if technique not in existing['discovery_techniques']:
-                        existing['discovery_techniques'].append(technique)
+                    if technique not in existing["discovery_techniques"]:
+                        existing["discovery_techniques"].append(technique)
 
                     # Merge message counts
-                    if 'message_count' in member and 'message_count' in existing:
-                        existing['message_count'] = max(existing['message_count'], member['message_count'])
+                    if "message_count" in member and "message_count" in existing:
+                        existing["message_count"] = max(
+                            existing["message_count"], member["message_count"]
+                        )
 
                     # Take earliest first message date
-                    if 'first_message_date' in member and 'first_message_date' in existing:
-                        if member['first_message_date'] < existing['first_message_date']:
-                            existing['first_message_date'] = member['first_message_date']
+                    if "first_message_date" in member and "first_message_date" in existing:
+                        if member["first_message_date"] < existing["first_message_date"]:
+                            existing["first_message_date"] = member["first_message_date"]
 
                     # Take latest last message date
-                    if 'last_message_date' in member and 'last_message_date' in existing:
-                        if member['last_message_date'] > existing['last_message_date']:
-                            existing['last_message_date'] = member['last_message_date']
+                    if "last_message_date" in member and "last_message_date" in existing:
+                        if member["last_message_date"] > existing["last_message_date"]:
+                            existing["last_message_date"] = member["last_message_date"]
 
-        logger.info(f"Consolidated {len(all_members)} unique members from {len(technique_results)} techniques")
+        logger.info(
+            f"Consolidated {len(all_members)} unique members from {len(technique_results)} techniques"
+        )
         return list(all_members.values())
 
     async def _store_comprehensive_member_data(self, members: List[Dict], channel_id: int):
@@ -3154,78 +3432,86 @@ class EliteMemberScraper:
                 # Store basic member info
                 # CRITICAL FIX: member is a dict, not an object, so use .get() instead of getattr()
                 self.db.save_member(
-                    user_id=member['user_id'],
-                    username=member.get('username'),
-                    first_name=member.get('first_name'),
-                    last_name=member.get('last_name'),
-                    phone=member.get('phone_number'),
-                    joined_at=member.get('joined_date'),
-                    last_seen=member.get('last_online_date'),
-                    status=member.get('member_status', 'member'),
+                    user_id=member["user_id"],
+                    username=member.get("username"),
+                    first_name=member.get("first_name"),
+                    last_name=member.get("last_name"),
+                    phone=member.get("phone_number"),
+                    joined_at=member.get("joined_date"),
+                    last_seen=member.get("last_online_date"),
+                    status=member.get("member_status", "member"),
                     channel_id=str(channel_id),
-                    activity_score=member.get('activity_score', 0),
-                    threat_score=member.get('risk_assessment', {}).get('overall_risk_score', 0) * 100,
-                    is_safe_target=member.get('risk_assessment', {}).get('overall_risk_score', 0) < 0.5,
-                    threat_reasons=json.dumps(member.get('risk_assessment', {}).get('risk_factors', [])),
-                    message_count=member.get('message_count', 0),
-                    last_message_date=member.get('last_message_date')
+                    activity_score=member.get("activity_score", 0),
+                    threat_score=member.get("risk_assessment", {}).get("overall_risk_score", 0)
+                    * 100,
+                    is_safe_target=member.get("risk_assessment", {}).get("overall_risk_score", 0)
+                    < 0.5,
+                    threat_reasons=json.dumps(
+                        member.get("risk_assessment", {}).get("risk_factors", [])
+                    ),
+                    message_count=member.get("message_count", 0),
+                    last_message_date=member.get("last_message_date"),
                 )
 
                 # Store comprehensive profile data
-                data_layer.store_comprehensive_profile(member['user_id'], member)
+                data_layer.store_comprehensive_profile(member["user_id"], member)
 
                 # Store activity patterns if available
-                activity_patterns = member.get('activity_patterns', {})
+                activity_patterns = member.get("activity_patterns", {})
                 if activity_patterns:
-                    data_layer.store_activity_patterns(member['user_id'], activity_patterns)
+                    data_layer.store_activity_patterns(member["user_id"], activity_patterns)
 
                 # Store network connections if available
-                network_data = member.get('network_analysis', {})
-                if network_data.get('group_memberships'):
+                network_data = member.get("network_analysis", {})
+                if network_data.get("group_memberships"):
                     connections = []
-                    for group in network_data['group_memberships']:
-                        connections.append({
-                            'type': 'group_membership',
-                            'connected_user_id': None,  # Group, not user
-                            'strength': 0.8,
-                            'metadata': {'group_info': group}
-                        })
-                    data_layer.store_network_connections(member['user_id'], connections)
+                    for group in network_data["group_memberships"]:
+                        connections.append(
+                            {
+                                "type": "group_membership",
+                                "connected_user_id": None,  # Group, not user
+                                "strength": 0.8,
+                                "metadata": {"group_info": group},
+                            }
+                        )
+                    data_layer.store_network_connections(member["user_id"], connections)
 
                 # Store behavioral insights
-                behavioral_data = member.get('behavioral_insights', {})
+                behavioral_data = member.get("behavioral_insights", {})
                 if behavioral_data:
-                    data_layer.store_behavioral_insights(member['user_id'], behavioral_data)
+                    data_layer.store_behavioral_insights(member["user_id"], behavioral_data)
 
                 logger.debug(f"Stored comprehensive data for member {member['user_id']}")
 
             except Exception as e:
-                logger.error(f"Failed to store comprehensive data for member {member['user_id']}: {e}")
+                logger.error(
+                    f"Failed to store comprehensive data for member {member['user_id']}: {e}"
+                )
 
     def _calculate_scraping_statistics(self, technique_results: Dict) -> Dict:
         """Calculate comprehensive scraping statistics."""
         stats = {
-            'techniques_used': len(technique_results),
-            'total_members_found': 0,
-            'technique_breakdown': {},
-            'average_data_completeness': 0.0,
-            'unique_members': 0
+            "techniques_used": len(technique_results),
+            "total_members_found": 0,
+            "technique_breakdown": {},
+            "average_data_completeness": 0.0,
+            "unique_members": 0,
         }
 
         all_members = []
         for technique, members in technique_results.items():
-            stats['technique_breakdown'][technique] = len(members)
-            stats['total_members_found'] += len(members)
+            stats["technique_breakdown"][technique] = len(members)
+            stats["total_members_found"] += len(members)
             all_members.extend(members)
 
         # Calculate unique members
-        unique_ids = set(member['user_id'] for member in all_members)
-        stats['unique_members'] = len(unique_ids)
+        unique_ids = set(member["user_id"] for member in all_members)
+        stats["unique_members"] = len(unique_ids)
 
         # Calculate average data completeness
-        completeness_scores = [member.get('data_completeness_score', 0) for member in all_members]
+        completeness_scores = [member.get("data_completeness_score", 0) for member in all_members]
         if completeness_scores:
-            stats['average_data_completeness'] = sum(completeness_scores) / len(completeness_scores)
+            stats["average_data_completeness"] = sum(completeness_scores) / len(completeness_scores)
 
         return stats
 
@@ -3238,8 +3524,13 @@ class EliteMemberScraper:
 class MemberScraper:
     """Advanced Telegram member scraper with comprehensive threat detection and elite anti-detection."""
 
-    def __init__(self, client: Client, db: MemberDatabase, anti_detection: EliteAntiDetectionSystem = None,
-                 threat_config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        client: Client,
+        db: MemberDatabase,
+        anti_detection: EliteAntiDetectionSystem = None,
+        threat_config: Optional[Dict[str, Any]] = None,
+    ):
         """Initialize the member scraper.
 
         Args:
@@ -3257,7 +3548,9 @@ class MemberScraper:
         self.anti_detection = anti_detection or EliteAntiDetectionSystem()
         self.data_extractor = ComprehensiveDataExtractor()
         # Pass the client to elite scraper for direct access
-        self.elite_scraper = EliteMemberScraper(db, self.anti_detection, self.data_extractor, self.client)
+        self.elite_scraper = EliteMemberScraper(
+            db, self.anti_detection, self.data_extractor, self.client
+        )
 
     @staticmethod
     def _resolve_pyrogram_client(client):
@@ -3288,9 +3581,9 @@ class MemberScraper:
         """
         # Handle various URL formats
         patterns = [
-            r'https?://t\.me/([a-zA-Z0-9_]+)',  # https://t.me/channel
-            r'@([a-zA-Z0-9_]+)',                # @channel
-            r'^([a-zA-Z0-9_]+)$'                # channel
+            r"https?://t\.me/([a-zA-Z0-9_]+)",  # https://t.me/channel
+            r"@([a-zA-Z0-9_]+)",  # @channel
+            r"^([a-zA-Z0-9_]+)$",  # channel
         ]
 
         for pattern in patterns:
@@ -3300,9 +3593,14 @@ class MemberScraper:
 
         return None
 
-    async def scrape_channel_members(self, channel_identifier: str, progress_callback=None,
-                                    analyze_messages: bool = True, max_messages: int = 10000,
-                                    use_elite_scraping: bool = False) -> Dict:
+    async def scrape_channel_members(
+        self,
+        channel_identifier: str,
+        progress_callback=None,
+        analyze_messages: bool = True,
+        max_messages: int = 10000,
+        use_elite_scraping: bool = False,
+    ) -> Dict:
         """Advanced scraping of ALL members from a channel/group, including hidden ones.
 
         Uses multiple techniques:
@@ -3326,8 +3624,12 @@ class MemberScraper:
         if use_elite_scraping:
             return await self.elite_scraper.scrape_channel_comprehensive(
                 channel_identifier,
-                techniques=['direct_members', 'message_history', 'reaction_analysis', 'media_analysis'] if analyze_messages else ['direct_members'],
-                max_depth=3
+                techniques=(
+                    ["direct_members", "message_history", "reaction_analysis", "media_analysis"]
+                    if analyze_messages
+                    else ["direct_members"]
+                ),
+                max_depth=3,
             )
 
         try:
@@ -3345,16 +3647,21 @@ class MemberScraper:
                     break
                 except (ConnectionError, asyncio.TimeoutError) as e:
                     if attempt < 2:
-                        logger.warning(f"Failed to get chat info (attempt {attempt + 1}): {e}, retrying...")
-                        await asyncio.sleep((2 ** attempt) * random.uniform(1, 3))
+                        logger.warning(
+                            f"Failed to get chat info (attempt {attempt + 1}): {e}, retrying..."
+                        )
+                        await asyncio.sleep((2**attempt) * random.uniform(1, 3))
                     else:
-                        return {'success': False, 'error': f'Cannot access channel after retries: {e}'}
+                        return {
+                            "success": False,
+                            "error": f"Cannot access channel after retries: {e}",
+                        }
                 except Exception as e:
-                    return {'success': False, 'error': f'Cannot access channel: {e}'}
+                    return {"success": False, "error": f"Cannot access channel: {e}"}
 
             # Check if we can get members
             if chat.type not in [ChatType.GROUP, ChatType.SUPERGROUP, ChatType.CHANNEL]:
-                return {'success': False, 'error': 'Not a group or channel'}
+                return {"success": False, "error": "Not a group or channel"}
 
             # Save channel info
             is_private = chat.has_protected_content or not chat.username
@@ -3363,13 +3670,14 @@ class MemberScraper:
             members_scraped = 0
             admins_found = set()
             message_analysis = {}  # user_id -> {count, last_date}
-            
+
             # Initialize resumable scraping if available
             resumable_manager = None
             job_id = None
             if RESUMABLE_SCRAPING_AVAILABLE:
                 try:
                     import uuid
+
                     resumable_manager = get_resumable_scraper_manager()
                     job_id = f"scrape_{chat.id}_{uuid.uuid4().hex[:8]}"
                     resumable_manager.create_job(job_id, channel_identifier)
@@ -3377,18 +3685,25 @@ class MemberScraper:
                     logger.info(f"Created resumable scraping job: {job_id}")
                 except Exception as e:
                     logger.debug(f"Could not initialize resumable scraping: {e}")
-            
+
             # METHOD 1: Get administrators (always filter these out)
             logger.info("🔍 Method 1: Scraping administrators...")
             try:
-                async for member in self.client.get_chat_members(chat.id, filter=ChatMembersFilter.ADMINISTRATORS):
+                async for member in self.client.get_chat_members(
+                    chat.id, filter=ChatMembersFilter.ADMINISTRATORS
+                ):
                     if not self.scraping_active:
                         break
                     admins_found.add(member.user.id)
-                    await self._process_member(member, chat.id, is_admin=True, is_owner=(member.status == ChatMemberStatus.OWNER))
+                    await self._process_member(
+                        member,
+                        chat.id,
+                        is_admin=True,
+                        is_owner=(member.status == ChatMemberStatus.OWNER),
+                    )
                     members_scraped += 1
                     await asyncio.sleep(0.1)
-                
+
                 # Save checkpoint
                 if resumable_manager and job_id:
                     resumable_manager.save_checkpoint(
@@ -3397,23 +3712,32 @@ class MemberScraper:
                         members_scraped=len(admins_found),
                         progress_percentage=10.0,
                         channel_id=str(chat.id),
-                        channel_name=chat.title
+                        channel_name=chat.title,
                     )
                     resumable_manager.mark_method_completed(job_id, ScrapingMethod.ADMINISTRATORS)
-                    
+
             except Exception as e:
                 logger.warning(f"Could not get administrators: {e}")
 
             # METHOD 2: Get all visible members
             logger.info("🔍 Method 2: Scraping visible members...")
             try:
-                async for member in self.client.get_chat_members(chat.id, filter=ChatMembersFilter.SEARCH):
+                async for member in self.client.get_chat_members(
+                    chat.id, filter=ChatMembersFilter.SEARCH
+                ):
                     if not self.scraping_active:
                         break
                     if member.user.id not in self.scraped_user_ids:
-                        is_admin = member.user.id in admins_found or member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
-                        await self._process_member(member, chat.id, is_admin=is_admin, 
-                                                  is_owner=(member.status == ChatMemberStatus.OWNER))
+                        is_admin = member.user.id in admins_found or member.status in [
+                            ChatMemberStatus.ADMINISTRATOR,
+                            ChatMemberStatus.OWNER,
+                        ]
+                        await self._process_member(
+                            member,
+                            chat.id,
+                            is_admin=is_admin,
+                            is_owner=(member.status == ChatMemberStatus.OWNER),
+                        )
                         members_scraped += 1
                         if progress_callback and members_scraped % 10 == 0:
                             progress_callback(members_scraped)
@@ -3429,43 +3753,48 @@ class MemberScraper:
                     async for message in self.client.get_chat_history(chat.id, limit=max_messages):
                         if not self.scraping_active:
                             break
-                        
+
                         if message.from_user and message.from_user.id:
                             user_id = message.from_user.id
-                            
+
                             # Track message activity
                             if user_id not in message_analysis:
                                 message_analysis[user_id] = {
-                                    'count': 0,
-                                    'last_date': message.date,
-                                    'user': message.from_user
+                                    "count": 0,
+                                    "last_date": message.date,
+                                    "user": message.from_user,
                                 }
-                            message_analysis[user_id]['count'] += 1
-                            if message.date > message_analysis[user_id]['last_date']:
-                                message_analysis[user_id]['last_date'] = message.date
-                            
+                            message_analysis[user_id]["count"] += 1
+                            if message.date > message_analysis[user_id]["last_date"]:
+                                message_analysis[user_id]["last_date"] = message.date
+
                             # If we haven't seen this user yet, add them
                             if user_id not in self.scraped_user_ids:
                                 # Create a ChatMember-like object from User
-                                fake_member = type('ChatMember', (), {
-                                    'user': message.from_user,
-                                    'status': ChatMemberStatus.MEMBER
-                                })()
-                                
+                                fake_member = type(
+                                    "ChatMember",
+                                    (),
+                                    {"user": message.from_user, "status": ChatMemberStatus.MEMBER},
+                                )()
+
                                 is_admin = user_id in admins_found
-                                await self._process_member(fake_member, chat.id, is_admin=is_admin,
-                                                          message_count=message_analysis[user_id]['count'],
-                                                          last_message_date=message_analysis[user_id]['last_date'])
+                                await self._process_member(
+                                    fake_member,
+                                    chat.id,
+                                    is_admin=is_admin,
+                                    message_count=message_analysis[user_id]["count"],
+                                    last_message_date=message_analysis[user_id]["last_date"],
+                                )
                                 members_scraped += 1
                                 if progress_callback and members_scraped % 10 == 0:
                                     progress_callback(members_scraped)
-                        
+
                         message_count += 1
                         if message_count % 100 == 0:
                             await asyncio.sleep(0.2)  # Rate limiting for message fetching
                         else:
                             await asyncio.sleep(0.05)
-                            
+
                 except Exception as e:
                     logger.warning(f"Message history analysis limited: {e}")
 
@@ -3475,109 +3804,117 @@ class MemberScraper:
 
             # Update member count
             stats = self.db.get_channel_stats(str(chat.id))
-            self.db.save_channel(str(chat.id), chat.title or "Unknown", stats['total_members'], is_private)
+            self.db.save_channel(
+                str(chat.id), chat.title or "Unknown", stats["total_members"], is_private
+            )
 
             # Get final stats
             safe_targets = self.db.get_safe_targets(str(chat.id))
-            threats_filtered = stats['total_members'] - len(safe_targets)
+            threats_filtered = stats["total_members"] - len(safe_targets)
 
             # Mark scraping job as completed with final results
             if resumable_manager and job_id:
                 try:
                     resumable_manager.save_partial_results(job_id, list(self.scraped_user_ids))
                     resumable_manager.update_job_status(
-                        job_id, 
-                        JobStatus.COMPLETED, 
-                        total_members=members_scraped
+                        job_id, JobStatus.COMPLETED, total_members=members_scraped
                     )
                     logger.info(f"✓ Scraping job {job_id} completed successfully")
                 except Exception as e:
                     logger.warning(f"Could not finalize scraping job: {e}")
 
             return {
-                'success': True,
-                'channel_id': str(chat.id),
-                'channel_title': chat.title,
-                'members_scraped': members_scraped,
-                'safe_targets': len(safe_targets),
-                'threats_filtered': threats_filtered,
-                'is_private': is_private,
-                'job_id': job_id  # Return for resume capability
+                "success": True,
+                "channel_id": str(chat.id),
+                "channel_title": chat.title,
+                "members_scraped": members_scraped,
+                "safe_targets": len(safe_targets),
+                "threats_filtered": threats_filtered,
+                "is_private": is_private,
+                "job_id": job_id,  # Return for resume capability
             }
 
         except Exception as e:
             logger.error(f"Error scraping channel {channel_identifier}: {e}")
             import traceback
+
             logger.error(traceback.format_exc())
-            
+
             # Save partial results on failure for resumable scraping
             if resumable_manager and job_id:
                 try:
                     # Save whatever we scraped before failure
                     resumable_manager.save_partial_results(job_id, list(self.scraped_user_ids))
                     resumable_manager.update_job_status(
-                        job_id,
-                        JobStatus.FAILED,
-                        error_message=str(e)
+                        job_id, JobStatus.FAILED, error_message=str(e)
                     )
                     logger.info(f"✓ Saved partial results for failed job {job_id}")
                 except Exception as save_error:
                     logger.warning(f"Could not save partial results: {save_error}")
-            
+
             partial = {
-                'success': False,
-                'error': str(e),
-                'members_scraped': locals().get('members_scraped', 0),
-                'job_id': job_id if 'job_id' in locals() else None,
-                'channel_id': str(chat.id) if 'chat' in locals() and chat else None,
-                'partial_results': {
-                    'admins_found': list(locals().get('admins_found', [])),
-                    'message_analysis_sample': list(locals().get('message_analysis', {}).items())[:10],
+                "success": False,
+                "error": str(e),
+                "members_scraped": locals().get("members_scraped", 0),
+                "job_id": job_id if "job_id" in locals() else None,
+                "channel_id": str(chat.id) if "chat" in locals() and chat else None,
+                "partial_results": {
+                    "admins_found": list(locals().get("admins_found", [])),
+                    "message_analysis_sample": list(locals().get("message_analysis", {}).items())[
+                        :10
+                    ],
                 },
             }
             return partial
         finally:
             self.scraping_active = False
 
-    async def _process_member(self, member: ChatMember, channel_id: str, is_admin: bool = False,
-                             is_owner: bool = False, message_count: int = 0, last_message_date: datetime = None):
+    async def _process_member(
+        self,
+        member: ChatMember,
+        channel_id: str,
+        is_admin: bool = False,
+        is_owner: bool = False,
+        message_count: int = 0,
+        last_message_date: datetime = None,
+    ):
         """Process and save a member with threat detection."""
         user_id = member.user.id
-        
+
         # Skip if already processed
         if user_id in self.scraped_user_ids:
             return
-        
+
         self.scraped_user_ids.add(user_id)
-        
+
         # Calculate activity score
         activity_score = self._calculate_activity_score(member, message_count)
-        
+
         # Calculate threat score
         last_message_days = None
         if last_message_date:
             last_message_days = (datetime.now() - last_message_date).days
-        
+
         threat_score, threat_reasons = self.threat_detector.calculate_threat_score(
             member, message_count, is_admin, False, is_owner, last_message_days
         )
-        
+
         # Determine if safe target
         is_safe = self.threat_detector.is_safe_target(threat_score, threat_reasons)
-        
+
         # Save member
         joined_at = datetime.now()  # Approximation
         last_seen = self._estimate_last_seen(member, last_message_date)
-        
+
         self.db.save_member(
             user_id=user_id,
             username=member.user.username,
             first_name=member.user.first_name,
             last_name=member.user.last_name,
-            phone=getattr(member.user, 'phone', None),
+            phone=getattr(member.user, "phone", None),
             joined_at=joined_at,
             last_seen=last_seen,
-            status=member.status.value if hasattr(member.status, 'value') else str(member.status),
+            status=member.status.value if hasattr(member.status, "value") else str(member.status),
             channel_id=str(channel_id),
             activity_score=activity_score,
             threat_score=threat_score,
@@ -3587,70 +3924,84 @@ class MemberScraper:
             message_count=message_count,
             last_message_date=last_message_date,
             is_safe_target=is_safe,
-            threat_reasons=', '.join(threat_reasons) if threat_reasons else None
+            threat_reasons=", ".join(threat_reasons) if threat_reasons else None,
         )
-    
-    async def _update_threat_scores(self, channel_id: str, message_analysis: Dict, admins_found: set):
+
+    async def _update_threat_scores(
+        self, channel_id: str, message_analysis: Dict, admins_found: set
+    ):
         """Update threat scores for all members based on message analysis."""
         # Get all members for this channel
         all_members = self.db.get_all_members(str(channel_id))
-        
+
         for member_data in all_members:
-            user_id = member_data['user_id']
-            
+            user_id = member_data["user_id"]
+
             # Update message count if we have data
             if user_id in message_analysis:
                 msg_data = message_analysis[user_id]
-                message_count = msg_data['count']
-                last_message_date = msg_data['last_date']
-                
+                message_count = msg_data["count"]
+                last_message_date = msg_data["last_date"]
+
                 # Recalculate threat score with updated message data
                 # We need to reconstruct member status
-                is_admin = member_data.get('is_admin', False) or user_id in admins_found
-                is_owner = member_data.get('is_owner', False)
-                
-                last_message_days = (datetime.now() - last_message_date).days if last_message_date else None
-                
+                is_admin = member_data.get("is_admin", False) or user_id in admins_found
+                is_owner = member_data.get("is_owner", False)
+
+                last_message_days = (
+                    (datetime.now() - last_message_date).days if last_message_date else None
+                )
+
                 # Create a minimal member object for threat calculation
-                fake_member = type('ChatMember', (), {
-                    'user': type('User', (), {
-                        'id': user_id,
-                        'username': member_data.get('username'),
-                        'first_name': member_data.get('first_name'),
-                        'last_name': member_data.get('last_name'),
-                        'is_verified': False,
-                        'is_premium': False,
-                        'photo': None
-                    })(),
-                    'status': ChatMemberStatus.ADMINISTRATOR if is_admin else ChatMemberStatus.MEMBER
-                })()
-                
+                fake_member = type(
+                    "ChatMember",
+                    (),
+                    {
+                        "user": type(
+                            "User",
+                            (),
+                            {
+                                "id": user_id,
+                                "username": member_data.get("username"),
+                                "first_name": member_data.get("first_name"),
+                                "last_name": member_data.get("last_name"),
+                                "is_verified": False,
+                                "is_premium": False,
+                                "photo": None,
+                            },
+                        )(),
+                        "status": (
+                            ChatMemberStatus.ADMINISTRATOR if is_admin else ChatMemberStatus.MEMBER
+                        ),
+                    },
+                )()
+
                 threat_score, threat_reasons = self.threat_detector.calculate_threat_score(
                     fake_member, message_count, is_admin, False, is_owner, last_message_days
                 )
-                
+
                 is_safe = self.threat_detector.is_safe_target(threat_score, threat_reasons)
-                
+
                 # Update member with new threat data
                 self.db.save_member(
                     user_id=user_id,
-                    username=member_data.get('username'),
-                    first_name=member_data.get('first_name'),
-                    last_name=member_data.get('last_name'),
-                    phone=member_data.get('phone'),
-                    joined_at=member_data.get('joined_at'),
-                    last_seen=member_data.get('last_seen'),
-                    status=member_data.get('status'),
+                    username=member_data.get("username"),
+                    first_name=member_data.get("first_name"),
+                    last_name=member_data.get("last_name"),
+                    phone=member_data.get("phone"),
+                    joined_at=member_data.get("joined_at"),
+                    last_seen=member_data.get("last_seen"),
+                    status=member_data.get("status"),
                     channel_id=str(channel_id),
-                    activity_score=member_data.get('activity_score', 0),
+                    activity_score=member_data.get("activity_score", 0),
                     threat_score=threat_score,
                     is_admin=is_admin,
-                    is_moderator=member_data.get('is_moderator', False),
+                    is_moderator=member_data.get("is_moderator", False),
                     is_owner=is_owner,
                     message_count=message_count,
                     last_message_date=last_message_date,
                     is_safe_target=is_safe,
-                    threat_reasons=', '.join(threat_reasons) if threat_reasons else None
+                    threat_reasons=", ".join(threat_reasons) if threat_reasons else None,
                 )
 
     def _calculate_activity_score(self, member: ChatMember, message_count: int = 0) -> int:
@@ -3681,11 +4032,13 @@ class MemberScraper:
 
         return score
 
-    def _estimate_last_seen(self, member: ChatMember, last_message_date: datetime = None) -> datetime:
+    def _estimate_last_seen(
+        self, member: ChatMember, last_message_date: datetime = None
+    ) -> datetime:
         """Estimate when member was last seen."""
         if last_message_date:
             return last_message_date
-        
+
         # This is an approximation - Telegram doesn't provide exact last seen
         base_time = datetime.now()
 
@@ -3713,8 +4066,9 @@ class MemberScraper:
         """
         return self.db.get_safe_targets(channel_id, limit)
 
-    def get_member_targets(self, channel_id: str, min_activity: int = 0, limit: int = None, 
-                          only_safe: bool = True) -> List[Dict]:
+    def get_member_targets(
+        self, channel_id: str, min_activity: int = 0, limit: int = None, only_safe: bool = True
+    ) -> List[Dict]:
         """Get members suitable for messaging based on activity criteria.
 
         Args:
@@ -3733,8 +4087,6 @@ class MemberScraper:
 
         # Filter by minimum activity
         if min_activity > 0:
-            members = [m for m in members if m.get('activity_score', 0) >= min_activity]
+            members = [m for m in members if m.get("activity_score", 0) >= min_activity]
 
         return members
-
-

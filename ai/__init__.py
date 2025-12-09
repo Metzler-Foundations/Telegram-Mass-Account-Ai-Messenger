@@ -1,6 +1,7 @@
 """
 AI and intelligence services module.
 """
+
 from .gemini_service import GeminiService
 from .intelligence_engine import IntelligenceEngine
 from .conversation_analyzer import ConversationAnalyzer
@@ -11,18 +12,12 @@ from .competitor_intelligence import CompetitorIntelligence
 from .network_analytics import NetworkAnalytics
 
 __all__ = [
-    'GeminiService',
-    'IntelligenceEngine',
-    'ConversationAnalyzer',
-    'ResponseOptimizer',
-    'MediaIntelligence',
-    'StatusIntelligence',
-    'CompetitorIntelligence',
-    'NetworkAnalytics',
+    "GeminiService",
+    "IntelligenceEngine",
+    "ConversationAnalyzer",
+    "ResponseOptimizer",
+    "MediaIntelligence",
+    "StatusIntelligence",
+    "CompetitorIntelligence",
+    "NetworkAnalytics",
 ]
-
-
-
-
-
-

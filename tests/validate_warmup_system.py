@@ -8,10 +8,11 @@ import os
 import ast
 import sys
 
+
 def validate_python_file(filepath):
     """Validate that a Python file has correct syntax."""
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             source = f.read()
 
         # Parse the AST to check syntax
@@ -22,9 +23,11 @@ def validate_python_file(filepath):
     except Exception as e:
         return False, f"Error: {e}"
 
+
 def check_file_exists(filepath):
     """Check if a file exists."""
     return os.path.exists(filepath), "File exists" if os.path.exists(filepath) else "File not found"
+
 
 def validate_warmup_system():
     """Validate all warmup system components."""
@@ -33,13 +36,13 @@ def validate_warmup_system():
 
     # Files to validate
     files_to_check = [
-        ('account_warmup_service.py', 'Account Warmup Service'),
-        ('advanced_cloning_system.py', 'Advanced Cloning System'),
-        ('api_key_manager.py', 'API Key Manager'),
-        ('gemini_service.py', 'Gemini Service'),
-        ('main.py', 'Main Application'),
-        ('test_warmup_system.py', 'Test Script'),
-        ('WARMUP_README.md', 'Documentation')
+        ("account_warmup_service.py", "Account Warmup Service"),
+        ("advanced_cloning_system.py", "Advanced Cloning System"),
+        ("api_key_manager.py", "API Key Manager"),
+        ("gemini_service.py", "Gemini Service"),
+        ("main.py", "Main Application"),
+        ("test_warmup_system.py", "Test Script"),
+        ("WARMUP_README.md", "Documentation"),
     ]
 
     all_valid = True
@@ -56,7 +59,7 @@ def validate_warmup_system():
             continue
 
         # Check syntax for Python files
-        if filename.endswith('.py'):
+        if filename.endswith(".py"):
             valid, error = validate_python_file(filepath)
             results.append((filename, description, valid, error if error else "Valid syntax"))
             if not valid:
@@ -99,6 +102,7 @@ def validate_warmup_system():
     else:
         print("❌ SOME COMPONENTS HAVE ISSUES THAT NEED TO BE RESOLVED")
         return False
+
 
 if __name__ == "__main__":
     success = validate_warmup_system()

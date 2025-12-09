@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class HTTPMetrics:
     """HTTP connection metrics."""
+
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
@@ -52,19 +53,19 @@ class HTTPConnectionPool:
         self.rate_limiters: Dict[str, Any] = {}
 
         # Default configuration
-        self.max_connections = self.config.get('max_connections', 50)
-        self.max_connections_per_host = self.config.get('max_connections_per_host', 10)
-        self.connection_timeout = self.config.get('connection_timeout', 30)
-        self.request_timeout = self.config.get('request_timeout', 60)
+        self.max_connections = self.config.get("max_connections", 50)
+        self.max_connections_per_host = self.config.get("max_connections_per_host", 10)
+        self.connection_timeout = self.config.get("connection_timeout", 30)
+        self.request_timeout = self.config.get("request_timeout", 60)
 
         # Connection pool settings
         self.connector_kwargs = {
-            'limit': self.max_connections,
-            'limit_per_host': self.max_connections_per_host,
-            'ttl_dns_cache': 300,  # 5 minutes DNS cache
-            'use_dns_cache': True,
-            'keepalive_timeout': 60,
-            'enable_cleanup_closed': True,
+            "limit": self.max_connections,
+            "limit_per_host": self.max_connections_per_host,
+            "ttl_dns_cache": 300,  # 5 minutes DNS cache
+            "use_dns_cache": True,
+            "keepalive_timeout": 60,
+            "enable_cleanup_closed": True,
         }
 
     async def get_session(self, domain: str) -> aiohttp.ClientSession:
@@ -80,8 +81,7 @@ class HTTPConnectionPool:
         if domain not in self.pools:
             # Create new session for this domain
             timeout = aiohttp.ClientTimeout(
-                total=self.request_timeout,
-                connect=self.connection_timeout
+                total=self.request_timeout, connect=self.connection_timeout
             )
 
             connector = aiohttp.TCPConnector(**self.connector_kwargs)
@@ -89,7 +89,7 @@ class HTTPConnectionPool:
             self.pools[domain] = aiohttp.ClientSession(
                 connector=connector,
                 timeout=timeout,
-                trust_env=True  # Use environment proxy settings
+                trust_env=True,  # Use environment proxy settings
             )
 
             logger.debug(f"Created HTTP session pool for {domain}")
@@ -111,6 +111,7 @@ class HTTPConnectionPool:
         """
         # Extract domain from URL
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         domain = parsed.netloc
 
@@ -143,12 +144,7 @@ class HTTPConnectionPool:
             self.metrics.active_connections -= 1
 
     async def _make_request_with_retry(
-        self,
-        session: aiohttp.ClientSession,
-        method: str,
-        url: str,
-        max_retries: int = 3,
-        **kwargs
+        self, session: aiohttp.ClientSession, method: str, url: str, max_retries: int = 3, **kwargs
     ) -> aiohttp.ClientResponse:
         """
         Make HTTP request with automatic retry logic.
@@ -173,7 +169,7 @@ class HTTPConnectionPool:
                 if response.status >= 500:
                     response.close()
                     if attempt < max_retries - 1:
-                        await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                        await asyncio.sleep(2**attempt)  # Exponential backoff
                         continue
 
                 return response
@@ -181,7 +177,7 @@ class HTTPConnectionPool:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 last_exception = e
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
                     continue
                 else:
                     raise e
@@ -211,37 +207,38 @@ class HTTPConnectionPool:
 
     async def get(self, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Make GET request."""
-        async with self.request('GET', url, **kwargs) as response:
+        async with self.request("GET", url, **kwargs) as response:
             return response
 
     async def post(self, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Make POST request."""
-        async with self.request('POST', url, **kwargs) as response:
+        async with self.request("POST", url, **kwargs) as response:
             return response
 
     async def put(self, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Make PUT request."""
-        async with self.request('PUT', url, **kwargs) as response:
+        async with self.request("PUT", url, **kwargs) as response:
             return response
 
     async def delete(self, url: str, **kwargs) -> aiohttp.ClientResponse:
         """Make DELETE request."""
-        async with self.request('DELETE', url, **kwargs) as response:
+        async with self.request("DELETE", url, **kwargs) as response:
             return response
 
     def get_metrics(self) -> Dict[str, Any]:
         """Get HTTP connection metrics."""
         return {
-            'total_requests': self.metrics.total_requests,
-            'successful_requests': self.metrics.successful_requests,
-            'failed_requests': self.metrics.failed_requests,
-            'success_rate': (
+            "total_requests": self.metrics.total_requests,
+            "successful_requests": self.metrics.successful_requests,
+            "failed_requests": self.metrics.failed_requests,
+            "success_rate": (
                 self.metrics.successful_requests / self.metrics.total_requests * 100
-                if self.metrics.total_requests > 0 else 0
+                if self.metrics.total_requests > 0
+                else 0
             ),
-            'avg_response_time': self.metrics.avg_response_time,
-            'active_connections': self.metrics.active_connections,
-            'pool_count': len(self.pools)
+            "avg_response_time": self.metrics.avg_response_time,
+            "active_connections": self.metrics.active_connections,
+            "pool_count": len(self.pools),
         }
 
     async def close_all(self):
@@ -256,6 +253,7 @@ class HTTPConnectionPool:
 # Global instance
 _http_pool = None
 
+
 def get_http_connection_pool(config: Dict[str, Any] = None) -> HTTPConnectionPool:
     """Get the global HTTP connection pool instance."""
     global _http_pool
@@ -264,5 +262,3 @@ def get_http_connection_pool(config: Dict[str, Any] = None) -> HTTPConnectionPoo
         _http_pool = HTTPConnectionPool(config)
 
     return _http_pool
-
-

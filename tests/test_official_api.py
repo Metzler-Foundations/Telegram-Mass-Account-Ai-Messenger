@@ -13,16 +13,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from telegram.telegram_client import TelegramClient
 from ai.gemini_service import GeminiService
 
+
 async def test_official_api():
     """Test connection with Telegram API credentials from environment"""
     import os
+
     print("🧪 Testing Telegram API Credentials")
     print("=" * 50)
 
     # Get API credentials from environment variables (REQUIRED)
     API_ID = os.getenv("TELEGRAM_API_ID", "")
     API_HASH = os.getenv("TELEGRAM_API_HASH", "")
-    
+
     if not API_ID or not API_HASH:
         print("❌ Error: TELEGRAM_API_ID and TELEGRAM_API_HASH environment variables are required")
         print("📝 Set them before running:")
@@ -69,12 +71,6 @@ async def test_official_api():
     finally:
         await client.stop()
 
+
 if __name__ == "__main__":
     asyncio.run(test_official_api())
-
-
-
-
-
-
-

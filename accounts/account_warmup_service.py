@@ -13,11 +13,13 @@ import psutil
 
 try:
     from ai.gemini_service import GeminiService
+
     GEMINI_AVAILABLE = True
 except ImportError:
     # Create a dummy GeminiService class for type hints
     class GeminiService:
         pass
+
     GEMINI_AVAILABLE = False
 from accounts.account_manager import AccountManager
 from telegram.telegram_client import TelegramClient
@@ -27,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 class WarmupStage(Enum):
     """Stages of account warmup process."""
+
     CREATED = "created"
     INITIAL_SETUP = "initial_setup"
     PROFILE_COMPLETION = "profile_completion"
@@ -42,6 +45,7 @@ class WarmupStage(Enum):
 
 class WarmupPriority(Enum):
     """Priority levels for warmup jobs."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -51,6 +55,7 @@ class WarmupPriority(Enum):
 @dataclass
 class WarmupJob:
     """Represents a warmup job in the queue."""
+
     job_id: str
     phone_number: str
     stage: WarmupStage
@@ -75,28 +80,34 @@ class WarmupJob:
         """Convert to dictionary for serialization."""
         data = asdict(self)
         # Convert enums to strings
-        data['stage'] = self.stage.value
-        data['priority'] = self.priority.value
+        data["stage"] = self.stage.value
+        data["priority"] = self.priority.value
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'WarmupJob':
+    def from_dict(cls, data: Dict[str, Any]) -> "WarmupJob":
         """Create from dictionary."""
         # Convert strings back to enums
         try:
-            data['stage'] = WarmupStage(data['stage'])
+            data["stage"] = WarmupStage(data["stage"])
         except Exception:
             logger.error(f"Invalid warmup stage encountered during load: {data.get('stage')}")
-            data['stage'] = WarmupStage.FAILED
+            data["stage"] = WarmupStage.FAILED
 
         try:
-            data['priority'] = WarmupPriority(data['priority'])
+            data["priority"] = WarmupPriority(data["priority"])
         except Exception:
             logger.error(f"Invalid warmup priority encountered during load: {data.get('priority')}")
-            data['priority'] = WarmupPriority.NORMAL
+            data["priority"] = WarmupPriority.NORMAL
 
         # Convert datetime strings back to datetime objects
-        for field in ['created_at', 'started_at', 'completed_at', 'last_activity', 'next_attempt_at']:
+        for field in [
+            "created_at",
+            "started_at",
+            "completed_at",
+            "last_activity",
+            "next_attempt_at",
+        ]:
             if data.get(field) and isinstance(data[field], str):
                 try:
                     data[field] = datetime.fromisoformat(data[field])
@@ -110,6 +121,7 @@ class WarmupJob:
 @dataclass
 class WarmupConfig:
     """Configuration for account warmup."""
+
     # Timing configurations
     initial_delay_hours: int = 24  # Wait 24 hours after creation
     stage_delays: Dict[str, int] = None  # Hours between stages
@@ -130,60 +142,64 @@ class WarmupConfig:
     # AI configurations
     use_gemini_for_responses: bool = True
     use_gemini_for_decisions: bool = True
-    
+
     # Blackout windows (hours in UTC, 0-23)
     blackout_window_1_start: Optional[int] = 2  # 2 AM UTC
     blackout_window_1_end: Optional[int] = 6  # 6 AM UTC
     blackout_window_2_start: Optional[int] = None
     blackout_window_2_end: Optional[int] = None
-    
+
     # Stage weights for time allocation (relative importance)
     stage_weights: Dict[str, float] = None
 
     def __post_init__(self):
         if self.stage_delays is None:
             self.stage_delays = {
-                'initial_setup': 6,
-                'profile_completion': 12,
-                'contact_building': 24,
-                'group_joining': 48,
-                'conversation_starters': 72,
-                'activity_increase': 96,
-                'advanced_interactions': 120,
-                'stabilization': 168  # 1 week
+                "initial_setup": 6,
+                "profile_completion": 12,
+                "contact_building": 24,
+                "group_joining": 48,
+                "conversation_starters": 72,
+                "activity_increase": 96,
+                "advanced_interactions": 120,
+                "stabilization": 168,  # 1 week
             }
-        
+
         if self.stage_weights is None:
             self.stage_weights = {
-                'initial_setup': 0.5,           # Quick setup
-                'profile_completion': 1.0,      # Standard weight
-                'contact_building': 1.5,        # More important
-                'group_joining': 1.5,           # More important
-                'conversation_starters': 2.0,   # High importance
-                'activity_increase': 2.0,       # High importance
-                'advanced_interactions': 1.5,   # Moderate
-                'stabilization': 3.0            # Most critical
+                "initial_setup": 0.5,  # Quick setup
+                "profile_completion": 1.0,  # Standard weight
+                "contact_building": 1.5,  # More important
+                "group_joining": 1.5,  # More important
+                "conversation_starters": 2.0,  # High importance
+                "activity_increase": 2.0,  # High importance
+                "advanced_interactions": 1.5,  # Moderate
+                "stabilization": 3.0,  # Most critical
             }
-    
+
     def is_in_blackout_window(self, check_time: Optional[datetime] = None) -> bool:
         """Check if current time is within a blackout window."""
         if check_time is None:
             check_time = datetime.now()
-        
+
         current_hour = check_time.hour
-        
+
         # Check window 1
         if self.blackout_window_1_start is not None and self.blackout_window_1_end is not None:
-            if self._is_hour_in_range(current_hour, self.blackout_window_1_start, self.blackout_window_1_end):
+            if self._is_hour_in_range(
+                current_hour, self.blackout_window_1_start, self.blackout_window_1_end
+            ):
                 return True
-        
+
         # Check window 2
         if self.blackout_window_2_start is not None and self.blackout_window_2_end is not None:
-            if self._is_hour_in_range(current_hour, self.blackout_window_2_start, self.blackout_window_2_end):
+            if self._is_hour_in_range(
+                current_hour, self.blackout_window_2_start, self.blackout_window_2_end
+            ):
                 return True
-        
+
         return False
-    
+
     @staticmethod
     def _is_hour_in_range(hour: int, start: int, end: int) -> bool:
         """Check if hour is in range, handling overnight periods."""
@@ -196,8 +212,12 @@ class WarmupConfig:
 class AccountWarmupService:
     """Advanced service for warming up Telegram accounts with AI-powered intelligence."""
 
-    def __init__(self, account_manager: AccountManager, gemini_service: Optional[GeminiService] = None,
-                 performance_profile: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        account_manager: AccountManager,
+        gemini_service: Optional[GeminiService] = None,
+        performance_profile: Optional[Dict[str, Any]] = None,
+    ):
         self.account_manager = account_manager
         self.gemini_service = gemini_service
         # Store reference for status updates
@@ -251,48 +271,58 @@ class AccountWarmupService:
                 callback(job)
             except Exception as e:
                 logger.warning(f"Status callback failed: {e}")
-        
+
         # Also update account manager if available
-        if hasattr(self, 'account_manager') and self.account_manager:
+        if hasattr(self, "account_manager") and self.account_manager:
             try:
                 from accounts.account_manager import AccountStatus
+
                 # Update account status based on warmup stage
                 if job.stage == WarmupStage.COMPLETED:
                     self.account_manager.update_account_status(
                         job.phone_number,
                         AccountStatus.READY,
                         {
-                            'warmup_job_id': job.job_id,
-                            'warmup_stage': job.stage.value,
-                            'warmup_progress': 100.0
-                        }
+                            "warmup_job_id": job.job_id,
+                            "warmup_stage": job.stage.value,
+                            "warmup_progress": 100.0,
+                        },
                     )
                 elif job.stage == WarmupStage.FAILED:
                     self.account_manager.update_account_status(
                         job.phone_number,
                         AccountStatus.ERROR,
                         {
-                            'error_message': job.error_message or "Warmup failed",
-                            'warmup_job_id': job.job_id,
-                            'warmup_stage': job.stage.value
-                        }
+                            "error_message": job.error_message or "Warmup failed",
+                            "warmup_job_id": job.job_id,
+                            "warmup_stage": job.stage.value,
+                        },
                     )
                 else:
                     # Update warmup progress
                     if job.phone_number in self.account_manager.account_status:
-                        self.account_manager.account_status[job.phone_number]['warmup_stage'] = job.stage.value
-                        self.account_manager.account_status[job.phone_number]['warmup_progress'] = job.progress
+                        self.account_manager.account_status[job.phone_number][
+                            "warmup_stage"
+                        ] = job.stage.value
+                        self.account_manager.account_status[job.phone_number][
+                            "warmup_progress"
+                        ] = job.progress
                         # Ensure status is WARMING_UP if not already in a later stage
-                        current_status = self.account_manager.account_status[job.phone_number].get('status')
-                        if current_status not in [AccountStatus.CLONING.value, AccountStatus.READY.value]:
+                        current_status = self.account_manager.account_status[job.phone_number].get(
+                            "status"
+                        )
+                        if current_status not in [
+                            AccountStatus.CLONING.value,
+                            AccountStatus.READY.value,
+                        ]:
                             self.account_manager.update_account_status(
                                 job.phone_number,
                                 AccountStatus.WARMING_UP,
                                 {
-                                    'warmup_job_id': job.job_id,
-                                    'warmup_stage': job.stage.value,
-                                    'warmup_progress': job.progress
-                                }
+                                    "warmup_job_id": job.job_id,
+                                    "warmup_stage": job.stage.value,
+                                    "warmup_progress": job.progress,
+                                },
                             )
             except Exception as e:
                 logger.warning(f"Failed to update account manager with warmup status: {e}")
@@ -308,7 +338,7 @@ class AccountWarmupService:
         logger.info("🚀 Starting Account Warmup Service")
 
         # Track tasks for proper cleanup
-        if not hasattr(self, '_background_tasks'):
+        if not hasattr(self, "_background_tasks"):
             self._background_tasks = []
 
         # Start the main processing loop
@@ -325,9 +355,9 @@ class AccountWarmupService:
         self.is_running = False
         self._shutdown_event.set()
         logger.info("🛑 Stopping Account Warmup Service")
-        
+
         # Cancel all background tasks
-        if hasattr(self, '_background_tasks'):
+        if hasattr(self, "_background_tasks"):
             for task in self._background_tasks:
                 if not task.done():
                     task.cancel()
@@ -336,10 +366,12 @@ class AccountWarmupService:
                     except asyncio.CancelledError:
                         pass
             self._background_tasks.clear()
-        if hasattr(self, '_monitor_task'):
+        if hasattr(self, "_monitor_task"):
             self._monitor_task = None
 
-    def add_warmup_job(self, phone_number: str, priority: WarmupPriority = WarmupPriority.NORMAL) -> str:
+    def add_warmup_job(
+        self, phone_number: str, priority: WarmupPriority = WarmupPriority.NORMAL
+    ) -> str:
         """Add a new warmup job to the queue."""
         job_id = f"warmup_{phone_number}_{int(time.time())}_{random.randint(1000, 9999)}"
 
@@ -349,7 +381,7 @@ class AccountWarmupService:
             stage=WarmupStage.CREATED,
             priority=priority,
             created_at=datetime.now(),
-            status_message="Job queued for warmup"
+            status_message="Job queued for warmup",
         )
 
         self.job_queue.append(job)
@@ -369,7 +401,7 @@ class AccountWarmupService:
             WarmupPriority.CRITICAL: 0,
             WarmupPriority.HIGH: 1,
             WarmupPriority.NORMAL: 2,
-            WarmupPriority.LOW: 3
+            WarmupPriority.LOW: 3,
         }
 
         self.job_queue.sort(key=lambda j: (priority_order[j.priority], j.created_at))
@@ -416,7 +448,9 @@ class AccountWarmupService:
                 self.active_jobs[job.job_id] = job
                 self._record_activity(job.phone_number, f"stage_start:{job.stage.value}")
 
-                logger.info(f"🔄 Starting warmup job {job.job_id} for {job.phone_number} (Stage: {job.stage.value})")
+                logger.info(
+                    f"🔄 Starting warmup job {job.job_id} for {job.phone_number} (Stage: {job.stage.value})"
+                )
                 self._notify_status_update(job, f"Starting {job.stage.value} stage")
 
                 # Process the job
@@ -430,8 +464,12 @@ class AccountWarmupService:
                             job.stage = next_stage
                             job.progress = 0.0
                             job.next_attempt_at = None
-                            job.status_message = f"Completed {job.stage.value}, moving to {next_stage.value}"
-                            self._record_activity(job.phone_number, f"stage_complete:{next_stage.value}")
+                            job.status_message = (
+                                f"Completed {job.stage.value}, moving to {next_stage.value}"
+                            )
+                            self._record_activity(
+                                job.phone_number, f"stage_complete:{next_stage.value}"
+                            )
                             # Re-queue for next stage
                             self.job_queue.append(job)
                         else:
@@ -459,14 +497,16 @@ class AccountWarmupService:
                         logger.error(f"❌ Job {job.job_id} failed permanently")
                     else:
                         # Re-queue with backoff
-                        delay_hours = 2 ** job.retry_count  # Exponential backoff
+                        delay_hours = 2**job.retry_count  # Exponential backoff
                         job.status_message = f"Job failed, retrying in {delay_hours} hours"
                         job.next_attempt_at = datetime.now() + timedelta(hours=delay_hours)
                         self.job_queue.append(job)
                         self.save_jobs()
                         should_resume = await self._sleep_with_cancellation(delay_hours * 3600)
                         if not should_resume:
-                            logger.info("Warmup service stopping during backoff; preserving queued retry state")
+                            logger.info(
+                                "Warmup service stopping during backoff; preserving queued retry state"
+                            )
 
                 # Remove from active jobs
                 if job.job_id in self.active_jobs:
@@ -522,7 +562,7 @@ class AccountWarmupService:
             WarmupStage.CONVERSATION_STARTERS,
             WarmupStage.ACTIVITY_INCREASE,
             WarmupStage.ADVANCED_INTERACTIONS,
-            WarmupStage.STABILIZATION
+            WarmupStage.STABILIZATION,
         ]
 
         try:
@@ -539,7 +579,7 @@ class AccountWarmupService:
         try:
             if not self._validate_job(job):
                 return False
-            
+
             # Check blackout window
             if self.config.is_in_blackout_window():
                 logger.info(f"⏸ Job {job.job_id} delayed - in blackout window")
@@ -549,7 +589,7 @@ class AccountWarmupService:
                 self.job_queue.append(job)
                 self.save_jobs()
                 return True  # Not a failure, just delayed
-            
+
             # Get account client
             client = await self._get_account_client(job.phone_number)
             if not client:
@@ -585,7 +625,7 @@ class AccountWarmupService:
             return False
         finally:
             # Clean up client
-            if 'client' in locals():
+            if "client" in locals():
                 try:
                     await client.stop()
                 except (AttributeError, RuntimeError, ConnectionError, Exception) as e:
@@ -617,18 +657,16 @@ class AccountWarmupService:
                 logger.error(f"Account data not found for {phone_number}")
                 return None
 
-            api_id = account_data.get('api_id')
-            api_hash = account_data.get('api_hash')
-            
+            api_id = account_data.get("api_id")
+            api_hash = account_data.get("api_hash")
+
             if not api_id or not api_hash:
-                logger.error(f"Missing API credentials for warmup account {phone_number} in account manager.")
+                logger.error(
+                    f"Missing API credentials for warmup account {phone_number} in account manager."
+                )
                 return None
-            
-            client = TelegramClient(
-                api_id=api_id,
-                api_hash=api_hash,
-                phone_number=phone_number
-            )
+
+            client = TelegramClient(api_id=api_id, api_hash=api_hash, phone_number=phone_number)
 
             success = await client.initialize()
             if success:
@@ -677,21 +715,29 @@ class AccountWarmupService:
         """Complete account profile setup with AI intelligence."""
         try:
             # Use Gemini to generate intelligent profile content based on account analysis
-            account_analysis = await self.warmup_intelligence.analyze_account_for_profile(job.phone_number)
-            profile_data = await self.warmup_intelligence.generate_profile_content(job.phone_number, account_analysis)
+            account_analysis = await self.warmup_intelligence.analyze_account_for_profile(
+                job.phone_number
+            )
+            profile_data = await self.warmup_intelligence.generate_profile_content(
+                job.phone_number, account_analysis
+            )
 
             # Update profile with AI-generated content
             await self._update_profile_with_content(client, profile_data)
             job.progress = 40
 
             # Set profile photo with AI selection
-            photo_suggestion = await self.warmup_intelligence.suggest_profile_photo(job.phone_number, profile_data)
+            photo_suggestion = await self.warmup_intelligence.suggest_profile_photo(
+                job.phone_number, profile_data
+            )
             if photo_suggestion:
                 await self._set_profile_photo_with_ai(client, photo_suggestion)
             job.progress = 70
 
             # Generate and set bio with AI
-            bio_suggestion = await self.warmup_intelligence.generate_bio_for_account(job.phone_number, profile_data)
+            bio_suggestion = await self.warmup_intelligence.generate_bio_for_account(
+                job.phone_number, profile_data
+            )
             if bio_suggestion:
                 await client.update_profile(bio=bio_suggestion)
             job.progress = 85
@@ -712,12 +758,14 @@ class AccountWarmupService:
         try:
             # Apply stage weight to activity count
             base_contacts = self.config.contacts_per_day
-            stage_weight = self.config.stage_weights.get('contact_building', 1.0)
+            stage_weight = self.config.stage_weights.get("contact_building", 1.0)
             contacts_to_add = min(int(base_contacts * stage_weight), 10)
 
             for i in range(contacts_to_add):
                 # Use Gemini to find suitable contacts to add
-                contact_suggestion = await self.warmup_intelligence.suggest_contact_to_add(job.phone_number)
+                contact_suggestion = await self.warmup_intelligence.suggest_contact_to_add(
+                    job.phone_number
+                )
 
                 if contact_suggestion:
                     await self._add_contact_safely(client, contact_suggestion)
@@ -738,12 +786,14 @@ class AccountWarmupService:
         try:
             # Apply stage weight to activity count
             base_groups = self.config.groups_per_day
-            stage_weight = self.config.stage_weights.get('group_joining', 1.0)
+            stage_weight = self.config.stage_weights.get("group_joining", 1.0)
             groups_to_join = min(int(base_groups * stage_weight), 5)
 
             for i in range(groups_to_join):
                 # Use Gemini to find suitable groups
-                group_suggestion = await self.warmup_intelligence.suggest_group_to_join(job.phone_number)
+                group_suggestion = await self.warmup_intelligence.suggest_group_to_join(
+                    job.phone_number
+                )
 
                 if group_suggestion:
                     await self._join_group_safely(client, group_suggestion)
@@ -764,12 +814,14 @@ class AccountWarmupService:
         try:
             # Apply stage weight to activity count
             base_messages = self.config.messages_per_day
-            stage_weight = self.config.stage_weights.get('conversation_starters', 1.0)
+            stage_weight = self.config.stage_weights.get("conversation_starters", 1.0)
             conversations_to_start = min(int(base_messages * stage_weight), 15)
 
             for i in range(conversations_to_start):
                 # Use Gemini to generate natural conversation starters
-                conversation_data = await self.warmup_intelligence.generate_conversation_starter(job.phone_number)
+                conversation_data = await self.warmup_intelligence.generate_conversation_starter(
+                    job.phone_number
+                )
 
                 if conversation_data:
                     await self._send_conversation_starter(client, conversation_data)
@@ -793,7 +845,7 @@ class AccountWarmupService:
                 self._perform_random_interactions,
                 self._update_online_status,
                 self._send_followup_messages,
-                self._engage_with_groups
+                self._engage_with_groups,
             ]
 
             completed_activities = 0
@@ -824,7 +876,7 @@ class AccountWarmupService:
                 self._create_and_share_content,
                 self._participate_in_polls,
                 self._share_media_content,
-                self._engage_in_group_discussions
+                self._engage_in_group_discussions,
             ]
 
             completed = 0
@@ -853,7 +905,7 @@ class AccountWarmupService:
                 self._maintain_online_presence,
                 self._respond_to_messages_consistently,
                 self._keep_groups_active,
-                self._update_profile_periodically
+                self._update_profile_periodically,
             ]
 
             completed = 0
@@ -887,9 +939,9 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for privacy settings")
                 return
-            
+
             from pyrogram import raw
-            
+
             # Set basic privacy: allow everyone to see last seen, phone number, etc.
             # This is a conservative default for new accounts
             try:
@@ -897,7 +949,7 @@ class AccountWarmupService:
                 await client.client.invoke(
                     raw.functions.account.SetPrivacy(
                         key=raw.types.InputPrivacyKeyStatusTimestamp(),
-                        rules=[raw.types.InputPrivacyValueAllowAll()]
+                        rules=[raw.types.InputPrivacyValueAllowAll()],
                     )
                 )
                 logger.debug("Privacy settings configured")
@@ -912,18 +964,18 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for profile validation")
                 return False
-            
+
             # Get current user info
             me = await client.client.get_me()
-            
+
             # Check if profile has basic info
             has_name = bool(me.first_name)
             has_username = bool(me.username)
-            
+
             if not has_name:
                 logger.warning("Profile missing first name")
                 return False
-            
+
             logger.debug(f"Profile validation: name={has_name}, username={has_username}")
             return True
         except Exception as e:
@@ -933,17 +985,22 @@ class AccountWarmupService:
     async def _update_profile_with_content(self, client: TelegramClient, profile_data: Dict):
         """Update profile with AI-generated content (sanitized)."""
         from utils.input_validation import sanitize_html
-        
-        if profile_data.get('bio'):
-            bio = sanitize_html(profile_data['bio'])[:70]  # Sanitize and limit
+
+        if profile_data.get("bio"):
+            bio = sanitize_html(profile_data["bio"])[:70]  # Sanitize and limit
             await client.update_profile(bio=bio)
-        if profile_data.get('first_name') or profile_data.get('last_name'):
-            first_name = sanitize_html(profile_data.get('first_name', ''))[:64] if profile_data.get('first_name') else None
-            last_name = sanitize_html(profile_data.get('last_name', ''))[:64] if profile_data.get('last_name') else None
-            await client.update_profile(
-                first_name=first_name,
-                last_name=last_name
+        if profile_data.get("first_name") or profile_data.get("last_name"):
+            first_name = (
+                sanitize_html(profile_data.get("first_name", ""))[:64]
+                if profile_data.get("first_name")
+                else None
             )
+            last_name = (
+                sanitize_html(profile_data.get("last_name", ""))[:64]
+                if profile_data.get("last_name")
+                else None
+            )
+            await client.update_profile(first_name=first_name, last_name=last_name)
 
     async def _set_profile_photo(self, client: TelegramClient, profile_data: Dict):
         """Set profile photo."""
@@ -951,18 +1008,19 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for setting profile photo")
                 return False
-            
-            photo_path = profile_data.get('photo_path')
+
+            photo_path = profile_data.get("photo_path")
             if not photo_path:
                 logger.debug("No photo path provided")
                 return False
-            
+
             from pathlib import Path
+
             photo_file = Path(photo_path)
             if not photo_file.exists():
                 logger.warning(f"Photo file not found: {photo_path}")
                 return False
-            
+
             await client.client.set_profile_photo(photo=str(photo_file))
             logger.info("Profile photo set successfully")
             return True
@@ -976,12 +1034,12 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for AI profile photo")
                 return False
-            
+
             # If AI suggested a photo path, use it
-            photo_path = photo_suggestion.get('photo_path')
+            photo_path = photo_suggestion.get("photo_path")
             if photo_path:
-                return await self._set_profile_photo(client, {'photo_path': photo_path})
-            
+                return await self._set_profile_photo(client, {"photo_path": photo_path})
+
             # Otherwise, AI might suggest generating or finding a photo
             # For now, just log that AI suggestion was received
             logger.debug(f"AI photo suggestion received: {photo_suggestion}")
@@ -996,21 +1054,21 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for AI profile configuration")
                 return False
-            
+
             # Use AI-generated content if available
             updates = {}
-            if profile_data.get('first_name'):
-                updates['first_name'] = profile_data['first_name']
-            if profile_data.get('last_name'):
-                updates['last_name'] = profile_data['last_name']
-            if profile_data.get('bio'):
-                updates['bio'] = profile_data['bio'][:70]  # Max 70 chars
-            
+            if profile_data.get("first_name"):
+                updates["first_name"] = profile_data["first_name"]
+            if profile_data.get("last_name"):
+                updates["last_name"] = profile_data["last_name"]
+            if profile_data.get("bio"):
+                updates["bio"] = profile_data["bio"][:70]  # Max 70 chars
+
             if updates:
                 await client.client.update_profile(**updates)
                 logger.info("Profile updated with AI-generated content")
                 return True
-            
+
             return False
         except Exception as e:
             logger.error(f"Failed to configure profile with AI: {e}")
@@ -1022,21 +1080,23 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for profile configuration")
                 return False
-            
+
             # Basic profile validation and setup
             me = await client.client.get_me()
-            
+
             # Ensure username is set if possible
             if not me.username:
                 # Try to set a username based on first name
                 if me.first_name:
-                    suggested_username = me.first_name.lower().replace(' ', '_') + str(random.randint(100, 999))
+                    suggested_username = me.first_name.lower().replace(" ", "_") + str(
+                        random.randint(100, 999)
+                    )
                     try:
                         await client.client.set_username(suggested_username)
                         logger.info(f"Set username: {suggested_username}")
                     except Exception as e:
                         logger.debug(f"Could not set username: {e}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to configure profile settings: {e}")
@@ -1048,32 +1108,30 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for adding contact")
                 return False
-            
-            phone_number = contact_data.get('phone_number')
-            first_name = contact_data.get('first_name', '')
-            last_name = contact_data.get('last_name', '')
-            
+
+            phone_number = contact_data.get("phone_number")
+            first_name = contact_data.get("first_name", "")
+            last_name = contact_data.get("last_name", "")
+
             if not phone_number:
                 logger.warning("No phone number provided for contact")
                 return False
-            
+
             # Add delay before adding contact
             await self._respect_rate_limits()
-            
+
             # Import contact method
             from pyrogram.types import InputPhoneContact
             from pyrogram import raw
-            
+
             contact = InputPhoneContact(
-                phone=phone_number,
-                first_name=first_name,
-                last_name=last_name
+                phone=phone_number, first_name=first_name, last_name=last_name
             )
-            
+
             result = await client.client.invoke(
                 raw.functions.contacts.ImportContacts(contacts=[contact.to_raw()])
             )
-            
+
             if result.users:
                 logger.info(f"Contact added: {phone_number}")
                 return True
@@ -1090,17 +1148,17 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for joining group")
                 return False
-            
-            group_username = group_data.get('username')
-            group_id = group_data.get('chat_id')
-            
+
+            group_username = group_data.get("username")
+            group_id = group_data.get("chat_id")
+
             if not group_username and not group_id:
                 logger.warning("No group identifier provided")
                 return False
-            
+
             # Add delay before joining
             await self._respect_rate_limits()
-            
+
             try:
                 if group_username:
                     await client.client.join_chat(group_username)
@@ -1124,17 +1182,17 @@ class AccountWarmupService:
             if not client or not client.client:
                 logger.warning("Client not available for sending message")
                 return False
-            
-            chat_id = conversation_data.get('chat_id')
-            message = conversation_data.get('message')
-            
+
+            chat_id = conversation_data.get("chat_id")
+            message = conversation_data.get("message")
+
             if not chat_id or not message:
                 logger.warning("Missing chat_id or message for conversation starter")
                 return False
-            
+
             # Add delay before sending
             await self._respect_rate_limits()
-            
+
             await client.client.send_message(chat_id, message)
             logger.info(f"Conversation starter sent to {chat_id}")
             return True
@@ -1147,24 +1205,24 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Random interactions: view chats, check messages, etc.
             interactions = [
                 self._view_recent_chats,
                 self._check_dialogs,
             ]
-            
+
             # Perform 1-3 random interactions
             num_interactions = random.randint(1, 3)
             selected = random.sample(interactions, min(num_interactions, len(interactions)))
-            
+
             for interaction in selected:
                 try:
                     await interaction(client)
                     await self._respect_rate_limits()
                 except Exception as e:
                     logger.debug(f"Random interaction failed: {e}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to perform random interactions: {e}")
@@ -1208,20 +1266,20 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Get recent chats
             dialogs = []
             async for dialog in client.client.get_dialogs(limit=5):
-                if dialog.chat.type.name in ['PRIVATE', 'GROUP', 'SUPERGROUP']:
+                if dialog.chat.type.name in ["PRIVATE", "GROUP", "SUPERGROUP"]:
                     dialogs.append(dialog)
-            
+
             if not dialogs:
                 logger.debug("No dialogs available for followup messages")
                 return False
-            
+
             # Send followup to 1-2 random chats
             selected_dialogs = random.sample(dialogs, min(2, len(dialogs)))
-            
+
             for dialog in selected_dialogs:
                 try:
                     # Generate a simple followup message
@@ -1231,13 +1289,13 @@ class AccountWarmupService:
                         "Hope you're doing well!",
                     ]
                     message = random.choice(followup_messages)
-                    
+
                     await client.client.send_message(dialog.chat.id, message)
                     await self._respect_rate_limits()
                     logger.debug(f"Sent followup to {dialog.chat.id}")
                 except Exception as e:
                     logger.debug(f"Failed to send followup: {e}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to send followup messages: {e}")
@@ -1248,20 +1306,20 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Get group chats
             groups = []
             async for dialog in client.client.get_dialogs():
-                if dialog.chat.type.name in ['GROUP', 'SUPERGROUP']:
+                if dialog.chat.type.name in ["GROUP", "SUPERGROUP"]:
                     groups.append(dialog.chat)
-            
+
             if not groups:
                 logger.debug("No groups available for engagement")
                 return False
-            
+
             # Engage with 1-2 random groups
             selected_groups = random.sample(groups, min(2, len(groups)))
-            
+
             for group in selected_groups:
                 try:
                     # Send a simple message to the group
@@ -1271,13 +1329,13 @@ class AccountWarmupService:
                         "Great group!",
                     ]
                     message = random.choice(messages)
-                    
+
                     await client.client.send_message(group.id, message)
                     await self._respect_rate_limits()
                     logger.debug(f"Engaged with group {group.id}")
                 except Exception as e:
                     logger.debug(f"Failed to engage with group: {e}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to engage with groups: {e}")
@@ -1288,17 +1346,17 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Get a group or channel to share in
             groups = []
             async for dialog in client.client.get_dialogs(limit=10):
-                if dialog.chat.type.name in ['GROUP', 'SUPERGROUP', 'CHANNEL']:
+                if dialog.chat.type.name in ["GROUP", "SUPERGROUP", "CHANNEL"]:
                     groups.append(dialog.chat)
-            
+
             if not groups:
                 logger.debug("No groups/channels available for sharing")
                 return False
-            
+
             # Share a simple text message
             content_messages = [
                 "Sharing some thoughts...",
@@ -1306,11 +1364,11 @@ class AccountWarmupService:
                 "Check this out!",
             ]
             message = random.choice(content_messages)
-            
+
             target = random.choice(groups)
             await client.client.send_message(target.id, message)
             await self._respect_rate_limits()
-            
+
             logger.debug(f"Shared content in {target.id}")
             return True
         except Exception as e:
@@ -1322,7 +1380,7 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Find messages with polls
             polls_found = 0
             async for dialog in client.client.get_dialogs(limit=20):
@@ -1339,7 +1397,7 @@ class AccountWarmupService:
                                     await client.client.vote_poll(
                                         chat_id=dialog.chat.id,
                                         message_id=message.id,
-                                        options=option_index
+                                        options=option_index,
                                     )
                                     polls_found += 1
                                     await self._respect_rate_limits()
@@ -1352,7 +1410,7 @@ class AccountWarmupService:
                         break
                 except Exception as e:
                     logger.debug(f"Error checking chat for polls: {e}")
-            
+
             return polls_found > 0
         except Exception as e:
             logger.error(f"Failed to participate in polls: {e}")
@@ -1363,22 +1421,22 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # For now, we'll just send text messages
             # Media sharing would require actual media files
             groups = []
             async for dialog in client.client.get_dialogs(limit=5):
-                if dialog.chat.type.name in ['GROUP', 'SUPERGROUP']:
+                if dialog.chat.type.name in ["GROUP", "SUPERGROUP"]:
                     groups.append(dialog.chat)
-            
+
             if not groups:
                 return False
-            
+
             target = random.choice(groups)
             # Send a message that could reference media
             await client.client.send_message(target.id, "Great content!")
             await self._respect_rate_limits()
-            
+
             logger.debug("Shared content (text-based)")
             return True
         except Exception as e:
@@ -1390,39 +1448,43 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Get group chats
             groups = []
             async for dialog in client.client.get_dialogs(limit=10):
-                if dialog.chat.type.name in ['GROUP', 'SUPERGROUP']:
+                if dialog.chat.type.name in ["GROUP", "SUPERGROUP"]:
                     groups.append(dialog.chat)
-            
+
             if not groups:
                 return False
-            
+
             # Engage in 1-2 group discussions
             selected_groups = random.sample(groups, min(2, len(groups)))
-            
+
             discussion_messages = [
                 "Interesting point!",
                 "I agree with that.",
                 "Thanks for sharing!",
                 "That makes sense.",
             ]
-            
+
             for group in selected_groups:
                 try:
                     # Get recent messages to reply to
                     async for message in client.client.get_chat_history(group.id, limit=5):
-                        if message.text and len(message.text) > 10:  # Only reply to substantial messages
+                        if (
+                            message.text and len(message.text) > 10
+                        ):  # Only reply to substantial messages
                             reply = random.choice(discussion_messages)
-                            await client.client.send_message(group.id, reply, reply_to_message_id=message.id)
+                            await client.client.send_message(
+                                group.id, reply, reply_to_message_id=message.id
+                            )
                             await self._respect_rate_limits()
                             logger.debug(f"Engaged in discussion in {group.id}")
                             break
                 except Exception as e:
                     logger.debug(f"Failed to engage in group discussion: {e}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to engage in group discussions: {e}")
@@ -1448,31 +1510,34 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Check for unread messages and respond
             dialogs = []
             async for dialog in client.client.get_dialogs(limit=20):
                 if dialog.unread_count > 0:
                     dialogs.append(dialog)
-            
+
             if not dialogs:
                 logger.debug("No unread messages to respond to")
                 return False
-            
+
             # Respond to 1-3 dialogs
             selected_dialogs = random.sample(dialogs, min(3, len(dialogs)))
-            
+
             response_messages = [
                 "Thanks for your message!",
                 "I'll get back to you soon.",
                 "Appreciate you reaching out!",
             ]
-            
+
             for dialog in selected_dialogs:
                 try:
                     # Get the latest message
                     async for message in client.client.get_chat_history(dialog.chat.id, limit=1):
-                        if message.from_user and message.from_user.id != (await client.client.get_me()).id:
+                        if (
+                            message.from_user
+                            and message.from_user.id != (await client.client.get_me()).id
+                        ):
                             response = random.choice(response_messages)
                             await client.client.send_message(dialog.chat.id, response)
                             await self._respect_rate_limits()
@@ -1480,7 +1545,7 @@ class AccountWarmupService:
                             break
                 except Exception as e:
                     logger.debug(f"Failed to respond to message: {e}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to respond to messages consistently: {e}")
@@ -1491,25 +1556,25 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Get active groups
             groups = []
             async for dialog in client.client.get_dialogs(limit=15):
-                if dialog.chat.type.name in ['GROUP', 'SUPERGROUP']:
+                if dialog.chat.type.name in ["GROUP", "SUPERGROUP"]:
                     groups.append(dialog.chat)
-            
+
             if not groups:
                 return False
-            
+
             # Send a message to 1-2 random groups to keep them active
             selected_groups = random.sample(groups, min(2, len(groups)))
-            
+
             activity_messages = [
                 "Hello!",
                 "Hope everyone is doing well!",
                 "Great to be here!",
             ]
-            
+
             for group in selected_groups:
                 try:
                     message = random.choice(activity_messages)
@@ -1518,7 +1583,7 @@ class AccountWarmupService:
                     logger.debug(f"Kept group active: {group.id}")
                 except Exception as e:
                     logger.debug(f"Failed to keep group active: {e}")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to keep groups active: {e}")
@@ -1529,11 +1594,11 @@ class AccountWarmupService:
         try:
             if not client or not client.client:
                 return False
-            
+
             # Small random profile updates (like bio tweaks)
             me = await client.client.get_me()
             current_bio = me.bio or ""
-            
+
             # Only update if bio is short or empty
             if len(current_bio) < 50:
                 # Generate a simple bio update
@@ -1543,14 +1608,14 @@ class AccountWarmupService:
                     "Making the most of every day.",
                 ]
                 new_bio = random.choice(bio_options)
-                
+
                 try:
                     await client.client.update_profile(bio=new_bio)
                     logger.debug("Updated profile bio")
                     return True
                 except Exception as e:
                     logger.debug(f"Could not update bio: {e}")
-            
+
             return False
         except Exception as e:
             logger.error(f"Failed to update profile periodically: {e}")
@@ -1558,7 +1623,9 @@ class AccountWarmupService:
 
     async def _respect_rate_limits(self):
         """Respect rate limits between actions."""
-        delay = random.uniform(self.config.min_delay_between_actions, self.config.max_delay_between_actions)
+        delay = random.uniform(
+            self.config.min_delay_between_actions, self.config.max_delay_between_actions
+        )
         await asyncio.sleep(delay)
 
     async def _monitor_job_status(self):
@@ -1607,22 +1674,27 @@ class AccountWarmupService:
 
     def get_all_jobs(self) -> List[WarmupJob]:
         """Get all jobs."""
-        return self.job_queue + list(self.active_jobs.values()) + self.completed_jobs + self.failed_jobs
+        return (
+            self.job_queue
+            + list(self.active_jobs.values())
+            + self.completed_jobs
+            + self.failed_jobs
+        )
 
     def save_jobs(self):
         """Save jobs to file."""
         try:
             data = {
-                'queued_jobs': [job.to_dict() for job in self.job_queue],
-                'active_jobs': [job.to_dict() for job in self.active_jobs.values()],
-                'completed_jobs': [job.to_dict() for job in self.completed_jobs],
-                'failed_jobs': [job.to_dict() for job in self.failed_jobs],
-                'last_updated': datetime.now().isoformat()
+                "queued_jobs": [job.to_dict() for job in self.job_queue],
+                "active_jobs": [job.to_dict() for job in self.active_jobs.values()],
+                "completed_jobs": [job.to_dict() for job in self.completed_jobs],
+                "failed_jobs": [job.to_dict() for job in self.failed_jobs],
+                "last_updated": datetime.now().isoformat(),
             }
 
             # Atomic write pattern
-            temp_file = self.jobs_file.with_suffix('.tmp')
-            with open(temp_file, 'w') as f:
+            temp_file = self.jobs_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
                 json.dump(data, f, indent=2, default=str)
 
             temp_file.replace(self.jobs_file)
@@ -1656,8 +1728,8 @@ class AccountWarmupService:
                 key: [ts.isoformat() for ts in entries]
                 for key, entries in self.daily_activity_log.items()
             }
-            temp_file = self.activity_file.with_suffix('.tmp')
-            with open(temp_file, 'w') as f:
+            temp_file = self.activity_file.with_suffix(".tmp")
+            with open(temp_file, "w") as f:
                 json.dump(serializable, f, indent=2)
             temp_file.replace(self.activity_file)
         except Exception as exc:
@@ -1677,15 +1749,15 @@ class AccountWarmupService:
 
                 # Save only the active jobs to avoid full file rewrite for performance
                 active_jobs_data = {
-                    'active_jobs': [j.to_dict() for j in self.active_jobs.values()],
-                    'last_updated': datetime.now().isoformat()
+                    "active_jobs": [j.to_dict() for j in self.active_jobs.values()],
+                    "last_updated": datetime.now().isoformat(),
                 }
 
-                temp_file = self.jobs_file.with_suffix('.progress.tmp')
-                with open(temp_file, 'w') as f:
+                temp_file = self.jobs_file.with_suffix(".progress.tmp")
+                with open(temp_file, "w") as f:
                     json.dump(active_jobs_data, f, indent=2, default=str)
 
-                temp_file.replace(self.jobs_file.with_suffix('.progress'))
+                temp_file.replace(self.jobs_file.with_suffix(".progress"))
 
                 logger.debug(f"Saved progress for job {job.job_id}: {job.progress}%")
 
@@ -1699,25 +1771,33 @@ class AccountWarmupService:
             return
 
         try:
-            with open(self.jobs_file, 'r') as f:
+            with open(self.jobs_file, "r") as f:
                 data = json.load(f)
 
             # Load queued jobs
-            self.job_queue = [WarmupJob.from_dict(job_data) for job_data in data.get('queued_jobs', [])]
+            self.job_queue = [
+                WarmupJob.from_dict(job_data) for job_data in data.get("queued_jobs", [])
+            ]
 
             # Load active jobs
-            for job_data in data.get('active_jobs', []):
+            for job_data in data.get("active_jobs", []):
                 job = WarmupJob.from_dict(job_data)
                 self.active_jobs[job.job_id] = job
 
             # Load completed jobs
-            self.completed_jobs = [WarmupJob.from_dict(job_data) for job_data in data.get('completed_jobs', [])]
+            self.completed_jobs = [
+                WarmupJob.from_dict(job_data) for job_data in data.get("completed_jobs", [])
+            ]
 
             # Load failed jobs
-            self.failed_jobs = [WarmupJob.from_dict(job_data) for job_data in data.get('failed_jobs', [])]
+            self.failed_jobs = [
+                WarmupJob.from_dict(job_data) for job_data in data.get("failed_jobs", [])
+            ]
 
-            logger.info(f"Loaded {len(self.job_queue)} queued, {len(self.active_jobs)} active, "
-                       f"{len(self.completed_jobs)} completed, {len(self.failed_jobs)} failed warmup jobs")
+            logger.info(
+                f"Loaded {len(self.job_queue)} queued, {len(self.active_jobs)} active, "
+                f"{len(self.completed_jobs)} completed, {len(self.failed_jobs)} failed warmup jobs"
+            )
 
         except Exception as e:
             logger.error(f"Failed to load warmup jobs: {e}")
@@ -1728,7 +1808,7 @@ class AccountWarmupService:
             return
 
         try:
-            with open(self.activity_file, 'r') as f:
+            with open(self.activity_file, "r") as f:
                 data = json.load(f)
 
             for key, entries in data.items():
@@ -1766,7 +1846,7 @@ class WarmupIntelligence:
     async def analyze_account_for_profile(self, phone_number: str) -> Dict[str, Any]:
         """Analyze account characteristics to inform profile generation."""
         if not self.gemini_service:
-            return {'account_type': 'general', 'interests': ['technology', 'general']}
+            return {"account_type": "general", "interests": ["technology", "general"]}
 
         prompt = f"""
         Based on the phone number {phone_number}, analyze what type of account this might be and suggest profile characteristics:
@@ -1781,26 +1861,31 @@ class WarmupIntelligence:
         """
 
         try:
-            response = await self.gemini_service.generate_reply(prompt, chat_id=f"account_analysis_{phone_number}")
+            response = await self.gemini_service.generate_reply(
+                prompt, chat_id=f"account_analysis_{phone_number}"
+            )
             # Parse JSON response
             import json
+
             try:
                 return json.loads(response)
             except (json.JSONDecodeError, ValueError, TypeError) as e:
                 logger.debug(f"Failed to parse JSON response: {e}")
-                return {'account_type': 'general', 'interests': ['technology', 'general']}
+                return {"account_type": "general", "interests": ["technology", "general"]}
         except Exception as e:
             logger.warning(f"Failed to analyze account: {e}")
-            return {'account_type': 'general', 'interests': ['technology', 'general']}
+            return {"account_type": "general", "interests": ["technology", "general"]}
 
-    async def generate_profile_content(self, phone_number: str, account_analysis: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def generate_profile_content(
+        self, phone_number: str, account_analysis: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """Generate intelligent profile content based on account analysis."""
         if not self.gemini_service:
             # Fallback content
             return {
-                'first_name': 'Alex',
-                'last_name': 'Johnson',
-                'bio': 'Tech enthusiast and coffee lover ☕'
+                "first_name": "Alex",
+                "last_name": "Johnson",
+                "bio": "Tech enthusiast and coffee lover ☕",
             }
 
         analysis_str = json.dumps(account_analysis) if account_analysis else "general account"
@@ -1819,23 +1904,27 @@ class WarmupIntelligence:
         """
 
         try:
-            response = await self.gemini_service.generate_reply(prompt, chat_id=f"profile_gen_{phone_number}")
+            response = await self.gemini_service.generate_reply(
+                prompt, chat_id=f"profile_gen_{phone_number}"
+            )
             # Parse the response and extract profile data
             # This would need more sophisticated parsing in a real implementation
             return {
-                'first_name': 'Alex',
-                'last_name': 'Johnson',
-                'bio': response[:70] if response else 'Tech enthusiast and coffee lover ☕'
+                "first_name": "Alex",
+                "last_name": "Johnson",
+                "bio": response[:70] if response else "Tech enthusiast and coffee lover ☕",
             }
         except Exception as e:
             logger.warning(f"Failed to generate profile content: {e}")
             return {
-                'first_name': 'Alex',
-                'last_name': 'Johnson',
-                'bio': 'Tech enthusiast and coffee lover ☕'
+                "first_name": "Alex",
+                "last_name": "Johnson",
+                "bio": "Tech enthusiast and coffee lover ☕",
             }
 
-    async def suggest_profile_photo(self, phone_number: str, profile_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def suggest_profile_photo(
+        self, phone_number: str, profile_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """Suggest appropriate profile photo based on profile data."""
         if not self.gemini_service:
             return None
@@ -1853,14 +1942,19 @@ class WarmupIntelligence:
         """
 
         try:
-            response = await self.gemini_service.generate_reply(prompt, chat_id=f"photo_suggest_{phone_number}")
+            response = await self.gemini_service.generate_reply(
+                prompt, chat_id=f"photo_suggest_{phone_number}"
+            )
             import json
+
             return json.loads(response)
         except Exception as e:
             logger.warning(f"Failed to suggest profile photo: {e}")
             return None
 
-    async def generate_bio_for_account(self, phone_number: str, profile_data: Dict[str, Any]) -> Optional[str]:
+    async def generate_bio_for_account(
+        self, phone_number: str, profile_data: Dict[str, Any]
+    ) -> Optional[str]:
         """Generate an intelligent bio for the account (sanitized)."""
         if not self.gemini_service:
             return None
@@ -1878,8 +1972,10 @@ class WarmupIntelligence:
 
         try:
             from utils.input_validation import sanitize_html
-            
-            response = await self.gemini_service.generate_reply(prompt, chat_id=f"bio_gen_{phone_number}")
+
+            response = await self.gemini_service.generate_reply(
+                prompt, chat_id=f"bio_gen_{phone_number}"
+            )
             if response:
                 # Sanitize AI-generated content
                 response = sanitize_html(response)
@@ -1898,20 +1994,30 @@ class WarmupIntelligence:
             # Fallback strategy: suggest common/safe contacts
             # Generate a realistic-looking contact
             import random
-            first_names = ['Alex', 'Sam', 'Jordan', 'Taylor', 'Morgan', 'Casey', 'Riley', 'Jamie']
-            last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis']
-            
+
+            first_names = ["Alex", "Sam", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Jamie"]
+            last_names = [
+                "Smith",
+                "Johnson",
+                "Williams",
+                "Brown",
+                "Jones",
+                "Garcia",
+                "Miller",
+                "Davis",
+            ]
+
             # Generate a phone number (use fake but valid format)
-            country_code = '+1'
-            area_code = random.choice(['555', '556', '557'])  # Reserved for testing
+            country_code = "+1"
+            area_code = random.choice(["555", "556", "557"])  # Reserved for testing
             number = f"{country_code}{area_code}{random.randint(1000000, 9999999)}"
-            
+
             return {
-                'phone_number': number,
-                'first_name': random.choice(first_names),
-                'last_name': random.choice(last_names)
+                "phone_number": number,
+                "first_name": random.choice(first_names),
+                "last_name": random.choice(last_names),
             }
-        
+
         # Use Gemini to suggest intelligent contacts
         try:
             prompt = f"""
@@ -1926,16 +2032,16 @@ class WarmupIntelligence:
             
             Make it look natural and region-appropriate.
             """
-            
+
             response = await self.gemini_service.generate_reply(
-                prompt, 
-                chat_id=f"contact_suggest_{phone_number}"
+                prompt, chat_id=f"contact_suggest_{phone_number}"
             )
-            
+
             import json
+
             contact_data = json.loads(response)
             return contact_data
-            
+
         except Exception as e:
             logger.debug(f"Failed to get AI contact suggestion: {e}")
             # Fall back to simple strategy
@@ -1947,13 +2053,14 @@ class WarmupIntelligence:
             # Fallback strategy: suggest popular public groups
             # These are safe, general-purpose groups
             safe_groups = [
-                {'username': 'telegram', 'chat_id': None},
-                {'username': 'durov', 'chat_id': None},
+                {"username": "telegram", "chat_id": None},
+                {"username": "durov", "chat_id": None},
             ]
-            
+
             import random
+
             return random.choice(safe_groups) if safe_groups else None
-        
+
         # Use Gemini to suggest appropriate groups
         try:
             prompt = f"""
@@ -1972,16 +2079,16 @@ class WarmupIntelligence:
             - General interest topics
             - Safe and legitimate
             """
-            
+
             response = await self.gemini_service.generate_reply(
-                prompt,
-                chat_id=f"group_suggest_{phone_number}"
+                prompt, chat_id=f"group_suggest_{phone_number}"
             )
-            
+
             import json
+
             group_data = json.loads(response)
             return group_data
-            
+
         except Exception as e:
             logger.debug(f"Failed to get AI group suggestion: {e}")
             return None
@@ -2008,9 +2115,9 @@ class WarmupIntelligence:
                     self._set_cached_reply(cache_key, response)
             if response:
                 return {
-                    'message': response,
-                    'target_type': 'contact',  # or 'group'
-                    'target_id': None  # Would be filled in by the calling code
+                    "message": response,
+                    "target_type": "contact",  # or 'group'
+                    "target_id": None,  # Would be filled in by the calling code
                 }
         except Exception as e:
             logger.warning(f"Failed to generate conversation starter: {e}")

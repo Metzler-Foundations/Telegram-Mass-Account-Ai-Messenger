@@ -1,6 +1,7 @@
 """
 Configuration validation helpers for critical credentials.
 """
+
 import os
 from typing import Dict, Any, List
 
@@ -46,8 +47,9 @@ def validate_core_credentials(config: ConfigurationManager) -> Dict[str, Any]:
     # Check Gemini API key from secrets manager
     try:
         from core.secrets_manager import get_secrets_manager
+
         secrets_manager = get_secrets_manager()
-        gemini_key = secrets_manager.get_secret('gemini_api_key', required=False)
+        gemini_key = secrets_manager.get_secret("gemini_api_key", required=False)
     except Exception:
         # Fallback to config/env if secrets manager fails
         gemini_cfg = config.get("gemini", {}) or {}
@@ -67,9 +69,3 @@ def validate_core_credentials(config: ConfigurationManager) -> Dict[str, Any]:
             "gemini_api_key_present": not _is_blank(gemini_key),
         },
     }
-
-
-
-
-
-

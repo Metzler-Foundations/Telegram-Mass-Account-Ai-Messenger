@@ -1,6 +1,7 @@
 """
 Shared utilities and constants to avoid circular imports.
 """
+
 import re
 import random
 import string
@@ -21,6 +22,7 @@ EVENT_VOICE_CONFIG_CHANGED = "voice.config.changed"
 EVENT_ERROR_OCCURRED = "error.occurred"
 EVENT_BACKUP_COMPLETED = "backup.completed"
 EVENT_ANTI_DETECTION_TRIGGERED = "anti_detection.triggered"
+
 
 # Global application context to avoid circular imports
 class ApplicationContext:
@@ -92,6 +94,7 @@ class ApplicationContext:
             except Exception:
                 pass
 
+
 # Global instance
 app_context = ApplicationContext.get_instance()
 
@@ -160,12 +163,12 @@ class RandomizationUtils:
     def get_retry_delay(attempt: int, base_multiplier: float = BASE_RETRY_DELAY) -> float:
         """Get exponential backoff delay for retries."""
         multiplier = random.uniform(MIN_RETRY_MULTIPLIER, MAX_RETRY_MULTIPLIER)
-        return (base_multiplier ** attempt) * multiplier
+        return (base_multiplier**attempt) * multiplier
 
     @staticmethod
     def get_session_suffix() -> str:
         """Generate a random session suffix."""
-        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=8))
+        return "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
     @staticmethod
     def get_connection_timeout() -> float:
@@ -203,25 +206,27 @@ class InputValidator:
 
     # Phone number patterns for different countries
     PHONE_PATTERNS = {
-        'international': re.compile(r'^\+[1-9]\d{1,14}$'),
-        'us': re.compile(r'^\+1\d{10}$'),
-        'russia': re.compile(r'^\+7\d{10}$'),
-        'ukraine': re.compile(r'^\+380\d{9}$'),
-        'general': re.compile(r'^\+?\d{7,15}$')
+        "international": re.compile(r"^\+[1-9]\d{1,14}$"),
+        "us": re.compile(r"^\+1\d{10}$"),
+        "russia": re.compile(r"^\+7\d{10}$"),
+        "ukraine": re.compile(r"^\+380\d{9}$"),
+        "general": re.compile(r"^\+?\d{7,15}$"),
     }
 
     # Channel/username patterns
     CHANNEL_PATTERNS = {
-        'telegram_url': re.compile(r'^(?:https?://)?(?:www\.)?t\.me/([a-zA-Z0-9_]{5,32})(?:/\w+)?/?$'),
-        'username': re.compile(r'^@[a-zA-Z0-9_]{5,32}$'),
-        'channel_id': re.compile(r'^-?\d+$')
+        "telegram_url": re.compile(
+            r"^(?:https?://)?(?:www\.)?t\.me/([a-zA-Z0-9_]{5,32})(?:/\w+)?/?$"
+        ),
+        "username": re.compile(r"^@[a-zA-Z0-9_]{5,32}$"),
+        "channel_id": re.compile(r"^-?\d+$"),
     }
 
     # Email pattern
-    EMAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    EMAIL_PATTERN = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
     # API key pattern (basic validation)
-    API_KEY_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{20,}$')
+    API_KEY_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{20,}$")
 
     @staticmethod
     def sanitize_text(text: str, max_length: int = 1000, allow_html: bool = False) -> str:
@@ -230,14 +235,14 @@ class InputValidator:
             return ""
 
         # Remove null bytes and control characters
-        text = text.replace('\0', '').replace('\r', '').replace('\n', ' ')
+        text = text.replace("\0", "").replace("\r", "").replace("\n", " ")
 
         # Remove dangerous control characters
-        text = ''.join(char for char in text if ord(char) >= 32 or char in '\t\n')
+        text = "".join(char for char in text if ord(char) >= 32 or char in "\t\n")
 
         if not allow_html:
             # Remove HTML tags
-            text = re.sub(r'<[^>]+>', '', text)
+            text = re.sub(r"<[^>]+>", "", text)
 
         # Limit length
         if len(text) > max_length:
@@ -326,20 +331,21 @@ class InputValidator:
         url = url.strip()
 
         # Basic URL validation
-        if not url.startswith(('http://', 'https://')):
+        if not url.startswith(("http://", "https://")):
             return False, "URL must start with http:// or https://"
 
         # Check for basic URL structure
         url_pattern = re.compile(
-            r'^https?://'  # http:// or https://
-            r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
-            r'localhost|'  # localhost...
-            r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
-            r'(?::\d+)?'  # optional port
-            r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+            r"^https?://"  # http:// or https://
+            r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|"  # domain...
+            r"localhost|"  # localhost...
+            r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"  # ...or ip
+            r"(?::\d+)?"  # optional port
+            r"(?:/?|[/?]\S+)$",
+            re.IGNORECASE,
+        )
 
         if not url_pattern.match(url):
             return False, "Invalid URL format"
 
         return True, "Valid URL"
-

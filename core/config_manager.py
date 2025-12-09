@@ -1,6 +1,7 @@
 """
 Configuration Manager - Centralized configuration handling.
 """
+
 import json
 import logging
 from typing import Dict, Any, Optional
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Import secrets manager for secure credential handling
 try:
     from core.secrets_manager import get_secrets_manager
+
     SECRETS_AVAILABLE = True
 except ImportError:
     SECRETS_AVAILABLE = False
@@ -33,27 +35,18 @@ class ConfigurationManager:
                 "phone_number": "",
                 "photo_path": "",
                 "validated": False,
-                "validated_at": ""
+                "validated_at": "",
             },
             "validated": False,
-            "validated_at": ""
+            "validated_at": "",
         },
-        "gemini": {
-            "api_key": "",
-            "validated": False,
-            "validated_at": ""
-        },
-        "brain": {
-            "prompt": "",
-            "auto_reply_enabled": True,
-            "typing_delay": 2,
-            "max_history": 50
-        },
+        "gemini": {"api_key": "", "validated": False, "validated_at": ""},
+        "brain": {"prompt": "", "auto_reply_enabled": True, "typing_delay": 2, "max_history": 50},
         "advanced": {
             "max_reply_length": 1024,
             "enable_logging": True,
             "realistic_typing": True,
-            "random_delays": True
+            "random_delays": True,
         },
         "anti_detection": {
             "min_delay": 2,
@@ -64,7 +57,7 @@ class ConfigurationManager:
             "random_skip": True,
             "time_based_delays": True,
             "error_backoff": True,
-            "session_recovery": True
+            "session_recovery": True,
         },
         "performance": {
             "low_power": False,
@@ -79,23 +72,17 @@ class ConfigurationManager:
                 "max_concurrent_operations": 10,
                 "memory_limit_mb": 512,
                 "cpu_limit_percent": 80,
-                "resource_check_interval": 30
+                "resource_check_interval": 30,
             },
             "accounts": {
                 "max_concurrent_connections": 50,
                 "max_per_shard": 10,
                 "health_check_interval": 30,
-                "batch_update_interval": 5.0
+                "batch_update_interval": 5.0,
             },
-            "scraping": {
-                "max_workers": 5,
-                "queue_poll_interval": 0.1
-            },
-            "ai": {
-                "max_tokens": 1024,
-                "max_history": 50
-            }
-        }
+            "scraping": {"max_workers": 5, "queue_poll_interval": 0.1},
+            "ai": {"max_tokens": 1024, "max_history": 50},
+        },
     }
 
     def __init__(self, config_path: str = "config.json"):
@@ -130,23 +117,23 @@ class ConfigurationManager:
             if "telegram" in data:
                 telegram_cfg = data["telegram"]
                 if telegram_cfg.get("api_id"):
-                    secrets_manager.set_secret('telegram_api_id', telegram_cfg["api_id"])
+                    secrets_manager.set_secret("telegram_api_id", telegram_cfg["api_id"])
                     del telegram_cfg["api_id"]
                     migrated = True
                 if telegram_cfg.get("api_hash"):
-                    secrets_manager.set_secret('telegram_api_hash', telegram_cfg["api_hash"])
+                    secrets_manager.set_secret("telegram_api_hash", telegram_cfg["api_hash"])
                     del telegram_cfg["api_hash"]
                     migrated = True
 
             # Migrate Gemini API key
             if "gemini" in data and data["gemini"].get("api_key"):
-                secrets_manager.set_secret('gemini_api_key', data["gemini"]["api_key"])
+                secrets_manager.set_secret("gemini_api_key", data["gemini"]["api_key"])
                 del data["gemini"]["api_key"]
                 migrated = True
 
             # Migrate SMS provider API key
             if "sms_providers" in data and data["sms_providers"].get("api_key"):
-                secrets_manager.set_secret('sms_provider_api_key', data["sms_providers"]["api_key"])
+                secrets_manager.set_secret("sms_provider_api_key", data["sms_providers"]["api_key"])
                 del data["sms_providers"]["api_key"]
                 migrated = True
 
@@ -201,26 +188,28 @@ class ConfigurationManager:
                 ConfigurationManager._deep_merge(base[key], value)
             else:
                 base[key] = value
-    
+
     def get_secret(self, secret_name: str, required: bool = False) -> Optional[str]:
         """Get a secret value from secrets manager.
-        
+
         Args:
             secret_name: Name of the secret (e.g., 'telegram_api_id', 'gemini_api_key')
             required: If True, raises ValueError if secret not found
-            
+
         Returns:
             Secret value or None if not found (and not required)
-            
+
         Raises:
             ValueError: If secret is required but not found
         """
         if not SECRETS_AVAILABLE:
             logger.warning(f"Secrets manager not available, secret '{secret_name}' not retrieved")
             if required:
-                raise ValueError(f"Secret '{secret_name}' is required but secrets manager not available")
+                raise ValueError(
+                    f"Secret '{secret_name}' is required but secrets manager not available"
+                )
             return None
-            
+
         try:
             secrets_manager = get_secrets_manager()
             return secrets_manager.get_secret(secret_name, required=required)
@@ -229,28 +218,19 @@ class ConfigurationManager:
             if required:
                 raise
             return None
-    
+
     def get_telegram_api_id(self) -> Optional[str]:
         """Get Telegram API ID from secrets manager."""
-        return self.get_secret('telegram_api_id', required=True)
-    
+        return self.get_secret("telegram_api_id", required=True)
+
     def get_telegram_api_hash(self) -> Optional[str]:
         """Get Telegram API hash from secrets manager."""
-        return self.get_secret('telegram_api_hash', required=True)
-    
+        return self.get_secret("telegram_api_hash", required=True)
+
     def get_gemini_api_key(self) -> Optional[str]:
         """Get Gemini API key from secrets manager."""
-        return self.get_secret('gemini_api_key', required=False)
-    
+        return self.get_secret("gemini_api_key", required=False)
+
     def get_sms_provider_api_key(self) -> Optional[str]:
         """Get SMS provider API key from secrets manager."""
-        return self.get_secret('sms_provider_api_key', required=False)
-
-
-
-
-
-
-
-
-
+        return self.get_secret("sms_provider_api_key", required=False)

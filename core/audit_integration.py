@@ -15,26 +15,28 @@ logger = logging.getLogger(__name__)
 # Import audit logging
 try:
     from accounts.account_audit_log import get_audit_log, AuditEvent, AuditEventType
+
     AUDIT_AVAILABLE = True
 except ImportError:
     AUDIT_AVAILABLE = False
     logger.warning("Audit log not available for integration")
 
 
-def with_audit_logging(event_type: 'AuditEventType'):
+def with_audit_logging(event_type: "AuditEventType"):
     """Decorator to automatically log operations to audit."""
+
     def decorator(func):
         @wraps(func)
         async def async_wrapper(self, *args, **kwargs):
             if not AUDIT_AVAILABLE:
                 return await func(self, *args, **kwargs)
-            
+
             audit_log = get_audit_log()
-            phone_number = kwargs.get('phone_number') or (args[0] if args else None)
-            
+            phone_number = kwargs.get("phone_number") or (args[0] if args else None)
+
             try:
                 result = await func(self, *args, **kwargs)
-                
+
                 # Log successful operation
                 if result:
                     event = AuditEvent(
@@ -43,10 +45,10 @@ def with_audit_logging(event_type: 'AuditEventType'):
                         event_type=event_type,
                         timestamp=datetime.now(),
                         success=True,
-                        metadata={'result': str(result)[:200]}
+                        metadata={"result": str(result)[:200]},
                     )
                     audit_log.log_event(event)
-                
+
                 return result
             except Exception as e:
                 # Log failed operation
@@ -56,22 +58,22 @@ def with_audit_logging(event_type: 'AuditEventType'):
                     event_type=event_type,
                     timestamp=datetime.now(),
                     success=False,
-                    error_message=str(e)[:500]
+                    error_message=str(e)[:500],
                 )
                 audit_log.log_event(event)
                 raise
-        
+
         @wraps(func)
         def sync_wrapper(self, *args, **kwargs):
             if not AUDIT_AVAILABLE:
                 return func(self, *args, **kwargs)
-            
+
             audit_log = get_audit_log()
-            phone_number = kwargs.get('phone_number') or (args[0] if args else None)
-            
+            phone_number = kwargs.get("phone_number") or (args[0] if args else None)
+
             try:
                 result = func(self, *args, **kwargs)
-                
+
                 # Log successful operation
                 if result:
                     event = AuditEvent(
@@ -79,10 +81,10 @@ def with_audit_logging(event_type: 'AuditEventType'):
                         phone_number=str(phone_number),
                         event_type=event_type,
                         timestamp=datetime.now(),
-                        success=True
+                        success=True,
                     )
                     audit_log.log_event(event)
-                
+
                 return result
             except Exception as e:
                 # Log failed operation
@@ -92,26 +94,29 @@ def with_audit_logging(event_type: 'AuditEventType'):
                     event_type=event_type,
                     timestamp=datetime.now(),
                     success=False,
-                    error_message=str(e)[:500]
+                    error_message=str(e)[:500],
                 )
                 audit_log.log_event(event)
                 raise
-        
+
         # Return appropriate wrapper based on function type
         import inspect
+
         if inspect.iscoroutinefunction(func):
             return async_wrapper
         else:
             return sync_wrapper
-    
+
     return decorator
 
 
-def log_sms_purchase(phone_number: str, provider: str, transaction_id: str, operator: str, cost: float):
+def log_sms_purchase(
+    phone_number: str, provider: str, transaction_id: str, operator: str, cost: float
+):
     """Log SMS number purchase to audit."""
     if not AUDIT_AVAILABLE:
         return
-    
+
     try:
         audit_log = get_audit_log()
         event = AuditEvent(
@@ -123,7 +128,7 @@ def log_sms_purchase(phone_number: str, provider: str, transaction_id: str, oper
             sms_transaction_id=transaction_id,
             sms_operator=operator,
             sms_cost=cost,
-            success=True
+            success=True,
         )
         audit_log.log_event(event)
         logger.info(f"✓ Logged SMS purchase: ${cost:.2f} from {provider}")
@@ -135,7 +140,7 @@ def log_proxy_assignment(phone_number: str, proxy_key: str, proxy_country: str):
     """Log proxy assignment to audit."""
     if not AUDIT_AVAILABLE:
         return
-    
+
     try:
         audit_log = get_audit_log()
         event = AuditEvent(
@@ -145,7 +150,7 @@ def log_proxy_assignment(phone_number: str, proxy_key: str, proxy_country: str):
             timestamp=datetime.now(),
             proxy_used=proxy_key,
             proxy_country=proxy_country,
-            success=True
+            success=True,
         )
         audit_log.log_event(event)
         logger.debug(f"✓ Logged proxy assignment: {proxy_key}")
@@ -153,11 +158,13 @@ def log_proxy_assignment(phone_number: str, proxy_key: str, proxy_country: str):
         logger.error(f"Failed to log proxy assignment: {e}")
 
 
-def log_account_creation_start(phone_number: str, proxy_key: str = None, device_fingerprint: str = None):
+def log_account_creation_start(
+    phone_number: str, proxy_key: str = None, device_fingerprint: str = None
+):
     """Log account creation start to audit."""
     if not AUDIT_AVAILABLE:
         return
-    
+
     try:
         audit_log = get_audit_log()
         event = AuditEvent(
@@ -167,7 +174,7 @@ def log_account_creation_start(phone_number: str, proxy_key: str = None, device_
             timestamp=datetime.now(),
             proxy_used=proxy_key,
             device_fingerprint=device_fingerprint,
-            success=True
+            success=True,
         )
         audit_log.log_event(event)
         logger.info(f"✓ Logged account creation start for {phone_number}")
@@ -179,7 +186,7 @@ def log_account_creation_success(phone_number: str, total_cost: float, username:
     """Log successful account creation to audit."""
     if not AUDIT_AVAILABLE:
         return
-    
+
     try:
         audit_log = get_audit_log()
         event = AuditEvent(
@@ -190,10 +197,12 @@ def log_account_creation_success(phone_number: str, total_cost: float, username:
             username_attempted=username,
             username_success=bool(username),
             total_cost=total_cost,
-            success=True
+            success=True,
         )
         audit_log.log_event(event)
-        logger.info(f"✅ Logged account creation success for {phone_number} (cost: ${total_cost:.2f})")
+        logger.info(
+            f"✅ Logged account creation success for {phone_number} (cost: ${total_cost:.2f})"
+        )
     except Exception as e:
         logger.error(f"Failed to log account creation success: {e}")
 
@@ -202,7 +211,7 @@ def log_account_creation_failure(phone_number: str, error_message: str, partial_
     """Log failed account creation to audit."""
     if not AUDIT_AVAILABLE:
         return
-    
+
     try:
         audit_log = get_audit_log()
         event = AuditEvent(
@@ -212,17 +221,9 @@ def log_account_creation_failure(phone_number: str, error_message: str, partial_
             timestamp=datetime.now(),
             total_cost=partial_cost,
             success=False,
-            error_message=error_message[:500]
+            error_message=error_message[:500],
         )
         audit_log.log_event(event)
         logger.warning(f"✓ Logged account creation failure for {phone_number}")
     except Exception as e:
         logger.error(f"Failed to log account creation failure: {e}")
-
-
-
-
-
-
-
-

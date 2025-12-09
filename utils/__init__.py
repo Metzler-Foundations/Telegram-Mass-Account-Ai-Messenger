@@ -1,40 +1,49 @@
 """
 Utilities and helpers module.
 """
+
+
 # Lazy imports to avoid circular dependencies
 def __getattr__(name):
-    if name == 'RetryHelper':
+    if name == "RetryHelper":
         from .retry_helper import RetryHelper
+
         return RetryHelper
-    elif name in ('LazyValue', 'LazyProperty', 'LazyDict'):
+    elif name in ("LazyValue", "LazyProperty", "LazyDict"):
         from . import lazy_loader
+
         return getattr(lazy_loader, name)
-    elif name == 'ObjectPool':
+    elif name == "ObjectPool":
         from .object_pool import ObjectPool
+
         return ObjectPool
-    elif name == 'BatchOptimizer':
+    elif name == "BatchOptimizer":
         from .batch_optimizer import BatchOptimizer
+
         return BatchOptimizer
-    elif name == 'MemoryOptimizer':
+    elif name == "MemoryOptimizer":
         from .memory_optimizer import MemoryOptimizer
+
         return MemoryOptimizer
-    elif name == 'ProgressTracker':
+    elif name == "ProgressTracker":
         from .progress_tracker import ProgressTracker
+
         return ProgressTracker
-    elif name == 'InputValidator':
+    elif name == "InputValidator":
         from .input_validation import InputValidator
+
         return InputValidator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-__all__ = [
-    'RetryHelper',
-    'LazyValue',
-    'LazyProperty',
-    'LazyDict',
-    'ObjectPool',
-    'BatchOptimizer',
-    'MemoryOptimizer',
-    'ProgressTracker',
-    'InputValidator',
-]
 
+__all__ = [
+    "RetryHelper",
+    "LazyValue",
+    "LazyProperty",
+    "LazyDict",
+    "ObjectPool",
+    "BatchOptimizer",
+    "MemoryOptimizer",
+    "ProgressTracker",
+    "InputValidator",
+]

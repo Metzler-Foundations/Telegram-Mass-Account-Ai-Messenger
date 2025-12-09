@@ -72,15 +72,24 @@ def main():
         total_checks += 1
         if run_command(
             [sys.executable, "-m", "pytest", "tests/", "-k", "integration", "-v", "--tb=short"],
-            "Integration Tests"
+            "Integration Tests",
         ):
             success_count += 1
 
     # 4. Coverage
     total_checks += 1
     if run_command(
-        [sys.executable, "-m", "pytest", "tests/", "--cov=.", "--cov-report=html", "--cov-report=term-missing", "--cov-fail-under=70"],
-        "Coverage Analysis"
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/",
+            "--cov=.",
+            "--cov-report=html",
+            "--cov-report=term-missing",
+            "--cov-fail-under=70",
+        ],
+        "Coverage Analysis",
     ):
         success_count += 1
 
@@ -88,6 +97,7 @@ def main():
     total_checks += 1
     try:
         import ruff
+
         cmd = ["ruff", "check", "."]
         if args.fix:
             cmd.append("--fix")
@@ -101,6 +111,7 @@ def main():
     total_checks += 1
     try:
         import mypy
+
         if run_command(["mypy", ".", "--ignore-missing-imports"], "MyPy Type Checking"):
             success_count += 1
     except ImportError:
@@ -111,6 +122,7 @@ def main():
     total_checks += 1
     try:
         import black
+
         cmd = ["black", "--check", "--diff", "."]
         if args.fix:
             cmd = ["black", "."]
@@ -124,7 +136,11 @@ def main():
     total_checks += 1
     try:
         import bandit
-        if run_command(["bandit", "-r", ".", "-f", "json", "-o", "bandit-report.json"], "Security Analysis (Bandit)"):
+
+        if run_command(
+            ["bandit", "-r", ".", "-f", "json", "-o", "bandit-report.json"],
+            "Security Analysis (Bandit)",
+        ):
             success_count += 1
     except ImportError:
         print("ℹ️  Bandit not installed - skipping security analysis")
@@ -134,6 +150,7 @@ def main():
     total_checks += 1
     try:
         import pre_commit
+
         if run_command(["pre-commit", "run", "--all-files"], "Pre-commit Hooks"):
             success_count += 1
     except ImportError:

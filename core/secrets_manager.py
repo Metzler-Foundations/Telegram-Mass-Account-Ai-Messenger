@@ -27,11 +27,11 @@ logger = logging.getLogger(__name__)
 
 class SecretsManager:
     """Secure secrets management system."""
-    
+
     def __init__(self, secrets_file: str = ".secrets.encrypted"):
         """
         Initialize secrets manager.
-        
+
         Args:
             secrets_file: Path to encrypted secrets file
         """
@@ -39,73 +39,73 @@ class SecretsManager:
         self._cache: Dict[str, Any] = {}
         self._master_key = self._get_or_create_master_key()
         self._fernet = Fernet(self._master_key)
-        
+
     def _get_or_create_master_key(self) -> bytes:
         """
         Get or create master encryption key from environment.
-        
+
         Returns:
             Master encryption key
         """
         # Try environment variable first (production)
-        env_key = os.environ.get('SECRET_MASTER_KEY')
+        env_key = os.environ.get("SECRET_MASTER_KEY")
         if env_key:
             logger.info("Using master key from environment variable")
             return base64.urlsafe_b64decode(env_key.encode())
-        
+
         # Try secure key file (with proper permissions)
-        key_file = Path.home() / '.telegram_bot' / 'master.key'
+        key_file = Path.home() / ".telegram_bot" / "master.key"
         if key_file.exists():
             # Verify file permissions
             stat_info = key_file.stat()
             if stat_info.st_mode & 0o077:
                 logger.warning(f"Key file {key_file} has insecure permissions! Should be 0600")
-            
-            with open(key_file, 'rb') as f:
+
+            with open(key_file, "rb") as f:
                 logger.info("Using master key from secure key file")
                 return f.read()
-        
+
         # Generate new key (development only)
         logger.warning("Generating NEW master key - save this securely!")
         key = Fernet.generate_key()
-        
+
         # Save to secure location
         key_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(key_file, 'wb') as f:
+        with open(key_file, "wb") as f:
             f.write(key)
-        
+
         # Set secure permissions (owner read/write only)
         os.chmod(key_file, 0o600)
-        
+
         logger.info(f"Master key saved to: {key_file}")
         logger.warning("Set SECRET_MASTER_KEY environment variable in production!")
         logger.warning(f"export SECRET_MASTER_KEY={base64.urlsafe_b64encode(key).decode()}")
-        
+
         return key
-    
+
     def get_secret(self, key: str, default: Any = None, required: bool = False) -> Any:
         """
         Get a secret value securely.
-        
+
         Priority:
         1. Environment variable (prefixed with SECRET_)
         2. Encrypted secrets file
         3. Default value (if provided)
-        
+
         Args:
             key: Secret key name
             default: Default value if not found
             required: Raise error if not found
-            
+
         Returns:
             Secret value
-            
+
         Raises:
             ValueError: If required secret not found
         """
         # Check cache first
         if key in self._cache:
-            audit_credential_access(key, 'cache', success=True)
+            audit_credential_access(key, "cache", success=True)
             return self._cache[key]
 
         # Check environment variable
@@ -114,7 +114,7 @@ class SecretsManager:
         if env_value:
             logger.debug(f"Secret '{key}' loaded from environment")
             self._cache[key] = env_value
-            audit_credential_access(key, 'environment', success=True)
+            audit_credential_access(key, "environment", success=True)
             return env_value
 
         # Check encrypted file
@@ -123,18 +123,18 @@ class SecretsManager:
             value = secrets[key]
             logger.debug(f"Secret '{key}' loaded from encrypted file")
             self._cache[key] = value
-            audit_credential_access(key, 'encrypted_file', success=True)
+            audit_credential_access(key, "encrypted_file", success=True)
             return value
 
         # Return default or raise error
         if required:
-            audit_credential_access(key, 'unknown', success=False)
+            audit_credential_access(key, "unknown", success=False)
             raise ValueError(f"Required secret '{key}' not found in environment or secrets file")
 
         logger.debug(f"Secret '{key}' not found, using default")
-        audit_credential_access(key, 'default', success=True)
+        audit_credential_access(key, "default", success=True)
         return default
-    
+
     def set_secret(self, key: str, value: Any) -> None:
         """
         Store a secret securely in encrypted file.
@@ -151,13 +151,13 @@ class SecretsManager:
             # Update cache
             self._cache[key] = value
 
-            audit_credential_modification(key, 'set', success=True)
+            audit_credential_modification(key, "set", success=True)
             logger.info(f"Secret '{key}' stored securely")
         except Exception as e:
-            audit_credential_modification(key, 'set', success=False)
+            audit_credential_modification(key, "set", success=False)
             logger.error(f"Failed to store secret '{key}': {e}")
             raise
-    
+
     def delete_secret(self, key: str) -> bool:
         """
         Delete a secret from encrypted storage.
@@ -177,73 +177,73 @@ class SecretsManager:
                 # Clear from cache
                 self._cache.pop(key, None)
 
-                audit_credential_modification(key, 'delete', success=True)
+                audit_credential_modification(key, "delete", success=True)
                 logger.info(f"Secret '{key}' deleted")
                 return True
 
-            audit_credential_modification(key, 'delete', success=False)
+            audit_credential_modification(key, "delete", success=False)
             logger.warning(f"Secret '{key}' not found for deletion")
             return False
         except Exception as e:
-            audit_credential_modification(key, 'delete', success=False)
+            audit_credential_modification(key, "delete", success=False)
             logger.error(f"Failed to delete secret '{key}': {e}")
             raise
-    
+
     def _load_encrypted_secrets(self) -> Dict[str, Any]:
         """
         Load secrets from encrypted file.
-        
+
         Returns:
             Dictionary of secrets
         """
         if not self.secrets_file.exists():
             return {}
-        
+
         try:
-            with open(self.secrets_file, 'rb') as f:
+            with open(self.secrets_file, "rb") as f:
                 encrypted_data = f.read()
-            
+
             decrypted_data = self._fernet.decrypt(encrypted_data)
             secrets = json.loads(decrypted_data.decode())
-            
+
             return secrets
         except Exception as e:
             logger.error(f"Failed to load encrypted secrets: {e}")
             return {}
-    
+
     def _save_encrypted_secrets(self, secrets: Dict[str, Any]) -> None:
         """
         Save secrets to encrypted file.
-        
+
         Args:
             secrets: Dictionary of secrets
         """
         try:
             # Serialize to JSON
             json_data = json.dumps(secrets, indent=2).encode()
-            
+
             # Encrypt
             encrypted_data = self._fernet.encrypt(json_data)
-            
+
             # Write to file
-            with open(self.secrets_file, 'wb') as f:
+            with open(self.secrets_file, "wb") as f:
                 f.write(encrypted_data)
-            
+
             # Set secure permissions
             os.chmod(self.secrets_file, 0o600)
-            
+
             logger.debug("Secrets saved to encrypted file")
         except Exception as e:
             logger.error(f"Failed to save encrypted secrets: {e}")
             raise
-    
+
     def migrate_from_plaintext_config(self, config_path: str = "config.json") -> int:
         """
         Migrate secrets from plaintext config.json to encrypted storage.
-        
+
         Args:
             config_path: Path to config.json
-            
+
         Returns:
             Number of secrets migrated
         """
@@ -251,109 +251,110 @@ class SecretsManager:
         if not config_file.exists():
             logger.warning(f"Config file not found: {config_path}")
             return 0
-        
-        with open(config_file, 'r') as f:
+
+        with open(config_file, "r") as f:
             config = json.load(f)
-        
+
         secrets_migrated = 0
-        
+
         # Migrate Telegram API credentials
-        if config.get('telegram', {}).get('api_id'):
-            self.set_secret('telegram_api_id', config['telegram']['api_id'])
+        if config.get("telegram", {}).get("api_id"):
+            self.set_secret("telegram_api_id", config["telegram"]["api_id"])
             secrets_migrated += 1
-        
-        if config.get('telegram', {}).get('api_hash'):
-            self.set_secret('telegram_api_hash', config['telegram']['api_hash'])
+
+        if config.get("telegram", {}).get("api_hash"):
+            self.set_secret("telegram_api_hash", config["telegram"]["api_hash"])
             secrets_migrated += 1
-        
+
         # Migrate Gemini API key
-        if config.get('gemini', {}).get('api_key'):
-            self.set_secret('gemini_api_key', config['gemini']['api_key'])
+        if config.get("gemini", {}).get("api_key"):
+            self.set_secret("gemini_api_key", config["gemini"]["api_key"])
             secrets_migrated += 1
-        
+
         # Migrate OpenAI API key
-        if config.get('openai', {}).get('api_key'):
-            self.set_secret('openai_api_key', config['openai']['api_key'])
+        if config.get("openai", {}).get("api_key"):
+            self.set_secret("openai_api_key", config["openai"]["api_key"])
             secrets_migrated += 1
-        
+
         # Migrate ElevenLabs API key
-        if config.get('elevenlabs', {}).get('api_key'):
-            self.set_secret('elevenlabs_api_key', config['elevenlabs']['api_key'])
+        if config.get("elevenlabs", {}).get("api_key"):
+            self.set_secret("elevenlabs_api_key", config["elevenlabs"]["api_key"])
             secrets_migrated += 1
-        
+
         # Migrate SMS provider API key
-        if config.get('sms_providers', {}).get('api_key'):
-            self.set_secret('sms_provider_api_key', config['sms_providers']['api_key'])
+        if config.get("sms_providers", {}).get("api_key"):
+            self.set_secret("sms_provider_api_key", config["sms_providers"]["api_key"])
             secrets_migrated += 1
-        
+
         logger.info(f"Migrated {secrets_migrated} secrets from config.json to encrypted storage")
-        
+
         # Create backup of original config
         if secrets_migrated > 0:
-            backup_path = config_file.with_suffix('.json.backup_before_migration')
+            backup_path = config_file.with_suffix(".json.backup_before_migration")
             import shutil
+
             shutil.copy(config_file, backup_path)
             logger.info(f"Config backup saved to: {backup_path}")
-        
+
         return secrets_migrated
-    
+
     def clear_secrets_from_config(self, config_path: str = "config.json") -> None:
         """
         Remove secrets from config.json and replace with placeholders.
-        
+
         Args:
             config_path: Path to config.json
         """
         config_file = Path(config_path)
         if not config_file.exists():
             return
-        
-        with open(config_file, 'r') as f:
+
+        with open(config_file, "r") as f:
             config = json.load(f)
-        
+
         # Replace secrets with placeholders
-        if 'telegram' in config:
-            if 'api_id' in config['telegram']:
-                config['telegram']['api_id'] = None
-            if 'api_hash' in config['telegram']:
-                config['telegram']['api_hash'] = None
-        
-        if 'gemini' in config:
-            if 'api_key' in config['gemini']:
-                config['gemini']['api_key'] = None
-        
-        if 'openai' in config:
-            if 'api_key' in config['openai']:
-                config['openai']['api_key'] = ""
-        
-        if 'elevenlabs' in config:
-            if 'api_key' in config['elevenlabs']:
-                config['elevenlabs']['api_key'] = ""
-        
-        if 'sms_providers' in config:
-            if 'api_key' in config['sms_providers']:
-                config['sms_providers']['api_key'] = None
-        
+        if "telegram" in config:
+            if "api_id" in config["telegram"]:
+                config["telegram"]["api_id"] = None
+            if "api_hash" in config["telegram"]:
+                config["telegram"]["api_hash"] = None
+
+        if "gemini" in config:
+            if "api_key" in config["gemini"]:
+                config["gemini"]["api_key"] = None
+
+        if "openai" in config:
+            if "api_key" in config["openai"]:
+                config["openai"]["api_key"] = ""
+
+        if "elevenlabs" in config:
+            if "api_key" in config["elevenlabs"]:
+                config["elevenlabs"]["api_key"] = ""
+
+        if "sms_providers" in config:
+            if "api_key" in config["sms_providers"]:
+                config["sms_providers"]["api_key"] = None
+
         # Write back
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config, f, indent=2)
-        
+
         logger.info("Secrets cleared from config.json")
-    
+
     def validate_secrets(self) -> Dict[str, bool]:
         """
         Validate that all required secrets are present.
-        
+
         Returns:
             Dictionary mapping secret names to presence status
         """
         required_secrets = [
-            'telegram_api_id',
-            'telegram_api_hash',
-            'gemini_api_key',
-            'sms_provider_api_key'
+            "telegram_api_id",
+            "telegram_api_hash",
+            "gemini_api_key",
+            "sms_provider_api_key",
         ]
-        
+
         status = {}
         for secret in required_secrets:
             try:
@@ -361,7 +362,7 @@ class SecretsManager:
                 status[secret] = value is not None and value != ""
             except Exception:
                 status[secret] = False
-        
+
         return status
 
 
@@ -372,7 +373,7 @@ _secrets_manager: Optional[SecretsManager] = None
 def get_secrets_manager() -> SecretsManager:
     """
     Get global secrets manager instance.
-    
+
     Returns:
         SecretsManager instance
     """
@@ -386,7 +387,7 @@ def migrate_secrets_from_config():
     """Convenience function to migrate secrets from config.json."""
     manager = get_secrets_manager()
     count = manager.migrate_from_plaintext_config()
-    
+
     if count > 0:
         manager.clear_secrets_from_config()
         print(f"✅ Migrated {count} secrets to encrypted storage")
@@ -403,9 +404,3 @@ def migrate_secrets_from_config():
 if __name__ == "__main__":
     # Run migration if executed directly
     migrate_secrets_from_config()
-
-
-
-
-
-

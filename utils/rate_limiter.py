@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class RateLimitConfig:
     """Rate limit configuration."""
+
     requests_per_second: float = 1.0
     burst_limit: int = 5
     backoff_factor: float = 2.0
@@ -97,14 +98,16 @@ class RateLimitManager:
 
         # Domain-specific rate limits (requests per second)
         self.domain_limits = {
-            'api.telegram.org': RateLimitConfig(requests_per_second=1.0, burst_limit=2),
-            'api.sms-activate.org': RateLimitConfig(requests_per_second=2.0, burst_limit=5),
-            'smshub.org': RateLimitConfig(requests_per_second=2.0, burst_limit=5),
-            '5sim.net': RateLimitConfig(requests_per_second=1.0, burst_limit=3),
-            'daisysms.com': RateLimitConfig(requests_per_second=2.0, burst_limit=5),
-            'api.smspool.net': RateLimitConfig(requests_per_second=2.0, burst_limit=5),
-            'textverified.com': RateLimitConfig(requests_per_second=1.0, burst_limit=3),
-            'generativelanguage.googleapis.com': RateLimitConfig(requests_per_second=2.0, burst_limit=10),
+            "api.telegram.org": RateLimitConfig(requests_per_second=1.0, burst_limit=2),
+            "api.sms-activate.org": RateLimitConfig(requests_per_second=2.0, burst_limit=5),
+            "smshub.org": RateLimitConfig(requests_per_second=2.0, burst_limit=5),
+            "5sim.net": RateLimitConfig(requests_per_second=1.0, burst_limit=3),
+            "daisysms.com": RateLimitConfig(requests_per_second=2.0, burst_limit=5),
+            "api.smspool.net": RateLimitConfig(requests_per_second=2.0, burst_limit=5),
+            "textverified.com": RateLimitConfig(requests_per_second=1.0, burst_limit=3),
+            "generativelanguage.googleapis.com": RateLimitConfig(
+                requests_per_second=2.0, burst_limit=10
+            ),
         }
 
     def get_limiter(self, domain: str) -> TokenBucketRateLimiter:
@@ -148,17 +151,18 @@ class RateLimitManager:
     def get_metrics(self) -> Dict[str, Any]:
         """Get rate limiting metrics."""
         return {
-            'active_limiters': len(self.limiters),
-            'domains': list(self.limiters.keys()),
-            'default_config': {
-                'requests_per_second': self.default_config.requests_per_second,
-                'burst_limit': self.default_config.burst_limit
-            }
+            "active_limiters": len(self.limiters),
+            "domains": list(self.limiters.keys()),
+            "default_config": {
+                "requests_per_second": self.default_config.requests_per_second,
+                "burst_limit": self.default_config.burst_limit,
+            },
         }
 
 
 # Global instance
 _rate_limit_manager = None
+
 
 def get_rate_limit_manager() -> RateLimitManager:
     """Get the global rate limit manager instance."""

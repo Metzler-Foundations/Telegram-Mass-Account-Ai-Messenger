@@ -30,6 +30,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta
 import os
 import threading
+
 try:
     import psutil
 except ImportError:
@@ -38,31 +39,86 @@ except ImportError:
 # Import memory optimizer for resource management
 try:
     from utils.memory_optimizer import MemoryMonitor as MemoryOptimizer
+
     MEMORY_OPTIMIZER_AVAILABLE = True
 except ImportError:
     MemoryOptimizer = None
     MEMORY_OPTIMIZER_AVAILABLE = False
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QTextEdit, QStatusBar, QSplitter,
-    QListWidget, QListWidgetItem, QMessageBox, QSystemTrayIcon,
-    QMenu, QProgressBar, QComboBox, QGroupBox, QTabWidget,
-    QSpinBox, QLineEdit, QCheckBox, QFormLayout, QScrollArea,
-    QInputDialog, QFileDialog, QProgressDialog, QDialog, QFrame,
-    QStackedWidget, QSizePolicy, QGridLayout, QTableWidget,
-    QTableWidgetItem, QHeaderView, QAbstractItemView, QCompleter
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QStatusBar,
+    QSplitter,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QSystemTrayIcon,
+    QMenu,
+    QProgressBar,
+    QComboBox,
+    QGroupBox,
+    QTabWidget,
+    QSpinBox,
+    QLineEdit,
+    QCheckBox,
+    QFormLayout,
+    QScrollArea,
+    QInputDialog,
+    QFileDialog,
+    QProgressDialog,
+    QDialog,
+    QFrame,
+    QStackedWidget,
+    QSizePolicy,
+    QGridLayout,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QAbstractItemView,
+    QCompleter,
 )
-from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread, QObject, QSize, QThreadPool, QRunnable, QMetaObject, Q_ARG
-from PyQt6.QtGui import QTextCursor, QIcon, QFont, QAction, QColor, QPalette, QShortcut, QKeySequence, QPixmap
+from PyQt6.QtCore import (
+    Qt,
+    QTimer,
+    pyqtSignal,
+    QThread,
+    QObject,
+    QSize,
+    QThreadPool,
+    QRunnable,
+    QMetaObject,
+    Q_ARG,
+)
+from PyQt6.QtGui import (
+    QTextCursor,
+    QIcon,
+    QFont,
+    QAction,
+    QColor,
+    QPalette,
+    QShortcut,
+    QKeySequence,
+    QPixmap,
+)
 
 from ui.theme_manager import ThemeManager
 
 from telegram.telegram_client import TelegramClient
 from ai.gemini_service import GeminiService
 from scraping.database import MemberDatabase
-from scraping.member_scraper import (MemberScraper, EliteAntiDetectionSystem,
-                            ComprehensiveDataExtractor, EliteMemberScraper)
+from scraping.member_scraper import (
+    MemberScraper,
+    EliteAntiDetectionSystem,
+    ComprehensiveDataExtractor,
+    EliteMemberScraper,
+)
 from accounts.account_creator import AccountCreator
 from accounts.account_manager import AccountManager
 from anti_detection.anti_detection_system import AntiDetectionSystem
@@ -81,6 +137,7 @@ logger = logging.getLogger(__name__)
 # Import Advanced Features Manager
 try:
     from monitoring.advanced_features_manager import get_features_manager
+
     ADVANCED_FEATURES_AVAILABLE = True
     logger.info("✅ Advanced features loaded successfully")
 except ImportError as e:
@@ -125,15 +182,33 @@ MAX_RETRY_MULTIPLIER = 3
 
 # Import event types and utilities from utils module to avoid circular imports
 from utils.utils import (
-    EVENT_MESSAGE_RECEIVED, EVENT_MESSAGE_SENT, EVENT_ERROR_OCCURRED,
-    EVENT_SERVICE_STARTED, EVENT_SERVICE_STOPPED, EVENT_STATUS_CHANGED
+    EVENT_MESSAGE_RECEIVED,
+    EVENT_MESSAGE_SENT,
+    EVENT_ERROR_OCCURRED,
+    EVENT_SERVICE_STARTED,
+    EVENT_SERVICE_STOPPED,
+    EVENT_STATUS_CHANGED,
 )
 from core.config_manager import ConfigurationManager
-from core.service_container import ServiceContainer, ServiceFactory, IMessageService, IAIService, IDatabaseService, IAntiDetectionService, EventSystem
+from core.service_container import (
+    ServiceContainer,
+    ServiceFactory,
+    IMessageService,
+    IAIService,
+    IDatabaseService,
+    IAntiDetectionService,
+    EventSystem,
+)
 from telegram.telegram_worker import TelegramWorker
 
 # Import performance monitor
-from monitoring.performance_monitor import PerformanceMonitor, StructuredLogger, init_resource_manager, shutdown_resource_manager, get_resource_manager
+from monitoring.performance_monitor import (
+    PerformanceMonitor,
+    StructuredLogger,
+    init_resource_manager,
+    shutdown_resource_manager,
+    get_resource_manager,
+)
 
 # Import error handler for user-friendly messages
 from core.error_handler import ErrorHandler
@@ -150,9 +225,10 @@ class ThreadSafeUI:
         """Invoke a method on the UI object in a thread-safe way."""
         try:
             QMetaObject.invokeMethod(
-                obj, method_name,
+                obj,
+                method_name,
                 Qt.ConnectionType.QueuedConnection,
-                *[Q_ARG(type(arg), arg) for arg in args]
+                *[Q_ARG(type(arg), arg) for arg in args],
             )
         except (TypeError, ValueError, RuntimeError) as e:
             logger.error(f"Failed to invoke {method_name}: {e}")
@@ -168,14 +244,16 @@ class ThreadSafeUI:
     def show_message_box(parent, icon, title: str, text: str):
         """Thread-safe message box display."""
         # For message boxes, we'll use a signal approach
-        if hasattr(parent, 'show_error_signal'):
+        if hasattr(parent, "show_error_signal"):
             if icon == QMessageBox.Icon.Critical:
                 parent.show_error_signal.emit("general_error", text)
             elif icon == QMessageBox.Icon.Information:
                 parent.show_success_signal.emit(title, text)
         else:
             # Fallback - this might not be thread-safe
-            logger.warning("No signal available for message box, using direct call (may cause race condition)")
+            logger.warning(
+                "No signal available for message box, using direct call (may cause race condition)"
+            )
             QMessageBox(icon, title, text, parent=parent).exec()
 
 
@@ -183,14 +261,17 @@ class ThreadSafeUI:
 def _on_campaign_created(campaign_data: dict):
     """Handle campaign creation event."""
     try:
-        campaign_id = campaign_data.get('campaign_id')
-        metrics = campaign_data.get('metrics', {})
-        logger.info(f"Campaign {campaign_id} created with {metrics.get('total_members', 0)} members")
+        campaign_id = campaign_data.get("campaign_id")
+        metrics = campaign_data.get("metrics", {})
+        logger.info(
+            f"Campaign {campaign_id} created with {metrics.get('total_members', 0)} members"
+        )
         # Update UI if needed - this will be connected to MainWindow instance
     except (KeyError, TypeError, AttributeError) as e:
         logger.error(f"Error handling campaign creation data: {e}")
     except Exception as e:
         logger.error(f"Unexpected error handling campaign creation: {e}")
+
 
 def _on_campaign_updated(campaign_id: int, stats: dict):
     """Handle campaign update event."""
@@ -202,6 +283,7 @@ def _on_campaign_updated(campaign_id: int, stats: dict):
     except Exception as e:
         logger.error(f"Unexpected error handling campaign update: {e}")
 
+
 def _on_account_status_changed(phone_number: str, status: str):
     """Handle account status change event."""
     try:
@@ -212,16 +294,18 @@ def _on_account_status_changed(phone_number: str, status: str):
     except Exception as e:
         logger.error(f"Unexpected error handling account status change: {e}")
 
+
 def _on_system_health_updated(health_data: dict):
     """Handle system health update event."""
     try:
-        health_score = health_data.get('overall_health', 0)
+        health_score = health_data.get("overall_health", 0)
         logger.info(f"System health updated: {health_score}%")
         # Update dashboard with health info - this will be connected to MainWindow instance
     except (KeyError, TypeError, AttributeError) as e:
         logger.error(f"Invalid system health data: {e}")
     except Exception as e:
         logger.error(f"Unexpected error handling system health update: {e}")
+
 
 def _on_controller_error(error_type: str, details: str):
     """Handle errors from UI controller."""
@@ -231,6 +315,7 @@ def _on_controller_error(error_type: str, details: str):
         logger.error(f"UI error handler unavailable: {e}")
     except Exception as e:
         logger.error(f"Unexpected error handling controller error: {e}")
+
 
 # Import UI redesign theme
 try:
@@ -275,7 +360,7 @@ class NavigationManager:
             ("📨  Delivery", 10, "Delivery analytics"),
             ("💬  Messages", 11, "Message stream"),
             ("⚙️  Settings", 12, "Configuration"),
-            ("📜  Logs", 13, "Application logs")
+            ("📜  Logs", 13, "Application logs"),
         ]
 
         for text, page_idx, tooltip in nav_items:
@@ -457,7 +542,7 @@ class DashboardWidget(QWidget):
             ("active_chats", "Active Accounts", "0/0", "yellow"),
             ("system_health", "System Health", "100%", "green"),
             ("uptime", "Uptime", "0h 0m", "purple"),
-            ("errors", "Errors", "0", "red")
+            ("errors", "Errors", "0", "red"),
         ]
 
         for idx, (key, label, value, color) in enumerate(metrics_data):
@@ -476,6 +561,7 @@ class DashboardWidget(QWidget):
         actions_layout.setContentsMargins(14, 8, 14, 12)
 
         from ui.theme_manager import ThemeManager
+
         helper = QLabel("Jump to key areas or configure automation.")
         c = ThemeManager.get_colors()
         helper.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px;")
@@ -540,18 +626,21 @@ class DashboardWidget(QWidget):
         layout.setSpacing(8)
 
         from ui.theme_manager import ThemeManager
+
         c = ThemeManager.get_colors()
         self.profile_photo_label = QLabel("👤")
         self.profile_photo_label.setMinimumSize(48, 48)
         self.profile_photo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.profile_photo_label.setStyleSheet(f"""
+        self.profile_photo_label.setStyleSheet(
+            f"""
             QLabel {{
                 background-color: {c['BG_PRIMARY']};
                 border: 1px solid {c['BORDER_DEFAULT']};
                 border-radius: 6px;
                 font-size: 24px;
             }}
-        """)
+        """
+        )
         layout.addWidget(self.profile_photo_label)
 
         text_block = QVBoxLayout()
@@ -561,7 +650,9 @@ class DashboardWidget(QWidget):
         text_block.addWidget(self.profile_name_label)
 
         self.profile_username_label = QLabel("Add Telegram credentials in the welcome wizard.")
-        self.profile_username_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 11.5px;")
+        self.profile_username_label.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-size: 11.5px;"
+        )
         text_block.addWidget(self.profile_username_label)
 
         self.profile_phone_label = QLabel("")
@@ -592,7 +683,10 @@ class DashboardWidget(QWidget):
             self.profile_status_chip.style().polish(self.profile_status_chip)
             return
 
-        display_name = profile.get("display_name") or f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+        display_name = (
+            profile.get("display_name")
+            or f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+        )
         username = profile.get("username") or ""
         phone = profile.get("phone_number") or ""
 
@@ -601,7 +695,9 @@ class DashboardWidget(QWidget):
         self.profile_phone_label.setText(phone)
 
         state = "ok" if profile.get("validated", False) else "warn"
-        self.profile_status_chip.setText("Validated" if profile.get("validated") else "Pending validation")
+        self.profile_status_chip.setText(
+            "Validated" if profile.get("validated") else "Pending validation"
+        )
         self.profile_status_chip.setProperty("state", state)
         self.profile_status_chip.style().unpolish(self.profile_status_chip)
         self.profile_status_chip.style().polish(self.profile_status_chip)
@@ -610,7 +706,12 @@ class DashboardWidget(QWidget):
         if photo_path and Path(photo_path).exists():
             pixmap = QPixmap(photo_path)
             if not pixmap.isNull():
-                scaled = pixmap.scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                scaled = pixmap.scaled(
+                    64,
+                    64,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
                 self.profile_photo_label.setPixmap(scaled)
                 self.profile_photo_label.setText("")
                 return
@@ -696,12 +797,21 @@ class MainWindow(QMainWindow):
 
         env_low_power = os.getenv("LOW_POWER_MODE")
         if env_low_power:
-            self.performance_settings["low_power"] = env_low_power.lower() in ("1", "true", "yes", "on")
+            self.performance_settings["low_power"] = env_low_power.lower() in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            )
         self.low_power_mode = bool(self.performance_settings.get("low_power"))
 
         # Apply timer defaults based on profile
-        self.stats_interval_ms = int(self.performance_settings.get("stats_interval_ms", STATS_UPDATE_INTERVAL))
-        self.dashboard_interval_ms = int(self.performance_settings.get("dashboard_interval_ms", 5000))
+        self.stats_interval_ms = int(
+            self.performance_settings.get("stats_interval_ms", STATS_UPDATE_INTERVAL)
+        )
+        self.dashboard_interval_ms = int(
+            self.performance_settings.get("dashboard_interval_ms", 5000)
+        )
         if self.low_power_mode:
             self.performance_settings.setdefault("background_services_enabled", False)
             self.stats_interval_ms = max(self.stats_interval_ms, 60000)
@@ -710,8 +820,7 @@ class MainWindow(QMainWindow):
         sampling_enabled = bool(self.performance_settings.get("enable_sampling", False))
         sampling_interval = float(self.performance_settings.get("sampling_interval_seconds", 30))
         self.performance_monitor = PerformanceMonitor(
-            sampling_enabled=sampling_enabled,
-            sample_interval_seconds=sampling_interval
+            sampling_enabled=sampling_enabled, sample_interval_seconds=sampling_interval
         )
 
         # Set up memory management timers
@@ -775,14 +884,15 @@ class MainWindow(QMainWindow):
             memory_limit = self.performance_settings.get("memory_limit_mb", 512)
 
             if memory_mb > (memory_limit * 0.9):  # 90% of limit
-                self.logger.log_event("high_memory_usage", {
-                    "current_mb": round(memory_mb, 1),
-                    "limit_mb": memory_limit
-                })
+                self.logger.log_event(
+                    "high_memory_usage",
+                    {"current_mb": round(memory_mb, 1), "limit_mb": memory_limit},
+                )
                 self._perform_memory_cleanup()
 
                 # Force additional cleanup
                 import gc
+
                 gc.collect(2)  # Full collection
 
         except (ImportError, AttributeError, RuntimeError) as e:
@@ -805,9 +915,7 @@ class MainWindow(QMainWindow):
         try:
             # Submit task to background executor
             future = self._background_executor.submit(func, *args, **kwargs)
-            future.add_done_callback(
-                functools.partial(self._background_task_done, task_id)
-            )
+            future.add_done_callback(functools.partial(self._background_task_done, task_id))
         except (RuntimeError, ValueError, TypeError) as e:
             logger.error(f"Failed to submit background task {task_id}: {e}")
         except Exception as e:
@@ -830,15 +938,14 @@ class MainWindow(QMainWindow):
         """Handle background task completion on main thread."""
         # This method can be overridden by subclasses or connected to specific handlers
         logger.debug(f"Background task {task_id} completed")
-        
+
         # Initialize member database and account manager early (needed for warmup service and UI)
         self.member_db = None
         self.account_manager = None
         try:
             self.member_db = MemberDatabase()
             self.account_manager = AccountManager(
-                self.member_db,
-                performance_profile=self.performance_settings
+                self.member_db, performance_profile=self.performance_settings
             )
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
@@ -847,7 +954,7 @@ class MainWindow(QMainWindow):
 
         # Load any existing validated profile details early
         self.telegram_profile = self._load_primary_account_profile()
-        
+
         # Initialize Advanced Features Manager (automatic)
         self.advanced_features = None
         self.auto_integrator = None
@@ -857,12 +964,15 @@ class MainWindow(QMainWindow):
                 logger.info("✅ Advanced features initialized and ready")
                 # Log available features
                 self.advanced_features.log_status()
-                
+
                 # Initialize auto-integrator for seamless integration
                 from integrations.auto_integrator import get_auto_integrator
+
                 self.auto_integrator = get_auto_integrator(self.advanced_features)
-                logger.info("🤖 Auto-Integrator enabled - features will apply automatically to campaigns")
-                
+                logger.info(
+                    "🤖 Auto-Integrator enabled - features will apply automatically to campaigns"
+                )
+
             except Exception as e:
                 logger.warning(f"Advanced features initialization failed: {e}")
                 self.advanced_features = None
@@ -877,25 +987,28 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 logger.error(f"Failed to initialize campaign manager: {e}")
                 self.campaign_manager = None
-        
+
         # Initialize proxy pool manager (starts async later)
         self.proxy_pool_manager = None
         try:
             from proxy_pool_manager import get_proxy_pool_manager
+
             self.proxy_pool_manager = get_proxy_pool_manager()
             logger.info("Proxy Pool Manager reference obtained")
         except ImportError:
             logger.warning("Proxy Pool Manager not available")
         except Exception as e:
             logger.error(f"Failed to get proxy pool manager: {e}")
-        
+
         # Schedule async initialization for account manager services
         try:
             import threading
+
             def init_async_services():
                 """Initialize async services in a background thread."""
                 # Start async services in background thread to avoid blocking UI
                 import threading
+
                 def start_async_services():
                     """Start async services in background thread."""
                     loop = asyncio.new_event_loop()
@@ -919,7 +1032,7 @@ class MainWindow(QMainWindow):
                 service_thread = threading.Thread(target=start_async_services, daemon=True)
                 service_thread.start()
                 logger.info("Async services starting in background thread")
-            
+
             # Run in background thread to not block UI
             init_thread = threading.Thread(target=init_async_services, daemon=True)
             init_thread.start()
@@ -950,6 +1063,7 @@ class MainWindow(QMainWindow):
         # Prevent app exit when dialogs are closed
         try:
             from PyQt6.QtWidgets import QApplication
+
             app = QApplication.instance()
             if app:
                 app.setQuitOnLastWindowClosed(False)
@@ -976,22 +1090,23 @@ class MainWindow(QMainWindow):
         self._refresh_validation_chips()
         self.setup_tray_icon()
         self.setup_keyboard_shortcuts()
-        
+
         # Handle application close - but don't auto-delete on close to prevent dialog issues
         # We'll handle cleanup manually in closeEvent
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-        
+
         # Check if first-time setup wizard is needed
         QTimer.singleShot(500, self._check_first_time_setup)
 
         # Set up cleanup on application exit
         import atexit
+
         atexit.register(self._cleanup_resources)
 
         # Initialize service container with concrete implementations
         # This must be called before AccountCreator initialization
         self._initialize_services()
-        
+
         # Initialize Account Creator now that services are ready
         # Fixed: Initialize AccountCreator AFTER gemini_service is available
         if self.member_db and self.account_manager:
@@ -999,7 +1114,7 @@ class MainWindow(QMainWindow):
                 self.account_creator = AccountCreator(
                     db=self.member_db,
                     gemini_service=self.gemini_service,  # Now available after _initialize_services()
-                    account_manager=self.account_manager
+                    account_manager=self.account_manager,
                 )
                 logger.info("Account Creator initialized with services")
             except Exception as e:
@@ -1008,21 +1123,22 @@ class MainWindow(QMainWindow):
 
         # Initialize API key manager and warmup service
         self.api_key_manager = APIKeyManager()
-        
+
         # Only initialize warmup service if account_manager is available
         if self.account_manager:
             try:
                 self.warmup_service = AccountWarmupService(
                     self.account_manager,
                     self.gemini_service,
-                    performance_profile=self.performance_settings
+                    performance_profile=self.performance_settings,
                 )
                 self.warmup_service.add_status_callback(self._on_warmup_status_update)
                 # Link warmup service to account manager for auto-queueing
                 self.account_manager.warmup_service = self.warmup_service
-                
+
                 # Add account manager status callback for UI updates
                 from accounts.account_manager import AccountStatus
+
                 self.account_manager.add_status_callback(self._on_account_status_changed)
             except Exception as e:
                 self.warmup_service = None
@@ -1039,14 +1155,20 @@ class MainWindow(QMainWindow):
                 self.config_manager = ConfigurationManager()
 
             # Refresh performance settings from persisted config
-            self.performance_settings = self.config_manager.get("performance", {}) or self.performance_settings
-            self.low_power_mode = bool(self.performance_settings.get("low_power", self.low_power_mode))
+            self.performance_settings = (
+                self.config_manager.get("performance", {}) or self.performance_settings
+            )
+            self.low_power_mode = bool(
+                self.performance_settings.get("low_power", self.low_power_mode)
+            )
 
             # Create services using factory pattern
             telegram_service = ServiceFactory.create_telegram_client(self.config_manager)
             ai_service = ServiceFactory.create_ai_service(self.config_manager)
             db_service = ServiceFactory.create_database_service(self.config_manager)
-            anti_detection_service = ServiceFactory.create_anti_detection_service(self.config_manager)
+            anti_detection_service = ServiceFactory.create_anti_detection_service(
+                self.config_manager
+            )
 
             # Register services with the container
             self.service_container.register_instance(IMessageService, telegram_service)
@@ -1060,14 +1182,22 @@ class MainWindow(QMainWindow):
 
             # Initialize resource manager
             self.resource_manager = get_resource_manager()
-            resource_limits = self.performance_settings.get("resource_limits", {}) if isinstance(self.performance_settings, dict) else {}
+            resource_limits = (
+                self.performance_settings.get("resource_limits", {})
+                if isinstance(self.performance_settings, dict)
+                else {}
+            )
             if self.low_power_mode:
                 resource_limits = {
                     **resource_limits,
-                    "max_concurrent_operations": min(resource_limits.get("max_concurrent_operations", 10), 4),
+                    "max_concurrent_operations": min(
+                        resource_limits.get("max_concurrent_operations", 10), 4
+                    ),
                     "memory_limit_mb": min(resource_limits.get("memory_limit_mb", 512), 256),
                     "cpu_limit_percent": min(resource_limits.get("cpu_limit_percent", 80), 60),
-                    "resource_check_interval": max(resource_limits.get("resource_check_interval", 30), 45)
+                    "resource_check_interval": max(
+                        resource_limits.get("resource_check_interval", 30), 45
+                    ),
                 }
             try:
                 self.resource_manager.apply_config(resource_limits)
@@ -1075,7 +1205,7 @@ class MainWindow(QMainWindow):
                 logger.debug(f"Resource manager config apply skipped: {exc}")
 
             logger.info("Service container initialized successfully with factory pattern")
-            
+
             # Start background monitoring and cleanup services
             self._start_background_services()
 
@@ -1106,8 +1236,10 @@ class MainWindow(QMainWindow):
                         "last_name": first_account.get("last_name", "") or "",
                         "display_name": first_account.get("display_name", "") or "",
                         "phone_number": first_account.get("phone_number", "") or "",
-                        "photo_path": first_account.get("photo_path") or first_account.get("profile_photo") or "",
-                        "validated": bool(first_account.get("status") in ("ready", "connected"))
+                        "photo_path": first_account.get("photo_path")
+                        or first_account.get("profile_photo")
+                        or "",
+                        "validated": bool(first_account.get("status") in ("ready", "connected")),
                     }
         except Exception as exc:
             logger.debug(f"Profile load from accounts failed: {exc}")
@@ -1122,7 +1254,7 @@ class MainWindow(QMainWindow):
                 self.dashboard_widget.update_profile(self.telegram_profile)
         except Exception as exc:
             logger.debug(f"Profile refresh skipped: {exc}")
-    
+
     def _refresh_validation_chips(self):
         """Update header chips based on validation state."""
         try:
@@ -1148,58 +1280,60 @@ class MainWindow(QMainWindow):
                 self._set_status_chip_state(self.ai_status_chip, state)
         except Exception as exc:
             logger.debug(f"Validation chip refresh skipped: {exc}")
-    
+
     def _start_background_services(self):
         """Start all background monitoring and cleanup services."""
         # This will be called async after UI is ready
         import threading
-        
+
         def start_async_services():
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
 
-                background_enabled = bool(self.performance_settings.get("background_services_enabled", True))
+                background_enabled = bool(
+                    self.performance_settings.get("background_services_enabled", True)
+                )
                 if self.low_power_mode and not background_enabled:
                     logger.info("Low-power mode: background services thread skipped")
                     return
-                
+
                 # Start cost monitoring
                 try:
                     if not self.low_power_mode:
                         from monitoring.cost_monitor_background import start_cost_monitoring
+
                         self.cost_monitor = loop.run_until_complete(
                             start_cost_monitoring(check_interval_hours=1)
                         )
-                        
+
                         # Add notification callback
-                        if hasattr(self.cost_monitor, '_cost_alert_system'):
+                        if hasattr(self.cost_monitor, "_cost_alert_system"):
                             self.cost_monitor._cost_alert_system.add_notification_callback(
                                 self._on_cost_alert
                             )
-                        
+
                         logger.info("✅ Cost monitoring service started")
                     else:
                         logger.info("Skipping cost monitoring in low-power mode")
                 except Exception as e:
                     logger.warning(f"Cost monitoring unavailable: {e}")
-                
+
                 # Start proxy cleanup
                 try:
                     if self.proxy_pool_manager:
                         from proxy.automated_cleanup_service import get_cleanup_service
+
                         self.cleanup_service = get_cleanup_service(self.proxy_pool_manager)
                         loop.run_until_complete(self.cleanup_service.start())
-                        
+
                         # Add notification callback
-                        self.cleanup_service.add_notification_callback(
-                            self._on_proxy_cleanup
-                        )
-                        
+                        self.cleanup_service.add_notification_callback(self._on_proxy_cleanup)
+
                         logger.info("✅ Proxy cleanup service started")
                 except Exception as e:
                     logger.warning(f"Proxy cleanup unavailable: {e}")
-                
+
                 # Start warmup service
                 try:
                     warmup_enabled = self.performance_settings.get("warmup_autostart", True)
@@ -1207,32 +1341,41 @@ class MainWindow(QMainWindow):
                         loop.run_until_complete(self.warmup_service.start_warmup_service())
                         logger.info("✅ Account warmup service started")
                     elif self.warmup_service:
-                        logger.info("Warmup service available but not auto-started (low-power/profile)")
+                        logger.info(
+                            "Warmup service available but not auto-started (low-power/profile)"
+                        )
                 except Exception as e:
                     logger.warning(f"Warmup service unavailable: {e}")
-                
+
                 # Start campaign scheduler
                 try:
                     campaign_enabled = self.performance_settings.get("campaign_autostart", True)
-                    if hasattr(self, 'campaign_manager') and self.campaign_manager and (campaign_enabled or not self.low_power_mode):
-                        if hasattr(self.campaign_manager, 'scheduler'):
+                    if (
+                        hasattr(self, "campaign_manager")
+                        and self.campaign_manager
+                        and (campaign_enabled or not self.low_power_mode)
+                    ):
+                        if hasattr(self.campaign_manager, "scheduler"):
                             loop.run_until_complete(self.campaign_manager.scheduler.start())
                             logger.info("✅ Campaign scheduler started")
                     elif self.low_power_mode:
                         logger.info("Campaign scheduler not started (low-power/profile)")
                 except Exception as e:
                     logger.warning(f"Campaign scheduler unavailable: {e}")
-                
+
                 # Start read receipt poller
                 try:
-                    if hasattr(self, 'campaign_manager') and self.campaign_manager and not self.low_power_mode:
+                    if (
+                        hasattr(self, "campaign_manager")
+                        and self.campaign_manager
+                        and not self.low_power_mode
+                    ):
                         from campaigns.read_receipt_poller import get_read_receipt_poller
                         from campaigns.delivery_analytics import get_delivery_analytics
-                        
+
                         delivery_analytics = get_delivery_analytics()
                         self.read_receipt_poller = get_read_receipt_poller(
-                            self.campaign_manager, 
-                            delivery_analytics
+                            self.campaign_manager, delivery_analytics
                         )
                         loop.run_until_complete(self.read_receipt_poller.start())
                         logger.info("✅ Read receipt poller started")
@@ -1240,49 +1383,53 @@ class MainWindow(QMainWindow):
                         logger.info("Read receipt poller skipped in low-power mode")
                 except Exception as e:
                     logger.warning(f"Read receipt poller unavailable: {e}")
-                
+
                 # Start response tracker
                 try:
-                    if hasattr(self, 'campaign_manager') and self.campaign_manager and not self.low_power_mode:
+                    if (
+                        hasattr(self, "campaign_manager")
+                        and self.campaign_manager
+                        and not self.low_power_mode
+                    ):
                         from campaigns.response_tracker import get_response_tracker
                         from campaigns.delivery_analytics import get_delivery_analytics
-                        
+
                         delivery_analytics = get_delivery_analytics()
                         self.response_tracker = get_response_tracker(
-                            self.campaign_manager,
-                            delivery_analytics
+                            self.campaign_manager, delivery_analytics
                         )
                         # Response tracker needs a client - we'll start it when we have one
                         # For now, just initialize it
-                        logger.info("✅ Response tracker initialized (will start with first client)")
+                        logger.info(
+                            "✅ Response tracker initialized (will start with first client)"
+                        )
                     elif self.low_power_mode:
                         logger.info("Response tracker skipped in low-power mode")
                 except Exception as e:
                     logger.warning(f"Response tracker unavailable: {e}")
-                
+
                 # Keep loop running for background services
                 loop.run_forever()
-                
+
             except Exception as e:
                 logger.error(f"Background services error: {e}")
-        
+
         # Start in background thread
         bg_thread = threading.Thread(target=start_async_services, daemon=True)
         bg_thread.start()
         logger.info("🚀 Background services thread started")
-    
+
     def _on_cost_alert(self, alert):
         """Handle cost alert notification."""
         try:
             # Emit signal for thread-safe UI update
             alert_msg = f"{alert.message}\n\nCurrent: ${alert.current_cost:.2f}\nThreshold: ${alert.threshold:.2f}"
             self.show_error_signal.emit(
-                f"Cost Alert - {alert.alert_level.value.upper()}",
-                alert_msg
+                f"Cost Alert - {alert.alert_level.value.upper()}", alert_msg
             )
         except Exception as e:
             logger.error(f"Cost alert handler error: {e}")
-    
+
     def _on_proxy_cleanup(self, event):
         """Handle proxy cleanup notification."""
         try:
@@ -1295,10 +1442,10 @@ class MainWindow(QMainWindow):
         """Thread-safe status update handler."""
         try:
             if status_type == "connection":
-                if hasattr(self, 'connection_status_label') and self.connection_status_label:
+                if hasattr(self, "connection_status_label") and self.connection_status_label:
                     self.connection_status_label.setText(message)
             elif status_type == "ai":
-                if hasattr(self, 'ai_status_label') and self.ai_status_label:
+                if hasattr(self, "ai_status_label") and self.ai_status_label:
                     self.ai_status_label.setText(message)
             self.add_log_message(f"Status [{status_type}]: {message}")
         except Exception as e:
@@ -1307,7 +1454,7 @@ class MainWindow(QMainWindow):
     def _safe_update_metrics(self, metrics: dict):
         """Thread-safe metrics update handler."""
         try:
-            if hasattr(self, 'dashboard_widget') and self.dashboard_widget:
+            if hasattr(self, "dashboard_widget") and self.dashboard_widget:
                 self.dashboard_widget.update_metrics(metrics)
         except Exception as e:
             logger.error(f"Error in _safe_update_metrics: {e}")
@@ -1329,14 +1476,16 @@ class MainWindow(QMainWindow):
     def _on_campaign_created(self, campaign_data: dict):
         """Handle campaign creation event from UI controller."""
         try:
-            campaign_id = campaign_data.get('campaign_id')
-            metrics = campaign_data.get('metrics', {})
-            logger.info(f"Campaign {campaign_id} created with {metrics.get('total_members', 0)} members")
+            campaign_id = campaign_data.get("campaign_id")
+            metrics = campaign_data.get("metrics", {})
+            logger.info(
+                f"Campaign {campaign_id} created with {metrics.get('total_members', 0)} members"
+            )
             self.add_log_message(f"✅ Campaign {campaign_id} created successfully")
             # Refresh campaign list if available
-            if hasattr(self, 'campaign_manager_widget'):
+            if hasattr(self, "campaign_manager_widget"):
                 self.campaign_manager_widget.refresh_campaigns()
-            if hasattr(self, 'analytics_widget') and self.analytics_widget:
+            if hasattr(self, "analytics_widget") and self.analytics_widget:
                 # Refresh dropdown options and any active campaign data
                 self.analytics_widget.refresh_campaigns_list()
                 QTimer.singleShot(0, self.analytics_widget.refresh_data)
@@ -1350,9 +1499,9 @@ class MainWindow(QMainWindow):
         try:
             logger.info(f"Campaign {campaign_id} updated: {stats}")
             # Refresh campaign list if available
-            if hasattr(self, 'campaign_manager_widget'):
+            if hasattr(self, "campaign_manager_widget"):
                 self.campaign_manager_widget.refresh_campaigns()
-            if hasattr(self, 'analytics_widget') and self.analytics_widget:
+            if hasattr(self, "analytics_widget") and self.analytics_widget:
                 # Keep analytics data in sync with backend updates
                 self.analytics_widget.refresh_campaigns_list()
                 QTimer.singleShot(0, self.analytics_widget.refresh_data)
@@ -1363,14 +1512,12 @@ class MainWindow(QMainWindow):
     def _on_system_health_updated(self, health_data: dict):
         """Handle system health update event from UI controller."""
         try:
-            health_score = health_data.get('overall_health', 0)
+            health_score = health_data.get("overall_health", 0)
             logger.info(f"System health updated: {health_score}%")
             # Update dashboard with health info
-            if hasattr(self, 'dashboard_widget') and self.dashboard_widget:
-                self.dashboard_widget.update_metrics({
-                    'system_health': f"{health_score}%"
-                })
-            if hasattr(self, 'health_dashboard_widget') and self.health_dashboard_widget:
+            if hasattr(self, "dashboard_widget") and self.dashboard_widget:
+                self.dashboard_widget.update_metrics({"system_health": f"{health_score}%"})
+            if hasattr(self, "health_dashboard_widget") and self.health_dashboard_widget:
                 # Trigger a full refresh so risk cards and charts stay accurate
                 QTimer.singleShot(0, self.health_dashboard_widget.refresh_data)
         except Exception as e:
@@ -1400,39 +1547,45 @@ class MainWindow(QMainWindow):
     def _on_message_received(self, data: Dict[str, Any]):
         """Handle message received event."""
         try:
-            if hasattr(self, 'add_log_message'):
-                self.add_log_message(f"📨 Message received in chat {data.get('chat_id', 'unknown')}")
-            
+            if hasattr(self, "add_log_message"):
+                self.add_log_message(
+                    f"📨 Message received in chat {data.get('chat_id', 'unknown')}"
+                )
+
             # Add to message history widget if available
-            if hasattr(self, 'message_history_widget'):
-                self.message_history_widget.add_message({
-                    'time': datetime.now().strftime("%H:%M:%S"),
-                    'account': 'Unknown', # Need to get account
-                    'contact': str(data.get('chat_id', 'Unknown')),
-                    'message': data.get('text', '')[:50] + '...',
-                    'status': 'Received'
-                })
+            if hasattr(self, "message_history_widget"):
+                self.message_history_widget.add_message(
+                    {
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "account": "Unknown",  # Need to get account
+                        "contact": str(data.get("chat_id", "Unknown")),
+                        "message": data.get("text", "")[:50] + "...",
+                        "status": "Received",
+                    }
+                )
         except Exception as e:
             logger.error(f"Error handling message received event: {e}")
 
     def _on_message_sent(self, data: Dict[str, Any]):
         """Handle message sent event."""
         try:
-            if hasattr(self, 'add_log_message'):
+            if hasattr(self, "add_log_message"):
                 self.add_log_message(f"📤 Message sent to chat {data.get('chat_id', 'unknown')}")
 
             # Track message count for dashboard/status bar
             self.message_count += 1
-            
+
             # Add to message history widget if available
-            if hasattr(self, 'message_history_widget'):
-                self.message_history_widget.add_message({
-                    'time': datetime.now().strftime("%H:%M:%S"),
-                    'account': 'Unknown',
-                    'contact': str(data.get('chat_id', 'Unknown')),
-                    'message': data.get('text', '')[:50] + '...',
-                    'status': 'Sent'
-                })
+            if hasattr(self, "message_history_widget"):
+                self.message_history_widget.add_message(
+                    {
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "account": "Unknown",
+                        "contact": str(data.get("chat_id", "Unknown")),
+                        "message": data.get("text", "")[:50] + "...",
+                        "status": "Sent",
+                    }
+                )
             QTimer.singleShot(0, self.update_dashboard_metrics)
             QTimer.singleShot(0, self.update_stats)
         except Exception as e:
@@ -1441,8 +1594,8 @@ class MainWindow(QMainWindow):
     def _on_service_started(self, data: Dict[str, Any]):
         """Handle service started event."""
         try:
-            service_name = data.get('service', 'unknown')
-            if hasattr(self, 'add_log_message'):
+            service_name = data.get("service", "unknown")
+            if hasattr(self, "add_log_message"):
                 self.add_log_message(f"✅ Service '{service_name}' started")
         except Exception as e:
             logger.error(f"Error handling service started event: {e}")
@@ -1450,8 +1603,8 @@ class MainWindow(QMainWindow):
     def _on_service_stopped(self, data: Dict[str, Any]):
         """Handle service stopped event."""
         try:
-            service_name = data.get('service', 'unknown')
-            if hasattr(self, 'add_log_message'):
+            service_name = data.get("service", "unknown")
+            if hasattr(self, "add_log_message"):
                 self.add_log_message(f"⏹️ Service '{service_name}' stopped")
         except Exception as e:
             logger.error(f"Error handling service stopped event: {e}")
@@ -1459,8 +1612,8 @@ class MainWindow(QMainWindow):
     def _on_error_occurred(self, data: Dict[str, Any]):
         """Handle error occurred event."""
         try:
-            error_msg = data.get('error', 'Unknown error')
-            if hasattr(self, 'add_log_message'):
+            error_msg = data.get("error", "Unknown error")
+            if hasattr(self, "add_log_message"):
                 self.add_log_message(f"❌ Error: {error_msg}")
 
             # Keep dashboard/error counters in sync
@@ -1473,47 +1626,54 @@ class MainWindow(QMainWindow):
     def _on_warmup_status_update(self, job):
         """Handle warmup status updates."""
         try:
-            if hasattr(self, 'add_log_message'):
-                status_msg = f"🔄 Warmup {job.stage.value}: {job.status_message} ({job.progress:.1f}%)"
+            if hasattr(self, "add_log_message"):
+                status_msg = (
+                    f"🔄 Warmup {job.stage.value}: {job.status_message} ({job.progress:.1f}%)"
+                )
                 self.add_log_message(status_msg)
 
             # Update the warmup jobs list in UI
-            if hasattr(self, '_refresh_warmup_status'):
+            if hasattr(self, "_refresh_warmup_status"):
                 # Schedule UI update on main thread
                 QTimer.singleShot(0, self._refresh_warmup_status)
             # Update account list to show warmup progress
             QTimer.singleShot(0, self.update_account_list)
         except Exception as e:
             logger.error(f"Error handling warmup status update: {e}")
-    
-    def _on_account_status_changed(self, phone_number: str, status, metadata: Optional[Dict] = None):
+
+    def _on_account_status_changed(
+        self, phone_number: str, status, metadata: Optional[Dict] = None
+    ):
         """Handle account status change callback and controller signal."""
         try:
             from accounts.account_manager import AccountStatus
             from accounts.account_manager import AccountStatus
+
             # Signals may send raw strings; normalize when possible
             status_value = status.value if isinstance(status, AccountStatus) else str(status)
             status_msg = f"Account {phone_number} status: {status_value}"
             if metadata:
-                if 'error_message' in metadata:
+                if "error_message" in metadata:
                     status_msg += f" - Error: {metadata['error_message']}"
-                elif 'clone_status' in metadata:
+                elif "clone_status" in metadata:
                     status_msg += f" - Clone: {metadata['clone_status']}"
-                elif 'warmup_stage' in metadata:
+                elif "warmup_stage" in metadata:
                     status_msg += f" - Warmup: {metadata['warmup_stage']}"
 
             logger.info(status_msg)
-            if hasattr(self, 'message_history_widget'):
-                self.message_history_widget.add_message({
-                    'time': datetime.now().strftime("%H:%M:%S"),
-                    'account': phone_number,
-                    'contact': phone_number,
-                    'message': status_msg,
-                    'status': 'Info'
-                })
+            if hasattr(self, "message_history_widget"):
+                self.message_history_widget.add_message(
+                    {
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "account": phone_number,
+                        "contact": phone_number,
+                        "message": status_msg,
+                        "status": "Info",
+                    }
+                )
             # Update account list immediately
             QTimer.singleShot(0, self.update_account_list)
-            if hasattr(self, 'health_dashboard_widget') and self.health_dashboard_widget:
+            if hasattr(self, "health_dashboard_widget") and self.health_dashboard_widget:
                 QTimer.singleShot(0, self.health_dashboard_widget.refresh_data)
             QTimer.singleShot(0, self.update_dashboard_metrics)
             QTimer.singleShot(0, self._refresh_dashboard_profile)
@@ -1527,11 +1687,21 @@ class MainWindow(QMainWindow):
         try:
             if hasattr(self, "connection_status_label") and self.connection_status_label:
                 try:
-                    state = "Connected" if (self.telegram_client and hasattr(self.telegram_client, 'is_connected') and self.telegram_client.is_connected()) else "Disconnected"
+                    state = (
+                        "Connected"
+                        if (
+                            self.telegram_client
+                            and hasattr(self.telegram_client, "is_connected")
+                            and self.telegram_client.is_connected()
+                        )
+                        else "Disconnected"
+                    )
                     self.connection_status_label.setText(state)
                     if hasattr(self, "connection_status_chip"):
                         self.connection_status_chip.setText(state)
-                        self._set_status_chip_state(self.connection_status_chip, "ok" if state == "Connected" else "bad")
+                        self._set_status_chip_state(
+                            self.connection_status_chip, "ok" if state == "Connected" else "bad"
+                        )
                 except Exception as e:
                     logger.debug(f"Error checking connection status: {e}")
                     self.connection_status_label.setText("Disconnected")
@@ -1540,9 +1710,13 @@ class MainWindow(QMainWindow):
                 self.ai_status_label.setText(ai_state)
                 if hasattr(self, "ai_status_chip"):
                     self.ai_status_chip.setText(ai_state)
-                    self._set_status_chip_state(self.ai_status_chip, "ok" if self.gemini_service else "warn")
+                    self._set_status_chip_state(
+                        self.ai_status_chip, "ok" if self.gemini_service else "warn"
+                    )
             if hasattr(self, "stats_indicator") and self.stats_indicator:
-                self.stats_indicator.setText(f"Messages: {self.message_count} | Errors: {self.error_count}")
+                self.stats_indicator.setText(
+                    f"Messages: {self.message_count} | Errors: {self.error_count}"
+                )
             # Lightweight performance summary in status bar
             if self.performance_monitor:
                 stats = self.performance_monitor.get_performance_stats()
@@ -1562,7 +1736,9 @@ class MainWindow(QMainWindow):
 
         # Skip dashboard refresh when not visible to reduce CPU
         try:
-            if hasattr(self, "content_stack") and self.content_stack.currentIndex() != getattr(self, "dashboard_page_index", 0):
+            if hasattr(self, "content_stack") and self.content_stack.currentIndex() != getattr(
+                self, "dashboard_page_index", 0
+            ):
                 return
         except Exception:
             pass
@@ -1585,11 +1761,11 @@ class MainWindow(QMainWindow):
             try:
                 accounts = self.account_manager.get_account_list()
                 total_accounts = len(accounts)
-                active_accounts = len([a for a in accounts if a.get('is_online', False)])
+                active_accounts = len([a for a in accounts if a.get("is_online", False)])
 
                 # Sum up messages from account metrics
                 stats = self.account_manager.get_account_stats()
-                total_messages_sent = stats.get('total_messages', 0) or 0
+                total_messages_sent = stats.get("total_messages", 0) or 0
             except Exception as e:
                 logger.warning(f"Failed to get account metrics: {e}")
 
@@ -1607,13 +1783,13 @@ class MainWindow(QMainWindow):
 
         # Return metrics for UI update
         return {
-            'total_accounts': total_accounts,
-            'active_accounts': active_accounts,
-            'total_campaigns': total_campaigns,
-            'active_campaigns': active_campaigns,
-            'total_messages_sent': total_messages_sent,
-            'campaign_messages': campaign_messages,
-            'uptime_seconds': uptime_seconds
+            "total_accounts": total_accounts,
+            "active_accounts": active_accounts,
+            "total_campaigns": total_campaigns,
+            "active_campaigns": active_campaigns,
+            "total_messages_sent": total_messages_sent,
+            "campaign_messages": campaign_messages,
+            "uptime_seconds": uptime_seconds,
         }
 
     def _on_background_task_completed(self, task_id: str, result):
@@ -1621,13 +1797,13 @@ class MainWindow(QMainWindow):
         if task_id == "dashboard_metrics" and result and self.dashboard_widget:
             try:
                 # Extract metrics from result
-                total_accounts = result.get('total_accounts', 0)
-                active_accounts = result.get('active_accounts', 0)
-                total_campaigns = result.get('total_campaigns', 0)
-                active_campaigns = result.get('active_campaigns', 0)
-                total_messages_sent = result.get('total_messages_sent', 0)
-                campaign_messages = result.get('campaign_messages', 0)
-                uptime_seconds = result.get('uptime_seconds', 0)
+                total_accounts = result.get("total_accounts", 0)
+                active_accounts = result.get("active_accounts", 0)
+                total_campaigns = result.get("total_campaigns", 0)
+                active_campaigns = result.get("active_campaigns", 0)
+                total_messages_sent = result.get("total_messages_sent", 0)
+                campaign_messages = result.get("campaign_messages", 0)
+                uptime_seconds = result.get("uptime_seconds", 0)
 
                 # Prefer account metrics; if unavailable, fall back to campaign totals
                 if total_messages_sent == 0:
@@ -1642,15 +1818,25 @@ class MainWindow(QMainWindow):
                 if active_accounts == 0 and total_accounts > 0:
                     health -= 20
 
-                empty_state = (total_accounts == 0 and total_campaigns == 0 and total_messages_sent == 0)
+                empty_state = (
+                    total_accounts == 0 and total_campaigns == 0 and total_messages_sent == 0
+                )
 
                 metrics = {
                     "message_count": "—" if empty_state else f"{total_messages_sent:,}",
                     "ai_responses": "—" if empty_state else f"{self.ai_responses:,}",
-                    "active_chats": "No accounts" if total_accounts == 0 else f"{active_accounts}/{total_accounts} Accounts",
+                    "active_chats": (
+                        "No accounts"
+                        if total_accounts == 0
+                        else f"{active_accounts}/{total_accounts} Accounts"
+                    ),
                     "system_health": "—" if empty_state else f"{max(0, health)}%",
-                    "uptime": "—" if empty_state else f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m",
-                    "errors": "—" if empty_state else str(self.error_count)
+                    "uptime": (
+                        "—"
+                        if empty_state
+                        else f"{uptime_seconds // 3600}h {(uptime_seconds % 3600) // 60}m"
+                    ),
+                    "errors": "—" if empty_state else str(self.error_count),
                 }
 
                 # Update dashboard with collected metrics
@@ -1665,8 +1851,12 @@ class MainWindow(QMainWindow):
                             "Live" if active_accounts > 0 else "Idle"
                         )
                         self.dashboard_widget.live_status_chip.setProperty("state", live_state)
-                        self.dashboard_widget.live_status_chip.style().unpolish(self.dashboard_widget.live_status_chip)
-                        self.dashboard_widget.live_status_chip.style().polish(self.dashboard_widget.live_status_chip)
+                        self.dashboard_widget.live_status_chip.style().unpolish(
+                            self.dashboard_widget.live_status_chip
+                        )
+                        self.dashboard_widget.live_status_chip.style().polish(
+                            self.dashboard_widget.live_status_chip
+                        )
 
                     if hasattr(self.dashboard_widget, "sync_status_chip"):
                         sync_state = "ok" if total_accounts > 0 else "warn"
@@ -1674,8 +1864,12 @@ class MainWindow(QMainWindow):
                             "Synced" if total_accounts > 0 else "No accounts"
                         )
                         self.dashboard_widget.sync_status_chip.setProperty("state", sync_state)
-                        self.dashboard_widget.sync_status_chip.style().unpolish(self.dashboard_widget.sync_status_chip)
-                        self.dashboard_widget.sync_status_chip.style().polish(self.dashboard_widget.sync_status_chip)
+                        self.dashboard_widget.sync_status_chip.style().unpolish(
+                            self.dashboard_widget.sync_status_chip
+                        )
+                        self.dashboard_widget.sync_status_chip.style().polish(
+                            self.dashboard_widget.sync_status_chip
+                        )
                 except Exception as exc:
                     logger.debug(f"Dashboard chip refresh issue: {exc}")
 
@@ -1686,10 +1880,14 @@ class MainWindow(QMainWindow):
                     self._set_status_chip_state(self.health_status_chip, state)
                 if hasattr(self, "accounts_chip"):
                     self.accounts_chip.setText(f"{active_accounts} Accounts")
-                    self._set_status_chip_state(self.accounts_chip, "ok" if active_accounts else "warn")
+                    self._set_status_chip_state(
+                        self.accounts_chip, "ok" if active_accounts else "warn"
+                    )
                 if hasattr(self, "campaigns_chip"):
                     self.campaigns_chip.setText(f"{active_campaigns} Campaigns")
-                    self._set_status_chip_state(self.campaigns_chip, "ok" if active_campaigns else "warn")
+                    self._set_status_chip_state(
+                        self.campaigns_chip, "ok" if active_campaigns else "warn"
+                    )
 
                 # Update performance summary in status bar
                 if self.performance_monitor:
@@ -1722,23 +1920,24 @@ class MainWindow(QMainWindow):
     def setup_campaigns_tab(self):
         """DM campaign overview."""
         page, content_layout = self._create_page_container(
-            "Campaign Engine",
-            "Monitor nurture sequences, templates, and delivery queues."
+            "Campaign Engine", "Monitor nurture sequences, templates, and delivery queues."
         )
 
         if self.campaign_manager:
             self.campaign_manager_widget = CampaignManagerWidget(self.campaign_manager)
-            self.campaign_manager_widget.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            self.campaign_manager_widget.setSizePolicy(
+                QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+            )
             content_layout.addWidget(self.campaign_manager_widget)
         else:
             status_label = QLabel("Campaign manager not initialized. Add accounts to enable it.")
             content_layout.addWidget(status_label)
-            
+
             open_settings = QPushButton("Open Settings")
             open_settings.clicked.connect(self._open_settings_dialog)
             open_settings.setObjectName("secondary")
             content_layout.addWidget(open_settings)
-            
+
             content_layout.addStretch()
 
         self.content_stack.addWidget(page)
@@ -1747,13 +1946,16 @@ class MainWindow(QMainWindow):
         """Campaign analytics and performance metrics."""
         page, content_layout = self._create_page_container(
             "Campaign Analytics",
-            "Visualize campaign performance, delivery rates, and account metrics."
+            "Visualize campaign performance, delivery rates, and account metrics.",
         )
-        
+
         try:
             from ui.campaign_analytics_widget import CampaignAnalyticsWidget
+
             self.analytics_widget = CampaignAnalyticsWidget(self.campaign_manager)
-            self.analytics_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.analytics_widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             analytics_container = QScrollArea()
             analytics_container.setWidgetResizable(True)
             analytics_container.setFrameShape(QFrame.Shape.NoFrame)
@@ -1765,20 +1967,22 @@ class MainWindow(QMainWindow):
             error_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_WARNING']};")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
-        
+
         self.content_stack.addWidget(page)
 
     def setup_proxy_pool_tab(self):
         """Proxy pool management interface."""
         page, content_layout = self._create_page_container(
-            "Proxy Pool",
-            "Manage proxy endpoints, monitor health, and configure auto-assignment."
+            "Proxy Pool", "Manage proxy endpoints, monitor health, and configure auto-assignment."
         )
-        
+
         try:
             from ui.proxy_management_widget import ProxyManagementWidget
+
             self.proxy_management_widget = ProxyManagementWidget()
-            self.proxy_management_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.proxy_management_widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             proxy_container = QScrollArea()
             proxy_container.setWidgetResizable(True)
             proxy_container.setFrameShape(QFrame.Shape.NoFrame)
@@ -1790,20 +1994,22 @@ class MainWindow(QMainWindow):
             error_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_WARNING']};")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
-        
+
         self.content_stack.addWidget(page)
 
     def setup_health_tab(self):
         """Account health monitoring dashboard."""
         page, content_layout = self._create_page_container(
-            "Account Health",
-            "Monitor account risk levels, ban probability, and quarantine status."
+            "Account Health", "Monitor account risk levels, ban probability, and quarantine status."
         )
-        
+
         try:
             from ui.account_health_widget import AccountHealthDashboard
+
             self.health_dashboard_widget = AccountHealthDashboard(self.account_manager)
-            self.health_dashboard_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.health_dashboard_widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             health_container = QScrollArea()
             health_container.setWidgetResizable(True)
             health_container.setFrameShape(QFrame.Shape.NoFrame)
@@ -1815,20 +2021,22 @@ class MainWindow(QMainWindow):
             error_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_WARNING']};")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
-        
+
         self.content_stack.addWidget(page)
-    
+
     def setup_engagement_tab(self):
         """Engagement automation management."""
         page, content_layout = self._create_page_container(
-            "Engagement Automation",
-            "Manage automated reactions and engagement rules for groups."
+            "Engagement Automation", "Manage automated reactions and engagement rules for groups."
         )
-        
+
         try:
             from ui.engagement_widget import EngagementWidget
+
             self.engagement_widget = EngagementWidget()
-            self.engagement_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.engagement_widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             engagement_container = QScrollArea()
             engagement_container.setWidgetResizable(True)
             engagement_container.setFrameShape(QFrame.Shape.NoFrame)
@@ -1840,30 +2048,34 @@ class MainWindow(QMainWindow):
             error_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_WARNING']};")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
-        
+
         self.content_stack.addWidget(page)
-    
+
     def setup_warmup_monitor_tab(self):
         """Warmup progress monitoring."""
         page, content_layout = self._create_page_container(
-            "Warmup Monitor",
-            "Track real-time warmup progress and manage warmup configurations."
+            "Warmup Monitor", "Track real-time warmup progress and manage warmup configurations."
         )
-        
+
         # Add tabs for progress and configuration
         from PyQt6.QtWidgets import QTabWidget
+
         warmup_tabs = QTabWidget()
-        
+
         try:
             from ui.warmup_progress_widget import WarmupProgressWidget
             from ui.warmup_config_widget import WarmupConfigWidget
-            
-            progress_widget = WarmupProgressWidget(self.warmup_service if hasattr(self, 'warmup_service') else None)
+
+            progress_widget = WarmupProgressWidget(
+                self.warmup_service if hasattr(self, "warmup_service") else None
+            )
             warmup_tabs.addTab(progress_widget, "Progress")
-            
-            config_widget = WarmupConfigWidget(self.warmup_service if hasattr(self, 'warmup_service') else None)
+
+            config_widget = WarmupConfigWidget(
+                self.warmup_service if hasattr(self, "warmup_service") else None
+            )
             warmup_tabs.addTab(config_widget, "Configuration")
-            
+
             content_layout.addWidget(warmup_tabs)
         except ImportError as e:
             logger.warning(f"Warmup widgets not available: {e}")
@@ -1871,20 +2083,22 @@ class MainWindow(QMainWindow):
             error_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_WARNING']};")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
-        
+
         self.content_stack.addWidget(page)
-    
+
     def setup_risk_monitor_tab(self):
         """Account risk monitoring dashboard."""
         page, content_layout = self._create_page_container(
-            "Risk Monitor",
-            "Real-time account risk scoring and quarantine recommendations."
+            "Risk Monitor", "Real-time account risk scoring and quarantine recommendations."
         )
-        
+
         try:
             from ui.risk_monitor_widget import RiskMonitorWidget
+
             self.risk_monitor_widget = RiskMonitorWidget()
-            self.risk_monitor_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.risk_monitor_widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             risk_container = QScrollArea()
             risk_container.setWidgetResizable(True)
             risk_container.setFrameShape(QFrame.Shape.NoFrame)
@@ -1896,20 +2110,22 @@ class MainWindow(QMainWindow):
             error_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_WARNING']};")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
-        
+
         self.content_stack.addWidget(page)
-    
+
     def setup_delivery_tab(self):
         """Delivery and response analytics."""
         page, content_layout = self._create_page_container(
-            "Delivery Analytics",
-            "Track message delivery, read receipts, and response times."
+            "Delivery Analytics", "Track message delivery, read receipts, and response times."
         )
-        
+
         try:
             from ui.delivery_analytics_widget import DeliveryAnalyticsWidget
+
             self.delivery_analytics_widget = DeliveryAnalyticsWidget()
-            self.delivery_analytics_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+            self.delivery_analytics_widget.setSizePolicy(
+                QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+            )
             delivery_container = QScrollArea()
             delivery_container.setWidgetResizable(True)
             delivery_container.setFrameShape(QFrame.Shape.NoFrame)
@@ -1921,14 +2137,14 @@ class MainWindow(QMainWindow):
             error_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_WARNING']};")
             content_layout.addWidget(error_label)
             content_layout.addStretch()
-        
+
         self.content_stack.addWidget(page)
 
     def setup_messages_tab(self):
         """Live log of messages and events."""
         page, content_layout = self._create_page_container(
             "Message Stream",
-            "Centralized log of incoming chats, AI replies, and automation events."
+            "Centralized log of incoming chats, AI replies, and automation events.",
         )
 
         self.message_history_widget = MessageHistoryWidget()
@@ -1941,13 +2157,15 @@ class MainWindow(QMainWindow):
         # Set up window accessibility properties
         self.setWindowTitle("Telegram Auto-Reply Bot")
         self.setAccessibleName("Telegram Auto-Reply Bot Main Window")
-        self.setAccessibleDescription("Main application window for managing Telegram automation bot")
-        
+        self.setAccessibleDescription(
+            "Main application window for managing Telegram automation bot"
+        )
+
         # Responsive window sizing
         screen = QApplication.primaryScreen().availableGeometry()
         screen_width = screen.width()
         screen_height = screen.height()
-        
+
         if screen_width < 1400 or screen_height < 800:
             # Small screens - compact layout
             self.setMinimumSize(1000, 600)
@@ -1956,7 +2174,7 @@ class MainWindow(QMainWindow):
             # Large screens - comfortable layout
             self.setMinimumSize(1200, 700)
             self.resize(1400, 900)
-        
+
         # Maximum size to prevent awkward stretching on huge monitors
         self.setMaximumSize(2400, 1600)
 
@@ -1972,7 +2190,9 @@ class MainWindow(QMainWindow):
         sidebar = QWidget()
         sidebar.setObjectName("sidebar_container")
         sidebar.setAccessibleName("Navigation Sidebar")
-        sidebar.setAccessibleDescription("Navigation menu for switching between application sections")
+        sidebar.setAccessibleDescription(
+            "Navigation menu for switching between application sections"
+        )
         sidebar.setMinimumWidth(180)
         sidebar.setMaximumWidth(260)
         sidebar.setProperty("expanded_width", 200)
@@ -1989,7 +2209,9 @@ class MainWindow(QMainWindow):
         content_area = QWidget()
         content_area.setObjectName("content_area")
         content_area.setAccessibleName("Main Content Area")
-        content_area.setAccessibleDescription("Main content area displaying current application section")
+        content_area.setAccessibleDescription(
+            "Main content area displaying current application section"
+        )
         content_layout = QVBoxLayout(content_area)
         content_layout.setContentsMargins(10, 10, 10, 10)
         content_layout.setSpacing(8)
@@ -2021,13 +2243,13 @@ class MainWindow(QMainWindow):
         self.setup_accounts_tab()
         self.setup_members_tab()
         self.setup_campaigns_tab()
-        self.setup_analytics_tab()       # Campaign analytics
-        self.setup_proxy_pool_tab()      # Proxy pool management
-        self.setup_health_tab()          # Account health dashboard
-        self.setup_engagement_tab()      # NEW: Engagement automation
+        self.setup_analytics_tab()  # Campaign analytics
+        self.setup_proxy_pool_tab()  # Proxy pool management
+        self.setup_health_tab()  # Account health dashboard
+        self.setup_engagement_tab()  # NEW: Engagement automation
         self.setup_warmup_monitor_tab()  # NEW: Warmup progress
-        self.setup_risk_monitor_tab()    # NEW: Risk monitoring
-        self.setup_delivery_tab()        # NEW: Delivery analytics
+        self.setup_risk_monitor_tab()  # NEW: Risk monitoring
+        self.setup_delivery_tab()  # NEW: Delivery analytics
         self.setup_messages_tab()
         self.setup_settings_tab()
         self.setup_logs_tab()
@@ -2058,7 +2280,6 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             logger.debug(f"Shortcut setup issue: {exc}")
 
-
     def _setup_accessibility(self):
         """Set up accessibility features for screen readers and keyboard navigation."""
         # Set up window properties
@@ -2068,7 +2289,7 @@ class MainWindow(QMainWindow):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # Set up accessible names for key UI elements
-        if hasattr(self, 'content_stack'):
+        if hasattr(self, "content_stack"):
             self.content_stack.setAccessibleName("Main Content Pages")
             self.content_stack.setAccessibleDescription("Container for different application views")
 
@@ -2076,30 +2297,32 @@ class MainWindow(QMainWindow):
         self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, False)
 
         # Set up live region for status updates
-        if hasattr(self, 'status_bar'):
+        if hasattr(self, "status_bar"):
             self.status_bar.setAccessibleName("Status Information")
             self.status_bar.setAccessibleDescription("Application status and progress information")
-
 
     def _setup_tab_order(self):
         """Set up logical tab order for keyboard navigation."""
         # Set initial focus to sidebar navigation
-        if hasattr(self, 'navigation_manager') and hasattr(self.navigation_manager, 'sidebar_buttons'):
+        if hasattr(self, "navigation_manager") and hasattr(
+            self.navigation_manager, "sidebar_buttons"
+        ):
             if self.navigation_manager.sidebar_buttons:
                 first_button = self.navigation_manager.sidebar_buttons[0]
                 first_button.setFocus()
 
         # Set up tab order for main content areas
-        if hasattr(self, 'content_stack'):
+        if hasattr(self, "content_stack"):
             self.setTabOrder(self.content_stack, self.content_stack)
 
         # Ensure command palette is reachable early
         try:
-            if hasattr(self, 'navigation_manager') and self.navigation_manager.sidebar_buttons:
-                self.setTabOrder(self.navigation_manager.sidebar_buttons[0], self.global_search_input)
+            if hasattr(self, "navigation_manager") and self.navigation_manager.sidebar_buttons:
+                self.setTabOrder(
+                    self.navigation_manager.sidebar_buttons[0], self.global_search_input
+                )
         except Exception:
             pass
-
 
     def _create_page_container(self, title: str, subtitle: str = ""):
         """Create a standard page container with title and subtitle."""
@@ -2158,7 +2381,7 @@ class MainWindow(QMainWindow):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setWidget(content_widget)
-        
+
         layout.addWidget(scroll, 1)
 
         return page, content_layout
@@ -2181,9 +2404,20 @@ class MainWindow(QMainWindow):
         self.global_search_input.setMinimumWidth(320)
         # Lightweight command suggestions
         palette_routes = [
-            ">dashboard", ">accounts", ">members", ">campaigns", ">analytics",
-            ">proxy", ">health", ">engagement", ">warmup", ">risk",
-            ">delivery", ">messages", ">settings", ">logs"
+            ">dashboard",
+            ">accounts",
+            ">members",
+            ">campaigns",
+            ">analytics",
+            ">proxy",
+            ">health",
+            ">engagement",
+            ">warmup",
+            ">risk",
+            ">delivery",
+            ">messages",
+            ">settings",
+            ">logs",
         ]
         palette_completer = QCompleter(palette_routes, self)
         palette_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
@@ -2197,7 +2431,9 @@ class MainWindow(QMainWindow):
         self.theme_toggle.addItems(["Dark", "Light"])
         self.theme_toggle.setFixedWidth(90)
         self.theme_toggle.setFixedHeight(32)
-        self.theme_toggle.setCurrentText("Dark" if ThemeManager.current_theme == "dark" else "Light")
+        self.theme_toggle.setCurrentText(
+            "Dark" if ThemeManager.current_theme == "dark" else "Light"
+        )
         self.theme_toggle.currentTextChanged.connect(self._on_theme_changed)
         layout.addWidget(self.theme_toggle, 0)
 
@@ -2283,7 +2519,11 @@ class MainWindow(QMainWindow):
     def _handle_global_search(self):
         """Lightweight command palette routing."""
         try:
-            query = self.global_search_input.text().strip().lower() if hasattr(self, "global_search_input") else ""
+            query = (
+                self.global_search_input.text().strip().lower()
+                if hasattr(self, "global_search_input")
+                else ""
+            )
             if not query:
                 return
 
@@ -2367,6 +2607,7 @@ class MainWindow(QMainWindow):
         # Gemini inline banner if AI offline (only show if AI not configured)
         try:
             from core.secrets_manager import get_secrets_manager
+
             secrets = get_secrets_manager()
             gemini_key = secrets.get_secret("gemini_api_key", required=False)
             show_banner = not gemini_key
@@ -2376,9 +2617,12 @@ class MainWindow(QMainWindow):
         if show_banner:
             banner = QFrame()
             from ui.theme_manager import ThemeManager
+
             c = ThemeManager.get_colors()
             banner.setObjectName("hero_card")
-            banner.setStyleSheet(f"background-color: {c['BG_SECONDARY']}; border: 1px solid {c['BORDER_DEFAULT']}; border-radius: 8px;")
+            banner.setStyleSheet(
+                f"background-color: {c['BG_SECONDARY']}; border: 1px solid {c['BORDER_DEFAULT']}; border-radius: 8px;"
+            )
             b_layout = QHBoxLayout(banner)
             b_layout.setContentsMargins(12, 10, 12, 10)
             b_layout.setSpacing(12)
@@ -2386,7 +2630,9 @@ class MainWindow(QMainWindow):
             text_block = QVBoxLayout()
             text_block.setSpacing(4)
             banner_title = QLabel("AI Setup Required")
-            banner_title.setStyleSheet(f"font-weight: 600; font-size: 13px; color: {c['TEXT_BRIGHT']};")
+            banner_title.setStyleSheet(
+                f"font-weight: 600; font-size: 13px; color: {c['TEXT_BRIGHT']};"
+            )
             banner_body = QLabel("Add your Gemini API key in Settings to enable AI responses.")
             banner_body.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px;")
             text_block.addWidget(banner_title)
@@ -2399,9 +2645,9 @@ class MainWindow(QMainWindow):
             setup_btn.setFixedHeight(32)
             setup_btn.clicked.connect(self._open_settings_dialog)
             b_layout.addWidget(setup_btn)
-            
+
             # Add banner to dashboard widget if it has a layout
-            if hasattr(self.dashboard_widget, 'layout') and self.dashboard_widget.layout():
+            if hasattr(self.dashboard_widget, "layout") and self.dashboard_widget.layout():
                 self.dashboard_widget.layout().insertWidget(0, banner)
                 self.dashboard_banner = banner
             else:
@@ -2411,19 +2657,17 @@ class MainWindow(QMainWindow):
 
         self.content_stack.addWidget(dashboard_scroll)
 
-
     def setup_accounts_tab(self):
         """Account management page."""
         page, content_layout = self._create_page_container(
-            "Account Management",
-            "Create, manage, and warm up Telegram accounts"
+            "Account Management", "Create, manage, and warm up Telegram accounts"
         )
 
         # Toolbar with filters
         toolbar_layout = QHBoxLayout()
         toolbar_layout.setSpacing(6)
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         create_btn = QPushButton("Create Account")
         create_btn.setObjectName("quick_action")
         create_btn.setFixedHeight(32)
@@ -2450,7 +2694,9 @@ class MainWindow(QMainWindow):
         toolbar_layout.addWidget(self.accounts_search)
 
         self.accounts_status_filter = QComboBox()
-        self.accounts_status_filter.addItems(["All", "Online", "Offline", "Warming", "Ready", "Error"])
+        self.accounts_status_filter.addItems(
+            ["All", "Online", "Offline", "Warming", "Ready", "Error"]
+        )
         self.accounts_status_filter.currentTextChanged.connect(self.update_account_list)
         toolbar_layout.addWidget(self.accounts_status_filter)
 
@@ -2459,8 +2705,12 @@ class MainWindow(QMainWindow):
         # Accounts list widget
         self.accounts_table = QTableWidget()
         self.accounts_table.setColumnCount(5)
-        self.accounts_table.setHorizontalHeaderLabels(["Phone", "Status", "Warmup", "Messages", "Actions"])
-        self.accounts_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.accounts_table.setHorizontalHeaderLabels(
+            ["Phone", "Status", "Warmup", "Messages", "Actions"]
+        )
+        self.accounts_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
         self.accounts_table.horizontalHeader().setStretchLastSection(True)
         self.accounts_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.accounts_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -2468,7 +2718,9 @@ class MainWindow(QMainWindow):
         self.accounts_table.verticalHeader().setDefaultSectionSize(30)  # Compact row height
         self.accounts_table.setMinimumHeight(180)
         self.accounts_table.setAlternatingRowColors(True)
-        self.accounts_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.accounts_table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
         content_layout.addWidget(self.accounts_table)
 
         # Loading overlay for table operations
@@ -2480,7 +2732,7 @@ class MainWindow(QMainWindow):
         """Elite member scraping page with comprehensive data extraction."""
         page, content_layout = self._create_page_container(
             "Elite Member Intelligence",
-            "Extract comprehensive member data from ANY Telegram channel with zero-risk guarantees"
+            "Extract comprehensive member data from ANY Telegram channel with zero-risk guarantees",
         )
 
         # Elite capabilities description
@@ -2494,13 +2746,15 @@ class MainWindow(QMainWindow):
         )
         elite_desc.setWordWrap(True)
         from ui.theme_manager import ThemeManager
+
         c = ThemeManager.get_colors()
-        accent_hex = c["ACCENT_PRIMARY"].lstrip('#')
+        accent_hex = c["ACCENT_PRIMARY"].lstrip("#")
         accent_r = int(accent_hex[0:2], 16)
         accent_g = int(accent_hex[2:4], 16)
         accent_b = int(accent_hex[4:6], 16)
         elite_desc.setObjectName("hero_card")
-        elite_desc.setStyleSheet(f"""
+        elite_desc.setStyleSheet(
+            f"""
             QLabel {{
                 background-color: rgba({accent_r}, {accent_g}, {accent_b}, 0.08);
                 border: 1px solid rgba({accent_r}, {accent_g}, {accent_b}, 0.2);
@@ -2510,7 +2764,8 @@ class MainWindow(QMainWindow):
                 font-size: 12px;
                 line-height: 1.5;
             }}
-        """)
+        """
+        )
         content_layout.addWidget(elite_desc)
 
         # Toolbar
@@ -2519,13 +2774,17 @@ class MainWindow(QMainWindow):
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
 
         channel_input = QLineEdit()
-        channel_input.setPlaceholderText("ANY channel: @username, https://t.me/channel, channel_id, or invite link")
+        channel_input.setPlaceholderText(
+            "ANY channel: @username, https://t.me/channel, channel_id, or invite link"
+        )
         toolbar_layout.addWidget(channel_input)
 
         scrape_btn = QPushButton("Start Scrape")
         scrape_btn.setObjectName("quick_action")
         scrape_btn.setFixedHeight(32)
-        scrape_btn.setToolTip("Extract ALL available member data with zero ban risk using advanced AI techniques")
+        scrape_btn.setToolTip(
+            "Extract ALL available member data with zero ban risk using advanced AI techniques"
+        )
         scrape_btn.clicked.connect(lambda: self.start_member_scraping(channel_input.text()))
         toolbar_layout.addWidget(scrape_btn)
 
@@ -2559,14 +2818,20 @@ class MainWindow(QMainWindow):
         # Status label
         self.scrape_status_label = QLabel("Ready to scrape members")
         c = ThemeManager.get_colors()
-        self.scrape_status_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 12px; padding: 4px 0;")
+        self.scrape_status_label.setStyleSheet(
+            f"color: {c['TEXT_DISABLED']}; font-size: 12px; padding: 4px 0;"
+        )
         content_layout.addWidget(self.scrape_status_label)
 
         # Elite members table with comprehensive data display
         self.members_table = QTableWidget()
         self.members_table.setColumnCount(4)
-        self.members_table.setHorizontalHeaderLabels(["Profile & Quality", "Username & Badges", "ID & Risk", "Messaging Potential"])
-        self.members_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.members_table.setHorizontalHeaderLabels(
+            ["Profile & Quality", "Username & Badges", "ID & Risk", "Messaging Potential"]
+        )
+        self.members_table.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Stretch
+        )
         self.members_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.members_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.members_table.verticalHeader().setVisible(False)
@@ -2606,8 +2871,14 @@ class MainWindow(QMainWindow):
     def _refresh_member_filters(self):
         """Apply search/risk filters to member table."""
         try:
-            search_text = self.members_search.text().lower() if hasattr(self, "members_search") else ""
-            risk_filter = self.members_risk_filter.currentText().lower() if hasattr(self, "members_risk_filter") else "all"
+            search_text = (
+                self.members_search.text().lower() if hasattr(self, "members_search") else ""
+            )
+            risk_filter = (
+                self.members_risk_filter.currentText().lower()
+                if hasattr(self, "members_risk_filter")
+                else "all"
+            )
             row_count = self.members_table.rowCount()
             for row in range(row_count):
                 visible = True
@@ -2631,8 +2902,7 @@ class MainWindow(QMainWindow):
     def setup_settings_tab(self):
         """Settings page."""
         page, content_layout = self._create_page_container(
-            "Settings",
-            "Configure your bot and automation parameters"
+            "Settings", "Configure your bot and automation parameters"
         )
 
         settings_btn = QPushButton("Open Settings")
@@ -2648,8 +2918,7 @@ class MainWindow(QMainWindow):
     def setup_logs_tab(self):
         """Logs page."""
         page, content_layout = self._create_page_container(
-            "Application Logs",
-            "Monitor system activity and debug information"
+            "Application Logs", "Monitor system activity and debug information"
         )
 
         # Log viewer
@@ -2666,7 +2935,7 @@ class MainWindow(QMainWindow):
         toolbar_layout = QHBoxLayout()
         toolbar_layout.setSpacing(6)
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         clear_btn = QPushButton("Clear Logs")
         clear_btn.setObjectName("danger")
         clear_btn.setFixedHeight(32)
@@ -2680,7 +2949,7 @@ class MainWindow(QMainWindow):
 
     def add_log_message(self, message: str):
         """Add a message to the log display."""
-        if hasattr(self, 'log_text_edit'):
+        if hasattr(self, "log_text_edit"):
             timestamp = datetime.now().strftime("%H:%M:%S")
             self.log_text_edit.append(f"[{timestamp}] {message}")
 
@@ -2689,7 +2958,7 @@ class MainWindow(QMainWindow):
         if ErrorHandler.safe_question(
             self,
             "Clear Logs",
-            "Are you sure you want to clear all logs?\n\nThis action cannot be undone."
+            "Are you sure you want to clear all logs?\n\nThis action cannot be undone.",
         ):
             self.log_text_edit.clear()
             self.add_log_message("Logs cleared by user")
@@ -2708,44 +2977,42 @@ class MainWindow(QMainWindow):
             (QKeySequence("Ctrl+8"), 7, "Health"),
             (QKeySequence("Ctrl+9"), 8, "Logs"),
         ]
-        
+
         for key_seq, page_index, name in nav_shortcuts:
             if page_index < self.content_stack.count():
                 shortcut = QShortcut(key_seq, self)
-                shortcut.activated.connect(
-                    lambda idx=page_index: self._navigate_to_page(idx)
-                )
-        
+                shortcut.activated.connect(lambda idx=page_index: self._navigate_to_page(idx))
+
         # Settings shortcut (Ctrl+,)
         settings_shortcut = QShortcut(QKeySequence("Ctrl+,"), self)
         settings_shortcut.activated.connect(self._open_settings_dialog)
-        
+
         # Refresh shortcut (F5)
         refresh_shortcut = QShortcut(QKeySequence("F5"), self)
         refresh_shortcut.activated.connect(self._refresh_current_view)
-        
+
         # Alternative refresh (Ctrl+R)
         refresh_shortcut2 = QShortcut(QKeySequence("Ctrl+R"), self)
         refresh_shortcut2.activated.connect(self._refresh_current_view)
-        
+
         # Quick search shortcut (Ctrl+F)
         search_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         search_shortcut.activated.connect(self._show_search_dialog)
-        
+
         # New account shortcut (Ctrl+N)
         new_account_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
         new_account_shortcut.activated.connect(self._quick_add_account)
-        
+
         # Start/Stop shortcut (Ctrl+Space)
         start_stop_shortcut = QShortcut(QKeySequence("Ctrl+Space"), self)
         start_stop_shortcut.activated.connect(self._toggle_bot_status)
-        
+
         # Quick help (F1)
         help_shortcut = QShortcut(QKeySequence("F1"), self)
         help_shortcut.activated.connect(self._show_shortcuts_help)
-        
+
         logger.info("Keyboard shortcuts configured")
-    
+
     def _navigate_to_page(self, page_index: int):
         """Navigate to a specific page in the content stack."""
         if 0 <= page_index < self.content_stack.count():
@@ -2753,39 +3020,37 @@ class MainWindow(QMainWindow):
             # Update navigation button states
             for idx, btn in self.navigation_manager.nav_buttons.items():
                 btn.setChecked(idx == page_index)
-    
+
     def _refresh_current_view(self):
         """Refresh the current view based on active page."""
         current_index = self.content_stack.currentIndex()
-        
+
         if current_index == 0:  # Dashboard
             self.update_dashboard_metrics()
         elif current_index == 1:  # Scraper
-            if hasattr(self, 'member_list'):
+            if hasattr(self, "member_list"):
                 self.member_list.clear()
         elif current_index == 4:  # Accounts
             self.update_account_list()
         elif current_index == 5:  # Analytics
-            if hasattr(self, 'analytics_widget'):
+            if hasattr(self, "analytics_widget"):
                 self.analytics_widget.refresh()
         elif current_index == 6:  # Proxy Pool
-            if hasattr(self, 'proxy_management_widget'):
+            if hasattr(self, "proxy_management_widget"):
                 self.proxy_management_widget.refresh_all()
         elif current_index == 7:  # Health
-            if hasattr(self, 'health_dashboard_widget'):
+            if hasattr(self, "health_dashboard_widget"):
                 self.health_dashboard_widget.refresh()
-        
+
         self.statusBar().showMessage("View refreshed", 2000)
-    
+
     def _show_search_dialog(self):
         """Show quick search dialog."""
         current_index = self.content_stack.currentIndex()
-        
+
         # Context-aware search based on current view
         if current_index == 1:  # Scraper - search members
-            search_text, ok = QInputDialog.getText(
-                self, "Search Members", "Enter username or ID:"
-            )
+            search_text, ok = QInputDialog.getText(self, "Search Members", "Enter username or ID:")
             if ok and search_text:
                 self._search_members(search_text)
         elif current_index == 4:  # Accounts - search accounts
@@ -2796,10 +3061,10 @@ class MainWindow(QMainWindow):
                 self._search_accounts(search_text)
         else:
             self.statusBar().showMessage("Search not available for this view", 2000)
-    
+
     def _search_members(self, query: str):
         """Search members in the member list."""
-        if hasattr(self, 'member_list'):
+        if hasattr(self, "member_list"):
             for i in range(self.member_list.count()):
                 item = self.member_list.item(i)
                 if query.lower() in item.text().lower():
@@ -2808,10 +3073,10 @@ class MainWindow(QMainWindow):
                     self.statusBar().showMessage(f"Found: {item.text()}", 2000)
                     return
             self.statusBar().showMessage("No matches found", 2000)
-    
+
     def _search_accounts(self, query: str):
         """Search accounts in the account list."""
-        if hasattr(self, 'account_list'):
+        if hasattr(self, "account_list"):
             for i in range(self.account_list.count()):
                 item = self.account_list.item(i)
                 if query.lower() in item.text().lower():
@@ -2820,25 +3085,25 @@ class MainWindow(QMainWindow):
                     self.statusBar().showMessage(f"Found: {item.text()}", 2000)
                     return
             self.statusBar().showMessage("No matches found", 2000)
-    
+
     def _quick_add_account(self):
         """Quick add account dialog."""
         # Navigate to accounts page and trigger add
         self._navigate_to_page(4)
         # Show add account dialog if available
-        if hasattr(self, 'show_add_account_dialog'):
+        if hasattr(self, "show_add_account_dialog"):
             self.show_add_account_dialog()
         else:
             self.statusBar().showMessage("Navigate to Accounts tab to add accounts", 2000)
-    
+
     def _toggle_bot_status(self):
         """Toggle bot start/stop."""
-        if hasattr(self, 'start_button') and hasattr(self, 'stop_button'):
+        if hasattr(self, "start_button") and hasattr(self, "stop_button"):
             if self.start_button.isEnabled():
                 self.start_button.click()
             elif self.stop_button.isEnabled():
                 self.stop_button.click()
-    
+
     def _show_shortcuts_help(self):
         """Show keyboard shortcuts help dialog."""
         shortcuts_text = """
@@ -2902,18 +3167,19 @@ class MainWindow(QMainWindow):
             # Load current settings
             config_path = Path("config.json")
             settings_data = {}
-            
+
             if config_path.exists():
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     settings_data = json.load(f)
-            
+
             # Check if wizard is needed
             from ui.settings_window import SetupWizardManager
+
             wizard_manager = SetupWizardManager(settings_data)
-            
+
             if wizard_manager.is_wizard_needed():
                 logger.info("First-time setup needed, showing wizard...")
-                
+
                 # Show info message
                 msg_box = QMessageBox(self)
                 msg_box.setWindowTitle("Welcome!")
@@ -2926,22 +3192,22 @@ class MainWindow(QMainWindow):
                 msg_box.setIcon(QMessageBox.Icon.Information)
                 msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
                 msg_box.exec()
-                
+
                 # Open settings in wizard mode
                 dialog = SettingsWindow(self, force_wizard=True)
                 result = dialog.exec()
-                
+
                 if result == QDialog.DialogCode.Accepted:
                     logger.info("First-time setup completed successfully")
                     # Reload configuration after setup
-                    if hasattr(self, 'config_manager'):
+                    if hasattr(self, "config_manager"):
                         self.config_manager.reload_config()
                     # Refresh dashboard profile with newly validated data
                     self._refresh_dashboard_profile()
                     self._refresh_validation_chips()
                 else:
                     logger.warning("First-time setup was cancelled")
-                    
+
         except (ImportError, AttributeError, RuntimeError, ConnectionError) as e:
             logger.error(f"Error during first-time setup check: {e}")
         except Exception as e:
@@ -2950,9 +3216,9 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(
                 self,
                 "Setup Error",
-                "There was a critical error during setup. Please restart the application."
+                "There was a critical error during setup. Please restart the application.",
             )
-    
+
     def _open_settings_dialog(self):
         """Open the settings dialog."""
         try:
@@ -2969,7 +3235,9 @@ class MainWindow(QMainWindow):
                 logger.info("Settings were saved")
         except (ImportError, AttributeError, TypeError) as e:
             logger.error(f"Failed to create settings dialog: {e}")
-            ErrorHandler.safe_critical(self, "Settings Error", f"Failed to create settings dialog: {e}")
+            ErrorHandler.safe_critical(
+                self, "Settings Error", f"Failed to create settings dialog: {e}"
+            )
         except Exception as e:
             logger.error(f"Unexpected error opening settings: {e}", exc_info=True)
             ErrorHandler.safe_critical(self, "Error", f"Failed to open settings: {e}")
@@ -2979,17 +3247,18 @@ class MainWindow(QMainWindow):
         try:
             logger.info("Settings updated, reloading configuration...")
             # Reload configuration after settings change
-            if hasattr(self, 'config_manager') and self.config_manager:
+            if hasattr(self, "config_manager") and self.config_manager:
                 self.config_manager.reload_config()
 
             # Update services that depend on configuration
-            if hasattr(self, 'gemini_service') and self.gemini_service:
+            if hasattr(self, "gemini_service") and self.gemini_service:
                 # Reinitialize Gemini service with new API key if changed
                 try:
                     from gemini_service import GeminiService
                     from core.secrets_manager import get_secrets_manager
+
                     secrets = get_secrets_manager()
-                    api_key = secrets.get_secret('gemini_api_key', required=False)
+                    api_key = secrets.get_secret("gemini_api_key", required=False)
                     if api_key:
                         self.gemini_service = GeminiService(api_key=api_key)
                         logger.info("Gemini service reinitialized with new settings")
@@ -2999,8 +3268,8 @@ class MainWindow(QMainWindow):
                     logger.error(f"Failed to reinitialize Gemini service: {e}")
 
             # Update anti-detection settings if they changed
-            anti_detection_config = settings.get('anti_detection', {})
-            if hasattr(self, 'anti_detection_system') and self.anti_detection_system:
+            anti_detection_config = settings.get("anti_detection", {})
+            if hasattr(self, "anti_detection_system") and self.anti_detection_system:
                 # Update anti-detection parameters
                 self.anti_detection_system.update_settings(anti_detection_config)
 
@@ -3024,12 +3293,12 @@ class MainWindow(QMainWindow):
             self,
             "Bulk Creation",
             "Bulk account creation feature.\n\n"
-            "This will be implemented in the account creator module."
+            "This will be implemented in the account creator module.",
         )
 
     def update_account_list(self):
         """Update the accounts list display."""
-        if hasattr(self, 'accounts_table') and self.account_manager:
+        if hasattr(self, "accounts_table") and self.account_manager:
             try:
                 if hasattr(self, "accounts_loading") and self.accounts_loading:
                     self.accounts_loading.show_loading("Refreshing accounts…")
@@ -3043,19 +3312,19 @@ class MainWindow(QMainWindow):
 
                 filtered = []
                 for acc in accounts:
-                    phone = acc.get('phone_number', '').lower()
-                    status = acc.get('status', '').lower()
-                    warm = "ready" if acc.get('is_warmed_up') else "warming"
+                    phone = acc.get("phone_number", "").lower()
+                    status = acc.get("status", "").lower()
+                    warm = "ready" if acc.get("is_warmed_up") else "warming"
                     if search_text and search_text not in f"{phone} {status} {warm}":
                         continue
                     if status_filter and status_filter != "all":
-                        if status_filter == "online" and not acc.get('is_online', False):
+                        if status_filter == "online" and not acc.get("is_online", False):
                             continue
-                        if status_filter == "offline" and acc.get('is_online', False):
+                        if status_filter == "offline" and acc.get("is_online", False):
                             continue
-                        if status_filter == "warming" and acc.get('is_warmed_up', False):
+                        if status_filter == "warming" and acc.get("is_warmed_up", False):
                             continue
-                        if status_filter == "ready" and not acc.get('is_warmed_up', False):
+                        if status_filter == "ready" and not acc.get("is_warmed_up", False):
                             continue
                         if status_filter == "error" and status != "error":
                             continue
@@ -3065,13 +3334,13 @@ class MainWindow(QMainWindow):
 
                 for row, account in enumerate(filtered):
                     # Phone number
-                    phone_item = QTableWidgetItem(account.get('phone_number', 'Unknown'))
+                    phone_item = QTableWidgetItem(account.get("phone_number", "Unknown"))
                     self.accounts_table.setItem(row, 0, phone_item)
 
                     # Status pill
                     status_pill = QLabel()
                     status_pill.setObjectName("status_chip")
-                    is_online = account.get('is_online', False)
+                    is_online = account.get("is_online", False)
                     status_text = "Online" if is_online else "Offline"
                     status_pill.setText(status_text)
                     status_pill.setProperty("state", "ok" if is_online else "warn")
@@ -3080,14 +3349,14 @@ class MainWindow(QMainWindow):
                     # Warmup pill
                     warmup_pill = QLabel()
                     warmup_pill.setObjectName("status_chip")
-                    is_warmed = account.get('is_warmed_up', False)
+                    is_warmed = account.get("is_warmed_up", False)
                     warmup_text = "Ready" if is_warmed else "Warming"
                     warmup_pill.setText(warmup_text)
                     warmup_pill.setProperty("state", "ok" if is_warmed else "warn")
                     self.accounts_table.setCellWidget(row, 2, warmup_pill)
 
                     # Messages sent
-                    messages = account.get('messages_sent', 0)
+                    messages = account.get("messages_sent", 0)
                     msg_item = QTableWidgetItem(str(messages))
                     self.accounts_table.setItem(row, 3, msg_item)
 
@@ -3100,14 +3369,18 @@ class MainWindow(QMainWindow):
                     start_btn = QPushButton("Start")
                     start_btn.setObjectName("secondary")
                     start_btn.setFixedWidth(64)
-                    start_btn.clicked.connect(lambda checked, phone=account.get('phone_number'): self.start_account(phone))
+                    start_btn.clicked.connect(
+                        lambda checked, phone=account.get("phone_number"): self.start_account(phone)
+                    )
                     start_btn.setEnabled(not is_online)
                     action_layout.addWidget(start_btn)
 
                     stop_btn = QPushButton("Stop")
                     stop_btn.setObjectName("danger")
                     stop_btn.setMinimumWidth(64)
-                    stop_btn.clicked.connect(lambda checked, phone=account.get('phone_number'): self.stop_account(phone))
+                    stop_btn.clicked.connect(
+                        lambda checked, phone=account.get("phone_number"): self.stop_account(phone)
+                    )
                     stop_btn.setEnabled(is_online)
                     action_layout.addWidget(stop_btn)
 
@@ -3116,21 +3389,23 @@ class MainWindow(QMainWindow):
 
                 if not filtered:
                     from ui.theme_manager import ThemeManager
+
                     self.accounts_table.setRowCount(1)
                     empty = QTableWidgetItem("No accounts yet. Create one to get started.")
                     c = ThemeManager.get_colors()
-                    empty.setForeground(QColor(c['TEXT_DISABLED']))
+                    empty.setForeground(QColor(c["TEXT_DISABLED"]))
                     self.accounts_table.setItem(0, 0, empty)
                     self.accounts_table.setSpan(0, 0, 1, self.accounts_table.columnCount())
 
             except Exception as e:
                 logger.error(f"Error updating account list: {e}")
                 from ui.theme_manager import ThemeManager
+
                 # Show error in table
                 self.accounts_table.setRowCount(1)
                 error_item = QTableWidgetItem(f"Error loading accounts: {e}")
                 c = ThemeManager.get_colors()
-                error_item.setForeground(QColor(c['ACCENT_DANGER']))
+                error_item.setForeground(QColor(c["ACCENT_DANGER"]))
                 self.accounts_table.setItem(0, 0, error_item)
                 self.accounts_table.setSpan(0, 0, 1, self.accounts_table.columnCount())
             finally:
@@ -3141,13 +3416,13 @@ class MainWindow(QMainWindow):
         """Clean up resources on application exit."""
         try:
             logger.info("Cleaning up resources...")
-            
+
             # Stop background services
             try:
-                if hasattr(self, 'cost_monitor') and self.cost_monitor:
+                if hasattr(self, "cost_monitor") and self.cost_monitor:
                     # Cost monitor stop (async)
                     logger.info("Stopping cost monitor...")
-                if hasattr(self, 'cleanup_service') and self.cleanup_service:
+                if hasattr(self, "cleanup_service") and self.cleanup_service:
                     # Cleanup service stop (async)
                     logger.info("Stopping proxy cleanup service...")
             except Exception as e:
@@ -3215,42 +3490,41 @@ class MainWindow(QMainWindow):
         try:
             # Get credentials from secrets manager
             from core.secrets_manager import get_secrets_manager
+
             secrets = get_secrets_manager()
-            
+
             # Get Telegram credentials
             api_id = secrets.get_secret("telegram_api_id", required=False)
             api_hash = secrets.get_secret("telegram_api_hash", required=False)
-            
+
             # Get phone number from config (not a secret)
             config_path = Path("config.json")
             phone = ""
             if config_path.exists():
-                with open(config_path, 'r') as f:
+                with open(config_path, "r") as f:
                     config = json.load(f)
                     phone = config.get("telegram", {}).get("phone_number", "")
-            
+
             # Get Gemini API key
             gemini_key = secrets.get_secret("gemini_api_key", required=False)
-            
+
             # Create services with proper credentials
             if api_id and api_hash and phone:
                 self.telegram_client = TelegramClient(
-                    api_id=api_id,
-                    api_hash=api_hash,
-                    phone_number=phone
+                    api_id=api_id, api_hash=api_hash, phone_number=phone
                 )
                 logger.info("Fallback Telegram client initialized")
             else:
                 logger.warning("Telegram credentials not available for fallback initialization")
                 self.telegram_client = None
-            
+
             if gemini_key:
                 self.gemini_service = GeminiService(gemini_key)
                 logger.info("Fallback Gemini service initialized")
             else:
                 logger.warning("Gemini API key not available for fallback initialization")
                 self.gemini_service = None
-            
+
             logger.info("Fallback service initialization completed")
         except Exception as e:
             logger.error(f"Failed to initialize fallback services: {e}")
@@ -3284,6 +3558,7 @@ class MainWindow(QMainWindow):
         """Create a single account with dedicated dialog."""
         try:
             from ui.account_creation_dialog import AccountCreationDialog
+
             dialog = AccountCreationDialog(self)
             dialog.exec()
         except ImportError:
@@ -3297,7 +3572,7 @@ class MainWindow(QMainWindow):
     def start_account(self, phone_number: str):
         """Start an account."""
         try:
-            if self.account_manager and hasattr(self.account_manager, 'start_client'):
+            if self.account_manager and hasattr(self.account_manager, "start_client"):
                 self._run_async_task(self.account_manager.start_client(phone_number))
                 # Update UI after a short delay
                 QTimer.singleShot(1000, self.update_account_list)
@@ -3309,7 +3584,7 @@ class MainWindow(QMainWindow):
     def stop_account(self, phone_number: str):
         """Stop an account."""
         try:
-            if self.account_manager and hasattr(self.account_manager, 'stop_client'):
+            if self.account_manager and hasattr(self.account_manager, "stop_client"):
                 self._run_async_task(self.account_manager.stop_client(phone_number))
                 # Update UI after a short delay
                 QTimer.singleShot(1000, self.update_account_list)
@@ -3321,13 +3596,14 @@ class MainWindow(QMainWindow):
     def _get_scraper_client(self):
         """Resolve an initialized Pyrogram client for member scraping."""
         try:
+
             def _is_connected(obj) -> bool:
                 connected_attr = getattr(obj, "is_connected", None)
                 if callable(connected_attr):
                     return bool(connected_attr())
                 return bool(connected_attr)
 
-            if self.account_manager and getattr(self.account_manager, 'active_clients', None):
+            if self.account_manager and getattr(self.account_manager, "active_clients", None):
                 for client in self.account_manager.active_clients.values():
                     if not _is_connected(client):
                         continue
@@ -3360,13 +3636,13 @@ class MainWindow(QMainWindow):
     def _reset_scraper_ui(self, message: Optional[str] = None, success: bool = False):
         """Reset scraping controls to a safe default state."""
         try:
-            if hasattr(self, 'scrape_progress') and self.scrape_progress:
+            if hasattr(self, "scrape_progress") and self.scrape_progress:
                 self.scrape_progress.setVisible(False)
-            if hasattr(self, 'current_channel_input') and self.current_channel_input:
+            if hasattr(self, "current_channel_input") and self.current_channel_input:
                 self.current_channel_input.setEnabled(True)
-            if hasattr(self, 'scrape_stop_button') and self.scrape_stop_button:
+            if hasattr(self, "scrape_stop_button") and self.scrape_stop_button:
                 self.scrape_stop_button.setEnabled(False)
-            if message and hasattr(self, 'scrape_status_label') and self.scrape_status_label:
+            if message and hasattr(self, "scrape_status_label") and self.scrape_status_label:
                 c = ThemeManager.get_colors()
                 color = c["ACCENT_SUCCESS"] if success else c["ACCENT_DANGER"]
                 self.scrape_status_label.setStyleSheet(f"color: {color};")
@@ -3377,7 +3653,9 @@ class MainWindow(QMainWindow):
     def start_member_scraping(self, channel_url: str):
         """Start member scraping for a channel."""
         if not channel_url.strip():
-            ErrorHandler.safe_warning(self, "Missing Channel", "Please enter a channel URL or username.")
+            ErrorHandler.safe_warning(
+                self, "Missing Channel", "Please enter a channel URL or username."
+            )
             return
 
         scraper_client = self._get_scraper_client()
@@ -3385,7 +3663,7 @@ class MainWindow(QMainWindow):
             ErrorHandler.safe_warning(
                 self,
                 "No Connected Account",
-                "Start at least one Telegram account before scraping members."
+                "Start at least one Telegram account before scraping members.",
             )
             return
         # Ensure client is authorized
@@ -3396,7 +3674,7 @@ class MainWindow(QMainWindow):
                 ErrorHandler.safe_warning(
                     self,
                     "Account Not Authorized",
-                    "The selected Telegram account is not signed in. Please sign in and try again."
+                    "The selected Telegram account is not signed in. Please sign in and try again.",
                 )
                 return
         except Exception:
@@ -3408,11 +3686,11 @@ class MainWindow(QMainWindow):
                 self,
                 "Database Error",
                 "Member database failed to initialize.\n\nPlease restart the application.\n\n"
-                "If the problem persists, check that the database files are not corrupted."
+                "If the problem persists, check that the database files are not corrupted.",
             )
             self._reset_scraper_ui("Database unavailable")
             return
-        
+
         try:
             # Normalize/validate channel identifier
             channel_identifier = channel_url
@@ -3422,15 +3700,18 @@ class MainWindow(QMainWindow):
                     ErrorHandler.safe_warning(
                         self,
                         "Invalid Channel",
-                        "Could not parse the channel. Use formats like:\n• https://t.me/channelname\n• @channelname\n• channelname"
+                        "Could not parse the channel. Use formats like:\n• https://t.me/channelname\n• @channelname\n• channelname",
                     )
                     return
                 channel_identifier = parsed
 
             # Initialize member scraper with elite systems if needed
-            if not hasattr(self, 'member_scraper') or not self.member_scraper:
-                from member_scraper import (MemberScraper, EliteAntiDetectionSystem,
-                                          ComprehensiveDataExtractor)
+            if not hasattr(self, "member_scraper") or not self.member_scraper:
+                from member_scraper import (
+                    MemberScraper,
+                    EliteAntiDetectionSystem,
+                    ComprehensiveDataExtractor,
+                )
 
                 # Initialize elite anti-detection system
                 self.anti_detection_system = EliteAntiDetectionSystem()
@@ -3442,7 +3723,7 @@ class MainWindow(QMainWindow):
                 self.member_scraper = MemberScraper(
                     client=scraper_client,
                     db=self.member_db,
-                    anti_detection=self.anti_detection_system
+                    anti_detection=self.anti_detection_system,
                 )
 
                 # Initialize session pool for elite scraping (will be done when needed)
@@ -3471,7 +3752,7 @@ class MainWindow(QMainWindow):
                 channel_url,
                 use_elite_scraping=True,
                 analyze_messages=not self.low_power_mode,
-                max_messages=2000 if self.low_power_mode else 10000
+                max_messages=2000 if self.low_power_mode else 10000,
             )
 
             # Update UI on main thread
@@ -3485,17 +3766,17 @@ class MainWindow(QMainWindow):
     def _update_elite_scraping_results(self, results):
         """Update UI with elite scraping results - comprehensive data."""
         try:
-            if not results.get('success', False):
-                self._show_scraping_error(results.get('error', 'Unknown error'))
+            if not results.get("success", False):
+                self._show_scraping_error(results.get("error", "Unknown error"))
                 return
 
             # Update progress
             self.scrape_progress.setVisible(False)
 
             # Show comprehensive results
-            channel_info = results.get('channel_info', {})
-            final_count = results.get('final_member_count', 0)
-            stats = results.get('scraping_stats', {})
+            channel_info = results.get("channel_info", {})
+            final_count = results.get("final_member_count", 0)
+            stats = results.get("scraping_stats", {})
 
             status_text = f"✅ Elite scraping complete!\n"
             status_text += f"📊 Channel: {channel_info.get('title', 'Unknown')}\n"
@@ -3504,7 +3785,9 @@ class MainWindow(QMainWindow):
             status_text += f"📈 Data completeness: {stats.get('average_data_completeness', 0):.1%}"
 
             self.scrape_status_label.setText(status_text)
-            self.scrape_status_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_SUCCESS']};")
+            self.scrape_status_label.setStyleSheet(
+                f"color: {ThemeManager._get_palette()['ACCENT_SUCCESS']};"
+            )
 
             # Update table with comprehensive data
             # For display, we'll show a summary. In a full implementation,
@@ -3513,8 +3796,10 @@ class MainWindow(QMainWindow):
 
             # Get some sample members to display (in practice, you'd get them from the database)
             try:
-                if hasattr(self, 'member_db') and self.member_db:
-                    sample_members = self.member_db.get_all_members(str(channel_info.get('id', '')))[:100]
+                if hasattr(self, "member_db") and self.member_db:
+                    sample_members = self.member_db.get_all_members(
+                        str(channel_info.get("id", ""))
+                    )[:100]
                 else:
                     sample_members = []
             except Exception as e:
@@ -3523,37 +3808,50 @@ class MainWindow(QMainWindow):
 
             for row, member in enumerate(sample_members):
                 # Name with completeness indicator
-                name = f"{member.get('first_name', '')} {member.get('last_name', '')}".strip() or 'Unknown'
-                completeness = member.get('data_completeness_score', 0)
-                completeness_indicator = "🔶" if completeness < 0.5 else "🟡" if completeness < 0.8 else "🟢"
-                self.members_table.setItem(row, 0, QTableWidgetItem(f"{completeness_indicator} {name}"))
+                name = (
+                    f"{member.get('first_name', '')} {member.get('last_name', '')}".strip()
+                    or "Unknown"
+                )
+                completeness = member.get("data_completeness_score", 0)
+                completeness_indicator = (
+                    "🔶" if completeness < 0.5 else "🟡" if completeness < 0.8 else "🟢"
+                )
+                self.members_table.setItem(
+                    row, 0, QTableWidgetItem(f"{completeness_indicator} {name}")
+                )
 
                 # Username with verification status
-                username = member.get('username', 'No username')
-                verified = member.get('is_verified', False)
-                premium = member.get('is_premium', False)
+                username = member.get("username", "No username")
+                verified = member.get("is_verified", False)
+                premium = member.get("is_premium", False)
                 badges = ""
                 if verified:
                     badges += "✓"
                 if premium:
                     badges += "⭐"
-                display_username = f"{badges} @{username}" if username != 'No username' else f"{badges} {username}"
+                display_username = (
+                    f"{badges} @{username}" if username != "No username" else f"{badges} {username}"
+                )
                 self.members_table.setItem(row, 1, QTableWidgetItem(display_username))
 
                 # User ID with risk score
-                user_id = str(member.get('user_id', 'Unknown'))
-                risk_score = member.get('threat_score', 0)
+                user_id = str(member.get("user_id", "Unknown"))
+                risk_score = member.get("threat_score", 0)
                 risk_indicator = "🟢" if risk_score < 30 else "🟡" if risk_score < 70 else "🔴"
                 risk_chip = QLabel(f"{risk_indicator} {user_id}")
                 risk_chip.setObjectName("status_chip")
-                risk_chip.setProperty("state", "ok" if risk_score < 30 else "warn" if risk_score < 70 else "bad")
+                risk_chip.setProperty(
+                    "state", "ok" if risk_score < 30 else "warn" if risk_score < 70 else "bad"
+                )
                 self.members_table.setCellWidget(row, 2, risk_chip)
 
                 # Status with messaging potential
                 messaging_potential = "High"  # Would be calculated based on comprehensive analysis
                 potential_chip = QLabel(f"🎯 {messaging_potential}")
                 potential_chip.setObjectName("status_chip")
-                potential_chip.setProperty("state", "ok" if messaging_potential == "High" else "warn")
+                potential_chip.setProperty(
+                    "state", "ok" if messaging_potential == "High" else "warn"
+                )
                 self.members_table.setCellWidget(row, 3, potential_chip)
 
             # Add a summary row if there are more members
@@ -3562,7 +3860,7 @@ class MainWindow(QMainWindow):
                 self.members_table.insertRow(row)
                 summary_item = QTableWidgetItem(f"📊 +{final_count - 100} more members available")
                 c = ThemeManager.get_colors()
-                summary_item.setForeground(QColor(c['ACCENT_PRIMARY']))
+                summary_item.setForeground(QColor(c["ACCENT_PRIMARY"]))
                 self.members_table.setItem(row, 0, summary_item)
                 self.members_table.setSpan(row, 0, 1, 4)  # Span across all columns
 
@@ -3578,7 +3876,7 @@ class MainWindow(QMainWindow):
                 f"📊 Data Quality: {stats.get('average_data_completeness', 0):.1%}\n"
                 f"🛡️  Risk Assessment: All members analyzed for safety\n"
                 f"🎯 Messaging Potential: Calculated for all members\n\n"
-                f"💾 All data saved to database with comprehensive profiles."
+                f"💾 All data saved to database with comprehensive profiles.",
             )
 
         except Exception as e:
@@ -3596,22 +3894,26 @@ class MainWindow(QMainWindow):
             self.members_table.setRowCount(len(members))
             for row, member in enumerate(members):
                 # Name
-                name = member.get('first_name', '') + ' ' + member.get('last_name', '')
-                name = name.strip() or 'Unknown'
+                name = member.get("first_name", "") + " " + member.get("last_name", "")
+                name = name.strip() or "Unknown"
                 self.members_table.setItem(row, 0, QTableWidgetItem(name))
 
                 # Username
-                username = member.get('username', 'No username')
-                self.members_table.setItem(row, 1, QTableWidgetItem(f"@{username}" if username != 'No username' else username))
+                username = member.get("username", "No username")
+                self.members_table.setItem(
+                    row,
+                    1,
+                    QTableWidgetItem(f"@{username}" if username != "No username" else username),
+                )
 
                 # User ID
-                user_id = str(member.get('user_id', 'Unknown'))
+                user_id = str(member.get("user_id", "Unknown"))
                 self.members_table.setItem(row, 2, QTableWidgetItem(user_id))
 
                 # Status
                 status_item = QTableWidgetItem("Safe")
                 c = ThemeManager.get_colors()
-                status_item.setForeground(QColor(c['ACCENT_SUCCESS']))
+                status_item.setForeground(QColor(c["ACCENT_SUCCESS"]))
                 self.members_table.setItem(row, 3, status_item)
 
             # Re-enable UI
@@ -3625,14 +3927,16 @@ class MainWindow(QMainWindow):
         """Show scraping error in UI."""
         self.scrape_progress.setVisible(False)
         self.scrape_status_label.setText(f"Error: {error_msg}")
-        self.scrape_status_label.setStyleSheet(f"color: {ThemeManager._get_palette()['ACCENT_DANGER']};")
+        self.scrape_status_label.setStyleSheet(
+            f"color: {ThemeManager._get_palette()['ACCENT_DANGER']};"
+        )
         self.current_channel_input.setEnabled(True)
         self.scrape_stop_button.setEnabled(False)
 
     def stop_member_scraping(self):
         """Stop member scraping."""
         try:
-            if hasattr(self, 'member_scraper') and self.member_scraper:
+            if hasattr(self, "member_scraper") and self.member_scraper:
                 # Cancel scraping operation
                 pass  # MemberScraper should handle cancellation
 
@@ -3652,16 +3956,16 @@ class MainWindow(QMainWindow):
             if not self.member_db:
                 ErrorHandler.safe_warning(self, "No Database", "Member database not initialized.")
                 return
-            
+
             # Show format selection dialog
             format_options = ["CSV (*.csv)", "JSON (*.json)", "Excel (*.xlsx)"]
             format_choice, ok = QInputDialog.getItem(
                 self, "Export Format", "Select export format:", format_options, 0, False
             )
-            
+
             if not ok:
                 return
-            
+
             # Determine file extension
             if "CSV" in format_choice:
                 ext = ".csv"
@@ -3672,33 +3976,38 @@ class MainWindow(QMainWindow):
             else:
                 ext = ".xlsx"
                 filter_str = "Excel Files (*.xlsx)"
-            
+
             # Get save path
             default_name = f"members_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "Export Members", default_name, filter_str
             )
-            
+
             if not file_path:
                 return
-            
+
             # Show filter options
             filters = {}
             filter_result = ErrorHandler.safe_message_box(
-                self, QMessageBox.Icon.Question, "Filter Options",
+                self,
+                QMessageBox.Icon.Question,
+                "Filter Options",
                 "Export only safe targets (low threat score)?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+                | QMessageBox.StandardButton.Cancel,
             )
-            
+
             if filter_result == QMessageBox.StandardButton.Cancel:
                 return
             elif filter_result == QMessageBox.StandardButton.Yes:
-                filters['is_safe_target'] = True
-            
+                filters["is_safe_target"] = True
+
             # Perform export using new ExportManager
             from export_manager import get_export_manager
+
             exporter = get_export_manager(self.member_db)
-            
+
             exported_count = 0
             if ext == ".csv":
                 exported_count = exporter.export_members_to_csv(file_path, filters)
@@ -3708,15 +4017,23 @@ class MainWindow(QMainWindow):
                 try:
                     exported_count = exporter.export_members_to_excel(file_path, filters)
                 except ImportError as e:
-                    ErrorHandler.safe_warning(self, "Excel Not Available", 
-                        "Excel export requires openpyxl. Install with: pip install openpyxl")
+                    ErrorHandler.safe_warning(
+                        self,
+                        "Excel Not Available",
+                        "Excel export requires openpyxl. Install with: pip install openpyxl",
+                    )
                     return
-            
+
             if exported_count > 0:
-                ErrorHandler.safe_information(self, "Export Complete",
-                    f"Successfully exported {exported_count} members to:\n{file_path}")
+                ErrorHandler.safe_information(
+                    self,
+                    "Export Complete",
+                    f"Successfully exported {exported_count} members to:\n{file_path}",
+                )
             else:
-                ErrorHandler.safe_warning(self, "No Data", "No members found matching the criteria.")
+                ErrorHandler.safe_warning(
+                    self, "No Data", "No members found matching the criteria."
+                )
 
         except Exception as e:
             logger.error(f"Error exporting members: {e}")
@@ -3745,27 +4062,30 @@ class MainWindow(QMainWindow):
 
             # Parse user ID from the risk indicator format (🟢 ID or 🔴 ID)
             import re
-            id_match = re.search(r'[🟢🔴🟡] (\d+)', user_id_text)
+
+            id_match = re.search(r"[🟢🔴🟡] (\d+)", user_id_text)
             if id_match:
                 user_id = int(id_match.group(1))
 
             if user_id:
                 # Get comprehensive data from data access layer
                 from member_scraper import EliteDataAccessLayer
+
                 data_layer = EliteDataAccessLayer(self.member_db)
 
                 # Get basic member data (simplified - would query database properly)
                 member_data = {
-                    'user_id': user_id,
-                    'first_name': 'Unknown',  # Would get from database
-                    'last_name': '',
-                    'username': 'unknown',
-                    'is_verified': False,
-                    'is_premium': False
+                    "user_id": user_id,
+                    "first_name": "Unknown",  # Would get from database
+                    "last_name": "",
+                    "username": "unknown",
+                    "is_verified": False,
+                    "is_premium": False,
                 }
 
                 # Show profile viewer
                 from ui_components import MemberProfileViewer
+
                 viewer = MemberProfileViewer(member_data, data_layer, self)
                 viewer.exec()
 

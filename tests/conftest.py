@@ -1,4 +1,5 @@
 """Pytest configuration to guard GUI tests when system dependencies are missing."""
+
 import ctypes.util
 import os
 from pathlib import Path
@@ -14,12 +15,15 @@ GUI_TEST_FILES = {
     "test_system.py",
 }
 
+
 def _has_libgl() -> bool:
     """Return True if libGL is available on the system."""
     return ctypes.util.find_library("GL") is not None
 
+
 # Ensure Qt uses an offscreen platform by default to reduce GUI requirements.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 
 def pytest_ignore_collect(collection_path: Path, config):
     """Prevent importing GUI-heavy test modules when libGL is unavailable."""
@@ -28,6 +32,7 @@ def pytest_ignore_collect(collection_path: Path, config):
 
     filename = Path(collection_path).name
     return filename in GUI_TEST_FILES
+
 
 def pytest_collection_modifyitems(config, items):
     """Skip GUI-heavy tests when libGL is missing so the suite can run headless."""

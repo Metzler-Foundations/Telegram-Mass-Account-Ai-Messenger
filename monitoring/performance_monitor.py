@@ -1,6 +1,7 @@
 """
 Performance Monitor - Application performance tracking, rate limiting, and resource management.
 """
+
 import time
 import logging
 import asyncio
@@ -56,10 +57,14 @@ class ResourceManager:
         if not config:
             return
         with self._lock:
-            self.max_concurrent_operations = config.get("max_concurrent_operations", self.max_concurrent_operations)
+            self.max_concurrent_operations = config.get(
+                "max_concurrent_operations", self.max_concurrent_operations
+            )
             self.memory_limit_mb = config.get("memory_limit_mb", self.memory_limit_mb)
             self.cpu_limit_percent = config.get("cpu_limit_percent", self.cpu_limit_percent)
-            self.resource_check_interval = config.get("resource_check_interval", self.resource_check_interval)
+            self.resource_check_interval = config.get(
+                "resource_check_interval", self.resource_check_interval
+            )
 
     async def start(self):
         """Start the resource manager."""
@@ -101,7 +106,7 @@ class ResourceManager:
 
         self._workers.clear()
 
-    def can_allocate_resources(self, operation_type: str = 'general') -> bool:
+    def can_allocate_resources(self, operation_type: str = "general") -> bool:
         """Check if resources are available for a new operation."""
         with self._lock:
             # Check concurrent operation limit
@@ -112,18 +117,22 @@ class ResourceManager:
             if psutil:
                 memory_mb = psutil.Process().memory_info().rss / 1024 / 1024
                 if memory_mb > self.memory_limit_mb:
-                    logger.warning(f"Memory limit exceeded: {memory_mb:.1f}MB > {self.memory_limit_mb}MB")
+                    logger.warning(
+                        f"Memory limit exceeded: {memory_mb:.1f}MB > {self.memory_limit_mb}MB"
+                    )
                     return False
 
                 # Check CPU usage
                 cpu_percent = psutil.cpu_percent(interval=0.1)
                 if cpu_percent > self.cpu_limit_percent:
-                    logger.warning(f"CPU limit exceeded: {cpu_percent:.1f}% > {self.cpu_limit_percent}%")
+                    logger.warning(
+                        f"CPU limit exceeded: {cpu_percent:.1f}% > {self.cpu_limit_percent}%"
+                    )
                     return False
 
             return True
 
-    async def execute_with_resource_limits(self, coro: Awaitable, priority: str = 'normal') -> Any:
+    async def execute_with_resource_limits(self, coro: Awaitable, priority: str = "normal") -> Any:
         """Execute a coroutine with resource limits and queuing."""
         if not self.can_allocate_resources():
             # Queue the operation
@@ -145,9 +154,9 @@ class ResourceManager:
 
     def _get_queue(self, priority: str) -> asyncio.Queue:
         """Get the appropriate queue for the priority level."""
-        if priority == 'high':
+        if priority == "high":
             return self.high_priority_queue
-        elif priority == 'low':
+        elif priority == "low":
             return self.low_priority_queue
         else:
             return self.normal_priority_queue
@@ -223,18 +232,28 @@ class ResourceManager:
                     if memory_mb > (self.memory_limit_mb * 0.8):  # 80% of limit
                         # Reduce concurrent operations when memory is high
                         with self._lock:
-                            self.max_concurrent_operations = max(3, self.max_concurrent_operations - 1)
-                            logger.info(f"Reduced concurrent operations to {self.max_concurrent_operations} due to high memory usage")
+                            self.max_concurrent_operations = max(
+                                3, self.max_concurrent_operations - 1
+                            )
+                            logger.info(
+                                f"Reduced concurrent operations to {self.max_concurrent_operations} due to high memory usage"
+                            )
 
                     elif memory_mb < (self.memory_limit_mb * 0.5):  # 50% of limit
                         # Increase concurrent operations when memory is low
                         with self._lock:
-                            self.max_concurrent_operations = min(20, self.max_concurrent_operations + 1)
-                            logger.info(f"Increased concurrent operations to {self.max_concurrent_operations} due to available memory")
+                            self.max_concurrent_operations = min(
+                                20, self.max_concurrent_operations + 1
+                            )
+                            logger.info(
+                                f"Increased concurrent operations to {self.max_concurrent_operations} due to available memory"
+                            )
 
                     # Log resource usage periodically
                     if int(time.time()) % 300 == 0:  # Every 5 minutes
-                        logger.info(f"Resource usage - Memory: {memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%, Active operations: {self.active_operations}")
+                        logger.info(
+                            f"Resource usage - Memory: {memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%, Active operations: {self.active_operations}"
+                        )
 
                 await asyncio.sleep(self.resource_check_interval)
 
@@ -245,18 +264,18 @@ class ResourceManager:
     def get_resource_stats(self) -> Dict[str, Any]:
         """Get current resource statistics."""
         stats = {
-            'active_operations': self.active_operations,
-            'max_concurrent_operations': self.max_concurrent_operations,
-            'queue_sizes': {
-                'high': self.high_priority_queue.qsize(),
-                'normal': self.normal_priority_queue.qsize(),
-                'low': self.low_priority_queue.qsize()
-            }
+            "active_operations": self.active_operations,
+            "max_concurrent_operations": self.max_concurrent_operations,
+            "queue_sizes": {
+                "high": self.high_priority_queue.qsize(),
+                "normal": self.normal_priority_queue.qsize(),
+                "low": self.low_priority_queue.qsize(),
+            },
         }
 
         if psutil:
-            stats['memory_mb'] = psutil.Process().memory_info().rss / 1024 / 1024
-            stats['cpu_percent'] = psutil.cpu_percent(interval=0.1)
+            stats["memory_mb"] = psutil.Process().memory_info().rss / 1024 / 1024
+            stats["cpu_percent"] = psutil.cpu_percent(interval=0.1)
 
         return stats
 
@@ -265,12 +284,17 @@ class CircuitBreaker:
     """Advanced circuit breaker with multiple states and recovery strategies."""
 
     class State:
-        CLOSED = "closed"      # Normal operation
-        OPEN = "open"          # Failing, requests rejected
-        HALF_OPEN = "half_open" # Testing recovery
+        CLOSED = "closed"  # Normal operation
+        OPEN = "open"  # Failing, requests rejected
+        HALF_OPEN = "half_open"  # Testing recovery
 
-    def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60,
-                 success_threshold: int = 3, name: str = "default"):
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        recovery_timeout: int = 60,
+        success_threshold: int = 3,
+        name: str = "default",
+    ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
@@ -335,18 +359,24 @@ class CircuitBreaker:
                 # Too many failures, open circuit
                 self.state = self.State.OPEN
                 self.next_attempt_time = time.time() + self.recovery_timeout
-                logger.warning(f"Circuit breaker '{self.name}' tripped to OPEN after {self.failure_count} failures")
+                logger.warning(
+                    f"Circuit breaker '{self.name}' tripped to OPEN after {self.failure_count} failures"
+                )
 
     def get_status(self) -> Dict[str, Any]:
         """Get current circuit breaker status."""
         with self._lock:
             return {
-                'name': self.name,
-                'state': self.state,
-                'failure_count': self.failure_count,
-                'success_count': self.success_count,
-                'next_attempt_time': self.next_attempt_time,
-                'time_until_next_attempt': max(0, (self.next_attempt_time or 0) - time.time()) if self.next_attempt_time else 0
+                "name": self.name,
+                "state": self.state,
+                "failure_count": self.failure_count,
+                "success_count": self.success_count,
+                "next_attempt_time": self.next_attempt_time,
+                "time_until_next_attempt": (
+                    max(0, (self.next_attempt_time or 0) - time.time())
+                    if self.next_attempt_time
+                    else 0
+                ),
             }
 
 
@@ -360,12 +390,14 @@ class FallbackStrategy:
 
     def add_fallback(self, fallback_func, description: str):
         """Add a fallback function."""
-        self.fallbacks.append({
-            'func': fallback_func,
-            'description': description,
-            'success_count': 0,
-            'failure_count': 0
-        })
+        self.fallbacks.append(
+            {
+                "func": fallback_func,
+                "description": description,
+                "success_count": 0,
+                "failure_count": 0,
+            }
+        )
 
     async def execute_with_fallback(self, primary_func, *args, **kwargs):
         """Execute primary function with fallback strategies."""
@@ -382,45 +414,50 @@ class FallbackStrategy:
         for i, fallback in enumerate(self.fallbacks):
             try:
                 logger.info(f"Trying fallback {i+1} for '{self.name}': {fallback['description']}")
-                result = await fallback['func'](*args, **kwargs)
+                result = await fallback["func"](*args, **kwargs)
                 self._record_success(i)
-                return result, fallback['description']
+                return result, fallback["description"]
             except Exception as e:
                 logger.warning(f"Fallback {i+1} failed for '{self.name}': {e}")
                 self._record_failure(i)
 
         # All strategies failed
-        raise Exception(f"All strategies failed for '{self.name}' including {len(self.fallbacks)} fallbacks")
+        raise Exception(
+            f"All strategies failed for '{self.name}' including {len(self.fallbacks)} fallbacks"
+        )
 
     def _record_success(self, fallback_index: int):
         """Record successful execution."""
         if fallback_index >= 0:
-            self.fallbacks[fallback_index]['success_count'] += 1
+            self.fallbacks[fallback_index]["success_count"] += 1
         # Reset current fallback index on success
         self.current_fallback_index = 0
 
     def _record_failure(self, fallback_index: int):
         """Record failed execution."""
         if fallback_index >= 0:
-            self.fallbacks[fallback_index]['failure_count'] += 1
+            self.fallbacks[fallback_index]["failure_count"] += 1
         # Move to next fallback
         self.current_fallback_index = min(self.current_fallback_index + 1, len(self.fallbacks) - 1)
 
     def get_stats(self) -> Dict[str, Any]:
         """Get fallback strategy statistics."""
         return {
-            'name': self.name,
-            'total_fallbacks': len(self.fallbacks),
-            'current_fallback_index': self.current_fallback_index,
-            'fallback_stats': [
+            "name": self.name,
+            "total_fallbacks": len(self.fallbacks),
+            "current_fallback_index": self.current_fallback_index,
+            "fallback_stats": [
                 {
-                    'description': fb['description'],
-                    'success_count': fb['success_count'],
-                    'failure_count': fb['failure_count'],
-                    'success_rate': (fb['success_count'] / max(fb['success_count'] + fb['failure_count'], 1)) * 100
+                    "description": fb["description"],
+                    "success_count": fb["success_count"],
+                    "failure_count": fb["failure_count"],
+                    "success_rate": (
+                        fb["success_count"] / max(fb["success_count"] + fb["failure_count"], 1)
+                    )
+                    * 100,
                 }
                 for fb in self.fallbacks
-            ]
+            ],
         }
 
 
@@ -446,8 +483,15 @@ class ResilienceManager:
                 self.fallback_strategies[name] = FallbackStrategy(name)
             return self.fallback_strategies[name]
 
-    async def execute_with_resilience(self, operation_name: str, operation_func, *args,
-                                     circuit_breaker: bool = True, fallback: bool = True, **kwargs):
+    async def execute_with_resilience(
+        self,
+        operation_name: str,
+        operation_func,
+        *args,
+        circuit_breaker: bool = True,
+        fallback: bool = True,
+        **kwargs,
+    ):
         """Execute operation with full resilience (circuit breaker + fallback)."""
         # Get circuit breaker
         cb = self.get_circuit_breaker(operation_name) if circuit_breaker else None
@@ -462,7 +506,9 @@ class ResilienceManager:
         try:
             if fb_strategy and fb_strategy.fallbacks:
                 # Use fallback strategy
-                result, fallback_used = await fb_strategy.execute_with_fallback(operation_func, *args, **kwargs)
+                result, fallback_used = await fb_strategy.execute_with_fallback(
+                    operation_func, *args, **kwargs
+                )
                 if cb:
                     cb.record_success()
                 return result
@@ -482,17 +528,18 @@ class ResilienceManager:
         """Get comprehensive resilience statistics."""
         with self._lock:
             return {
-                'circuit_breakers': {
+                "circuit_breakers": {
                     name: cb.get_status() for name, cb in self.circuit_breakers.items()
                 },
-                'fallback_strategies': {
+                "fallback_strategies": {
                     name: fb.get_stats() for name, fb in self.fallback_strategies.items()
-                }
+                },
             }
 
 
 # Global resilience manager instance
 _resilience_manager = None
+
 
 def get_resilience_manager() -> ResilienceManager:
     """Get the global resilience manager instance."""
@@ -505,6 +552,7 @@ def get_resilience_manager() -> ResilienceManager:
 # Global resource manager instance
 _resource_manager = None
 
+
 def get_resource_manager() -> ResourceManager:
     """Get the global resource manager instance."""
     global _resource_manager
@@ -512,12 +560,14 @@ def get_resource_manager() -> ResourceManager:
         _resource_manager = ResourceManager()
     return _resource_manager
 
+
 async def init_resource_manager():
     """Initialize the global resource manager."""
     global _resource_manager
     if _resource_manager is None:
         _resource_manager = ResourceManager()
         await _resource_manager.start()
+
 
 async def shutdown_resource_manager():
     """Shutdown the global resource manager."""
@@ -531,12 +581,10 @@ class StructuredLogger:
     """Structured logging with consistent formatting."""
 
     def __init__(self):
-        self.logger = logging.getLogger('structured')
+        self.logger = logging.getLogger("structured")
         if not self.logger.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
             self.logger.setLevel(logging.INFO)
@@ -554,13 +602,13 @@ class PerformanceMonitor:
 
     def __init__(self, sampling_enabled: bool = False, sample_interval_seconds: float = 30.0):
         self.metrics = {
-            'api_calls': 0,
-            'api_errors': 0,
-            'db_queries': 0,
-            'db_errors': 0,
-            'memory_usage': [],
-            'response_times': [],
-            'start_time': time.time()
+            "api_calls": 0,
+            "api_errors": 0,
+            "db_queries": 0,
+            "db_errors": 0,
+            "memory_usage": [],
+            "response_times": [],
+            "start_time": time.time(),
         }
         self._last_memory_check = 0
         self.sampling_enabled = sampling_enabled
@@ -570,20 +618,20 @@ class PerformanceMonitor:
 
     def record_api_call(self, response_time: float = None, error: bool = False):
         """Record an API call."""
-        self.metrics['api_calls'] += 1
+        self.metrics["api_calls"] += 1
         if error:
-            self.metrics['api_errors'] += 1
+            self.metrics["api_errors"] += 1
         if response_time:
-            self.metrics['response_times'].append(response_time)
+            self.metrics["response_times"].append(response_time)
             # Keep only last 1000 response times
-            if len(self.metrics['response_times']) > 1000:
-                self.metrics['response_times'] = self.metrics['response_times'][-1000:]
+            if len(self.metrics["response_times"]) > 1000:
+                self.metrics["response_times"] = self.metrics["response_times"][-1000:]
 
     def record_db_query(self, error: bool = False):
         """Record a database query."""
-        self.metrics['db_queries'] += 1
+        self.metrics["db_queries"] += 1
         if error:
-            self.metrics['db_errors'] += 1
+            self.metrics["db_errors"] += 1
 
     def check_memory_usage(self):
         """Check current memory usage."""
@@ -595,17 +643,17 @@ class PerformanceMonitor:
                     memory_mb = process.memory_info().rss / 1024 / 1024
                 else:
                     memory_mb = 0  # psutil not available
-                self.metrics['memory_usage'].append((current_time, memory_mb))
+                self.metrics["memory_usage"].append((current_time, memory_mb))
             except Exception as e:
                 logger.warning(f"Failed to check memory usage: {e}")
                 # Continue without memory metrics
         # Keep only last 100 memory readings
-        if len(self.metrics['memory_usage']) > 100:
-            self.metrics['memory_usage'] = self.metrics['memory_usage'][-100:]
+        if len(self.metrics["memory_usage"]) > 100:
+            self.metrics["memory_usage"] = self.metrics["memory_usage"][-100:]
         # Update last check time
         self._last_memory_check = current_time
-        if self.metrics['memory_usage']:
-            return self.metrics['memory_usage'][-1][1]
+        if self.metrics["memory_usage"]:
+            return self.metrics["memory_usage"][-1][1]
         return 0
 
     def cleanup_old_data(self):
@@ -614,25 +662,28 @@ class PerformanceMonitor:
 
         # Clean up response times older than 1 hour
         max_age = 3600  # 1 hour
-        self.metrics['response_times'] = [
-            rt for rt in self.metrics['response_times']
-            if current_time - rt < max_age  # Assuming rt is a timestamp, but it's actually response time in seconds
+        self.metrics["response_times"] = [
+            rt
+            for rt in self.metrics["response_times"]
+            if current_time - rt
+            < max_age  # Assuming rt is a timestamp, but it's actually response time in seconds
         ]
 
         # Keep only last 1000 response times regardless of age
-        if len(self.metrics['response_times']) > 1000:
-            self.metrics['response_times'] = self.metrics['response_times'][-1000:]
+        if len(self.metrics["response_times"]) > 1000:
+            self.metrics["response_times"] = self.metrics["response_times"][-1000:]
 
         # Clean up memory usage data older than 24 hours
         max_age = 86400  # 24 hours
-        self.metrics['memory_usage'] = [
-            (timestamp, memory) for timestamp, memory in self.metrics['memory_usage']
+        self.metrics["memory_usage"] = [
+            (timestamp, memory)
+            for timestamp, memory in self.metrics["memory_usage"]
             if current_time - timestamp < max_age
         ]
 
         # Keep only last 100 memory readings regardless of age
-        if len(self.metrics['memory_usage']) > 100:
-            self.metrics['memory_usage'] = self.metrics['memory_usage'][-100:]
+        if len(self.metrics["memory_usage"]) > 100:
+            self.metrics["memory_usage"] = self.metrics["memory_usage"][-100:]
 
     def _sample_process_resources(self) -> Optional[str]:
         """Lightweight sampling of current CPU and memory for UI/status display."""
@@ -660,26 +711,27 @@ class PerformanceMonitor:
         # Periodic cleanup to prevent memory leaks
         self.cleanup_old_data()
 
-        uptime = time.time() - self.metrics['start_time']
+        uptime = time.time() - self.metrics["start_time"]
         memory_mb = self.check_memory_usage()
 
-        response_times = self.metrics['response_times']
+        response_times = self.metrics["response_times"]
         avg_response_time = sum(response_times) / len(response_times) if response_times else 0
 
         stats = {
-            'uptime_seconds': uptime,
-            'api_calls_total': self.metrics['api_calls'],
-            'api_error_rate': (self.metrics['api_errors'] / max(self.metrics['api_calls'], 1)) * 100,
-            'db_queries_total': self.metrics['db_queries'],
-            'db_error_rate': (self.metrics['db_errors'] / max(self.metrics['db_queries'], 1)) * 100,
-            'avg_response_time': avg_response_time,
-            'current_memory_mb': memory_mb,
-            'memory_trend': [m[1] for m in self.metrics['memory_usage'][-10:]]  # Last 10 readings
+            "uptime_seconds": uptime,
+            "api_calls_total": self.metrics["api_calls"],
+            "api_error_rate": (self.metrics["api_errors"] / max(self.metrics["api_calls"], 1))
+            * 100,
+            "db_queries_total": self.metrics["db_queries"],
+            "db_error_rate": (self.metrics["db_errors"] / max(self.metrics["db_queries"], 1)) * 100,
+            "avg_response_time": avg_response_time,
+            "current_memory_mb": memory_mb,
+            "memory_trend": [m[1] for m in self.metrics["memory_usage"][-10:]],  # Last 10 readings
         }
 
         summary = self._sample_process_resources()
         if summary:
-            stats['summary'] = summary
+            stats["summary"] = summary
         return stats
 
 
@@ -702,16 +754,16 @@ class RateLimiter:
 
         # Different rate limits for different operations
         self.rate_limits = {
-            'message': {'max': 30, 'window': 60},  # Messages
-            'api_call': {'max': 60, 'window': 60},  # General API calls
-            'account_creation': {'max': 5, 'window': 300},  # Account creation (conservative)
-            'scraping': {'max': 10, 'window': 60}  # Member scraping
+            "message": {"max": 30, "window": 60},  # Messages
+            "api_call": {"max": 60, "window": 60},  # General API calls
+            "account_creation": {"max": 5, "window": 300},  # Account creation (conservative)
+            "scraping": {"max": 10, "window": 60},  # Member scraping
         }
 
         # Separate request tracking per operation type
         self.requests_by_type = {op: [] for op in self.rate_limits.keys()}
 
-    def is_allowed(self, operation_type: str = 'api_call') -> bool:
+    def is_allowed(self, operation_type: str = "api_call") -> bool:
         """Check if a request is allowed for the given operation type."""
         current_time = time.time()
 
@@ -725,15 +777,16 @@ class RateLimiter:
 
         # Get rate limit for this operation
         if operation_type not in self.rate_limits:
-            operation_type = 'api_call'
+            operation_type = "api_call"
 
         limit_config = self.rate_limits[operation_type]
-        max_requests = limit_config['max']
-        window_seconds = limit_config['window']
+        max_requests = limit_config["max"]
+        window_seconds = limit_config["window"]
 
         # Clean old requests for this operation type
         self.requests_by_type[operation_type] = [
-            req_time for req_time in self.requests_by_type[operation_type]
+            req_time
+            for req_time in self.requests_by_type[operation_type]
             if current_time - req_time < window_seconds
         ]
 
@@ -744,7 +797,7 @@ class RateLimiter:
         self.requests_by_type[operation_type].append(current_time)
         return True
 
-    def record_failure(self, operation_type: str = 'api_call'):
+    def record_failure(self, operation_type: str = "api_call"):
         """Record a failure for backoff and circuit breaker logic."""
         current_time = time.time()
 
@@ -760,7 +813,7 @@ class RateLimiter:
         if self.consecutive_failures >= 3:
             backoff_seconds = min(
                 60 * (self.backoff_multiplier ** (self.consecutive_failures - 2)),
-                self.max_backoff_seconds
+                self.max_backoff_seconds,
             )
             self.backoff_until = current_time + backoff_seconds
 
@@ -780,20 +833,21 @@ class RateLimiter:
 
     def is_allowed_legacy(self) -> bool:
         """Legacy method for backward compatibility."""
-        return self.is_allowed('api_call')
+        return self.is_allowed("api_call")
 
-    def get_remaining_requests(self, operation_type: str = 'api_call') -> int:
+    def get_remaining_requests(self, operation_type: str = "api_call") -> int:
         """Get remaining requests for the given operation type."""
         if operation_type not in self.rate_limits:
-            operation_type = 'api_call'
+            operation_type = "api_call"
 
         limit_config = self.rate_limits[operation_type]
-        max_requests = limit_config['max']
-        window_seconds = limit_config['window']
+        max_requests = limit_config["max"]
+        window_seconds = limit_config["window"]
 
         current_time = time.time()
         self.requests_by_type[operation_type] = [
-            req_time for req_time in self.requests_by_type[operation_type]
+            req_time
+            for req_time in self.requests_by_type[operation_type]
             if current_time - req_time < window_seconds
         ]
 
@@ -814,12 +868,12 @@ class RateLimiter:
     def get_status(self) -> Dict[str, Any]:
         """Get current rate limiter status."""
         return {
-            'backoff_remaining': self.get_backoff_remaining(),
-            'circuit_breaker_remaining': self.get_circuit_breaker_remaining(),
-            'consecutive_failures': self.consecutive_failures,
-            'remaining_requests': {
+            "backoff_remaining": self.get_backoff_remaining(),
+            "circuit_breaker_remaining": self.get_circuit_breaker_remaining(),
+            "consecutive_failures": self.consecutive_failures,
+            "remaining_requests": {
                 op: self.get_remaining_requests(op) for op in self.rate_limits.keys()
-            }
+            },
         }
 
 
@@ -827,10 +881,9 @@ class NetworkRecoveryManager:
     """Track network recovery attempts with exponential delays."""
 
     def __init__(self):
-        self._state: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
-            "attempts": 0,
-            "last_failure": 0.0
-        })
+        self._state: Dict[str, Dict[str, Any]] = defaultdict(
+            lambda: {"attempts": 0, "last_failure": 0.0}
+        )
         self.max_attempts = 10
         self.base_delay = 2.0
 
@@ -863,11 +916,3 @@ def get_performance_monitor() -> PerformanceMonitor:
     if _performance_monitor is None:
         _performance_monitor = PerformanceMonitor()
     return _performance_monitor
-
-
-
-
-
-
-
-

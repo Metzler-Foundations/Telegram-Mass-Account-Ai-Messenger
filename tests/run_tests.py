@@ -14,11 +14,10 @@ PROJECT_ROOT = Path(__file__).parent.parent
 def run_unit_tests():
     """Run unit tests."""
     print("🧪 Running Unit Tests...")
-    result = subprocess.run([
-        sys.executable, "-m", "pytest",
-        "tests/test_business_logic.py",
-        "-v", "--tb=short"
-    ], cwd=PROJECT_ROOT)
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/test_business_logic.py", "-v", "--tb=short"],
+        cwd=PROJECT_ROOT,
+    )
 
     return result.returncode == 0
 
@@ -26,11 +25,10 @@ def run_unit_tests():
 def run_integration_tests():
     """Run integration tests."""
     print("🔗 Running Integration Tests...")
-    result = subprocess.run([
-        sys.executable, "-m", "pytest",
-        "tests/test_integration.py",
-        "-v", "--tb=short"
-    ], cwd=PROJECT_ROOT)
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/test_integration.py", "-v", "--tb=short"],
+        cwd=PROJECT_ROOT,
+    )
 
     return result.returncode == 0
 
@@ -38,11 +36,9 @@ def run_integration_tests():
 def run_all_tests():
     """Run all tests."""
     print("🚀 Running Complete Test Suite...")
-    result = subprocess.run([
-        sys.executable, "-m", "pytest",
-        "tests/",
-        "-v", "--tb=short"
-    ], cwd=PROJECT_ROOT)
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short"], cwd=PROJECT_ROOT
+    )
 
     return result.returncode == 0
 
@@ -50,13 +46,18 @@ def run_all_tests():
 def run_coverage_report():
     """Generate coverage report."""
     print("📊 Generating Coverage Report...")
-    result = subprocess.run([
-        sys.executable, "-m", "pytest",
-        "tests/",
-        "--cov=.",
-        "--cov-report=html:htmlcov",
-        "--cov-report=term-missing"
-    ], cwd=PROJECT_ROOT)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/",
+            "--cov=.",
+            "--cov-report=html:htmlcov",
+            "--cov-report=term-missing",
+        ],
+        cwd=PROJECT_ROOT,
+    )
 
     if result.returncode == 0:
         print("📄 Coverage report generated in htmlcov/ directory")

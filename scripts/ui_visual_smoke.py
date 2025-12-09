@@ -60,6 +60,7 @@ def main() -> int:
 
     try:
         from ui.theme_manager import ThemeManager
+
         ThemeManager.apply_to_application(app)
     except Exception:
         pass  # Fall back to default Qt theme if theme import fails
@@ -103,4 +104,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

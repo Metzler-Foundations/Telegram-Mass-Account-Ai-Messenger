@@ -42,11 +42,9 @@ class MemberDatabase:
     @contextmanager
     def get_connection(self):
         """Get a thread-local database connection."""
-        if not hasattr(self._local, 'connection'):
+        if not hasattr(self._local, "connection"):
             self._local.connection = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-                timeout=30.0
+                str(self.db_path), check_same_thread=False, timeout=30.0
             )
             self._local.connection.row_factory = sqlite3.Row
             # Enable WAL mode for better concurrency
@@ -59,7 +57,7 @@ class MemberDatabase:
             yield self._local.connection
         except Exception:
             # Rollback on error
-            if hasattr(self._local, 'connection'):
+            if hasattr(self._local, "connection"):
                 try:
                     self._local.connection.rollback()
                 except Exception:
@@ -70,7 +68,8 @@ class MemberDatabase:
         """Create database tables."""
         with self.get_connection() as conn:
             # Members table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS members (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER UNIQUE NOT NULL,
@@ -94,10 +93,12 @@ class MemberDatabase:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
+            """
+            )
 
             # Groups table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS groups (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     group_id INTEGER UNIQUE NOT NULL,
@@ -113,10 +114,12 @@ class MemberDatabase:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_scraped TIMESTAMP
                 )
-            ''')
+            """
+            )
 
             # Scraping sessions table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS scraping_sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT UNIQUE NOT NULL,
@@ -128,10 +131,12 @@ class MemberDatabase:
                     errors INTEGER DEFAULT 0,
                     status TEXT DEFAULT 'running'
                 )
-            ''')
+            """
+            )
 
             # Error log table
-            conn.execute('''
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS error_log (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT,
@@ -140,7 +145,8 @@ class MemberDatabase:
                     error_message TEXT NOT NULL,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
+            """
+            )
 
             conn.commit()
 
@@ -156,7 +162,7 @@ class MemberDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_groups_group_id ON groups(group_id)",
                 "CREATE INDEX IF NOT EXISTS idx_groups_type ON groups(type)",
                 "CREATE INDEX IF NOT EXISTS idx_error_log_session_id ON error_log(session_id)",
-                "CREATE INDEX IF NOT EXISTS idx_scraping_sessions_account_id ON scraping_sessions(account_id)"
+                "CREATE INDEX IF NOT EXISTS idx_scraping_sessions_account_id ON scraping_sessions(account_id)",
             ]
 
             for index_sql in indexes:
@@ -180,38 +186,41 @@ class MemberDatabase:
         try:
             with self.get_connection() as conn:
                 # Prepare data
-                user_id = member_data['user_id']
-                profile_data = json.dumps(member_data.get('profile_data', {}))
+                user_id = member_data["user_id"]
+                profile_data = json.dumps(member_data.get("profile_data", {}))
 
                 # Insert or replace member
-                conn.execute('''
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO members (
                         user_id, username, first_name, last_name, phone,
                         group_id, joined_date, last_seen, status, is_bot,
                         is_verified, is_scam, language_code, country, city,
                         timezone, profile_data, threat_score, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    user_id,
-                    member_data.get('username'),
-                    member_data.get('first_name'),
-                    member_data.get('last_name'),
-                    member_data.get('phone'),
-                    member_data['group_id'],
-                    member_data.get('joined_date'),
-                    member_data.get('last_seen'),
-                    member_data.get('status', 'member'),
-                    member_data.get('is_bot', False),
-                    member_data.get('is_verified', False),
-                    member_data.get('is_scam', False),
-                    member_data.get('language_code'),
-                    member_data.get('country'),
-                    member_data.get('city'),
-                    member_data.get('timezone'),
-                    profile_data,
-                    member_data.get('threat_score', 0.0),
-                    datetime.now()
-                ))
+                """,
+                    (
+                        user_id,
+                        member_data.get("username"),
+                        member_data.get("first_name"),
+                        member_data.get("last_name"),
+                        member_data.get("phone"),
+                        member_data["group_id"],
+                        member_data.get("joined_date"),
+                        member_data.get("last_seen"),
+                        member_data.get("status", "member"),
+                        member_data.get("is_bot", False),
+                        member_data.get("is_verified", False),
+                        member_data.get("is_scam", False),
+                        member_data.get("language_code"),
+                        member_data.get("country"),
+                        member_data.get("city"),
+                        member_data.get("timezone"),
+                        profile_data,
+                        member_data.get("threat_score", 0.0),
+                        datetime.now(),
+                    ),
+                )
 
                 conn.commit()
                 return True
@@ -233,17 +242,20 @@ class MemberDatabase:
         """
         try:
             with self.get_connection() as conn:
-                cursor = conn.execute('''
+                cursor = conn.execute(
+                    """
                     SELECT * FROM members
                     WHERE user_id = ? AND group_id = ?
-                ''', (user_id, group_id))
+                """,
+                    (user_id, group_id),
+                )
 
                 row = cursor.fetchone()
                 if row:
                     data = dict(row)
                     # Parse JSON profile data
-                    if data.get('profile_data'):
-                        data['profile_data'] = json.loads(data['profile_data'])
+                    if data.get("profile_data"):
+                        data["profile_data"] = json.loads(data["profile_data"])
                     return data
 
         except Exception as e:
@@ -264,19 +276,22 @@ class MemberDatabase:
         """
         try:
             with self.get_connection() as conn:
-                cursor = conn.execute('''
+                cursor = conn.execute(
+                    """
                     SELECT * FROM members
                     WHERE group_id = ?
                     ORDER BY created_at DESC
                     LIMIT ?
-                ''', (group_id, limit))
+                """,
+                    (group_id, limit),
+                )
 
                 members = []
                 for row in cursor.fetchall():
                     data = dict(row)
                     # Parse JSON profile data
-                    if data.get('profile_data'):
-                        data['profile_data'] = json.loads(data['profile_data'])
+                    if data.get("profile_data"):
+                        data["profile_data"] = json.loads(data["profile_data"])
                     members.append(data)
 
                 return members
@@ -299,11 +314,14 @@ class MemberDatabase:
         """
         try:
             with self.get_connection() as conn:
-                conn.execute('''
+                conn.execute(
+                    """
                     UPDATE members
                     SET threat_score = ?, updated_at = ?
                     WHERE user_id = ?
-                ''', (threat_score, datetime.now(), user_id))
+                """,
+                    (threat_score, datetime.now(), user_id),
+                )
 
                 conn.commit()
                 return True
@@ -331,31 +349,36 @@ class MemberDatabase:
                 total_groups = cursor.fetchone()[0]
 
                 # Members by country
-                cursor = conn.execute('''
+                cursor = conn.execute(
+                    """
                     SELECT country, COUNT(*) as count
                     FROM members
                     WHERE country IS NOT NULL
                     GROUP BY country
                     ORDER BY count DESC
                     LIMIT 10
-                ''')
+                """
+                )
                 top_countries = {row[0]: row[1] for row in cursor.fetchall()}
 
                 # Recent additions (last 24 hours)
                 yesterday = datetime.now() - timedelta(days=1)
-                cursor = conn.execute('''
+                cursor = conn.execute(
+                    """
                     SELECT COUNT(*) as recent
                     FROM members
                     WHERE created_at > ?
-                ''', (yesterday,))
+                """,
+                    (yesterday,),
+                )
                 recent_members = cursor.fetchone()[0]
 
                 return {
-                    'total_members': total_members,
-                    'total_groups': total_groups,
-                    'top_countries': top_countries,
-                    'recent_members_24h': recent_members,
-                    'avg_members_per_group': total_members / max(total_groups, 1)
+                    "total_members": total_members,
+                    "total_groups": total_groups,
+                    "top_countries": top_countries,
+                    "recent_members_24h": recent_members,
+                    "avg_members_per_group": total_members / max(total_groups, 1),
                 }
 
         except Exception as e:
@@ -378,10 +401,13 @@ class MemberDatabase:
 
             with self.get_connection() as conn:
                 # Delete old members (but keep at least basic info for active users)
-                cursor = conn.execute('''
+                cursor = conn.execute(
+                    """
                     DELETE FROM members
                     WHERE updated_at < ? AND threat_score < 0.5
-                ''', (cutoff_date,))
+                """,
+                    (cutoff_date,),
+                )
 
                 deleted_count = cursor.rowcount
                 conn.commit()
@@ -405,5 +431,3 @@ class MemberDatabase:
 
         except Exception as e:
             logger.error(f"Failed to optimize database: {e}")
-
-

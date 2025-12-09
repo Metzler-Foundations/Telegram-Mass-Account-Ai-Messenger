@@ -141,9 +141,19 @@ class ThemeManager:
         palette.setColor(QPalette.ColorRole.Link, QColor(colors["ACCENT_PRIMARY"]))
         palette.setColor(QPalette.ColorRole.LinkVisited, QColor(colors["ACCENT_PRIMARY"]))
 
-        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(colors["TEXT_DISABLED"]))
-        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, QColor(colors["TEXT_DISABLED"]))
-        palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor(colors["TEXT_DISABLED"]))
+        palette.setColor(
+            QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, QColor(colors["TEXT_DISABLED"])
+        )
+        palette.setColor(
+            QPalette.ColorGroup.Disabled,
+            QPalette.ColorRole.WindowText,
+            QColor(colors["TEXT_DISABLED"]),
+        )
+        palette.setColor(
+            QPalette.ColorGroup.Disabled,
+            QPalette.ColorRole.ButtonText,
+            QColor(colors["TEXT_DISABLED"]),
+        )
 
         app.setPalette(palette)
 
@@ -240,7 +250,9 @@ class ThemeManager:
             }}
         """
         if button_type == "primary":
-            return common + f"""
+            return (
+                common
+                + f"""
                 QPushButton {{
                     background-color: {c["ACCENT_PRIMARY"]};
                     color: {c["TEXT_BRIGHT"]};
@@ -255,8 +267,11 @@ class ThemeManager:
                     background-color: {c["BG_TERTIARY"]};
                 }}
             """
+            )
         elif button_type == "danger":
-            return common + f"""
+            return (
+                common
+                + f"""
                 QPushButton {{
                     background-color: {c["ACCENT_DANGER"]};
                     color: {c["TEXT_BRIGHT"]};
@@ -268,8 +283,11 @@ class ThemeManager:
                     background-color: #b62f32;
                 }}
             """
+            )
         elif button_type == "success":
-            return common + f"""
+            return (
+                common
+                + f"""
                 QPushButton {{
                     background-color: {c["ACCENT_SUCCESS"]};
                     color: {c["TEXT_BRIGHT"]};
@@ -281,8 +299,11 @@ class ThemeManager:
                     background-color: #27996b;
                 }}
             """
+            )
         else:
-            return common + f"""
+            return (
+                common
+                + f"""
                 QPushButton {{
                     background-color: {c["BG_TERTIARY"]};
                     color: {c["TEXT_PRIMARY"]};
@@ -297,6 +318,7 @@ class ThemeManager:
                     background-color: {c["BG_TERTIARY"]};
                 }}
             """
+            )
 
     @classmethod
     def get_label_style(cls, label_type: str = "default") -> str:
@@ -474,4 +496,3 @@ def apply_theme_to_widget(widget: QWidget):
 def apply_theme_to_app(app: QApplication):
     """Convenience function to apply theme to application."""
     ThemeManager.apply_to_application(app)
-

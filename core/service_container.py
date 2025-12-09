@@ -1,6 +1,7 @@
 """
 Service Container - Dependency injection and service management.
 """
+
 import asyncio
 import logging
 import os
@@ -73,7 +74,9 @@ class IAIService(IService):
     """Abstract interface for AI services."""
 
     @abstractmethod
-    async def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    async def generate_response(
+        self, message: str, context: Optional[Dict[str, Any]] = None
+    ) -> Optional[str]:
         """Generate AI response for a message."""
         pass
 
@@ -92,7 +95,9 @@ class IDatabaseService(IService):
         pass
 
     @abstractmethod
-    def get_data(self, table: str, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def get_data(
+        self, table: str, filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
         """Retrieve data from database."""
         pass
 
@@ -166,7 +171,7 @@ class ServiceContainer:
         """Initialize all registered services."""
         success = True
         for service_name, instance in self._singletons.items():
-            if instance is not None and hasattr(instance, 'initialize'):
+            if instance is not None and hasattr(instance, "initialize"):
                 try:
                     if asyncio.iscoroutinefunction(instance.initialize):
                         result = await instance.initialize()
@@ -184,7 +189,7 @@ class ServiceContainer:
     async def shutdown_all_services(self) -> None:
         """Shutdown all registered services."""
         for service_name, instance in self._singletons.items():
-            if instance is not None and hasattr(instance, 'shutdown'):
+            if instance is not None and hasattr(instance, "shutdown"):
                 try:
                     if asyncio.iscoroutinefunction(instance.shutdown):
                         await instance.shutdown()
@@ -209,7 +214,7 @@ class TelegramMessageService(IMessageService):
 
     async def shutdown(self) -> None:
         """Shutdown the message service."""
-        if self._telegram_client and hasattr(self._telegram_client, 'shutdown'):
+        if self._telegram_client and hasattr(self._telegram_client, "shutdown"):
             await self._telegram_client.shutdown()
 
     async def send_message(self, chat_id: int, text: str) -> bool:
@@ -238,30 +243,32 @@ class GeminiAIService(IAIService):
 
     async def shutdown(self) -> None:
         """Shutdown the AI service."""
-        if self._gemini_service and hasattr(self._gemini_service, 'shutdown'):
+        if self._gemini_service and hasattr(self._gemini_service, "shutdown"):
             await self._gemini_service.shutdown()
 
-    async def generate_response(self, message: str, context: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    async def generate_response(
+        self, message: str, context: Optional[Dict[str, Any]] = None
+    ) -> Optional[str]:
         """Generate AI response for a message."""
         if self._gemini_service:
-            chat_id = context.get('chat_id', 0) if context else 0
+            chat_id = context.get("chat_id", 0) if context else 0
             return await self._gemini_service.generate_reply(message, chat_id)
         return None
 
     def update_configuration(self, config: Dict[str, Any]) -> None:
         """Update AI service configuration."""
-        if 'api_key' in config and config['api_key'].strip():
+        if "api_key" in config and config["api_key"].strip():
             # Add/update API key through the manager
-            self.api_key_manager.add_api_key('gemini', config['api_key'].strip())
+            self.api_key_manager.add_api_key("gemini", config["api_key"].strip())
 
             # Get the validated key for the service
-            validated_key = self.api_key_manager.get_api_key('gemini')
+            validated_key = self.api_key_manager.get_api_key("gemini")
             if validated_key and self._gemini_service:
                 self._gemini_service.update_api_key(validated_key)
 
         if self._gemini_service:
-            if 'brain_prompt' in config:
-                self._gemini_service.set_brain_prompt(config['brain_prompt'])
+            if "brain_prompt" in config:
+                self._gemini_service.set_brain_prompt(config["brain_prompt"])
 
 
 class SQLiteDatabaseService(IDatabaseService):
@@ -303,7 +310,9 @@ class SQLiteDatabaseService(IDatabaseService):
                 return False
         return False
 
-    def get_data(self, table: str, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    def get_data(
+        self, table: str, filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
         """Retrieve data from database."""
         if self._db_service:
             try:
@@ -393,7 +402,7 @@ class ServiceFactory:
                 telegram_client = TelegramClient(
                     api_id="",  # Empty credentials will cause graceful failure
                     api_hash="",
-                    phone_number=""
+                    phone_number="",
                 )
             else:
                 logger.error("TelegramClient not available due to import issues")
@@ -404,20 +413,14 @@ class ServiceFactory:
             telegram_cfg = config_manager.get("telegram", {})
             phone_number = telegram_cfg.get("phone_number", "")
             telegram_client = TelegramClient(
-                api_id=api_id,
-                api_hash=api_hash,
-                phone_number=phone_number
+                api_id=api_id, api_hash=api_hash, phone_number=phone_number
             )
         return TelegramMessageService(telegram_client)
 
     @staticmethod
     def create_ai_service(config_manager: ConfigurationManager) -> GeminiAIService:
         # Get API key from secrets manager or environment
-        api_key = (
-            config_manager.get_gemini_api_key()
-            or os.getenv("GEMINI_API_KEY", "")
-            or ""
-        )
+        api_key = config_manager.get_gemini_api_key() or os.getenv("GEMINI_API_KEY", "") or ""
 
         if not api_key:
             logger.warning("Gemini API key not configured, creating service without API key")
@@ -439,14 +442,8 @@ class ServiceFactory:
         return SQLiteDatabaseService(member_db)
 
     @staticmethod
-    def create_anti_detection_service(config_manager: ConfigurationManager) -> AntiDetectionServiceAdapter:
+    def create_anti_detection_service(
+        config_manager: ConfigurationManager,
+    ) -> AntiDetectionServiceAdapter:
         anti_detection_service = AntiDetectionSystem()
         return AntiDetectionServiceAdapter(anti_detection_service)
-
-
-
-
-
-
-
-

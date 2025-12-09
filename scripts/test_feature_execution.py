@@ -38,11 +38,11 @@ class FeatureTestResult:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'feature': self.feature_name,
-            'status': '✅ WORKING' if self.passed else '❌ BROKEN',
-            'errors': self.errors,
-            'warnings': self.warnings,
-            'notes': self.notes
+            "feature": self.feature_name,
+            "status": "✅ WORKING" if self.passed else "❌ BROKEN",
+            "errors": self.errors,
+            "warnings": self.warnings,
+            "notes": self.notes,
         }
 
 
@@ -86,14 +86,16 @@ def test_configuration_management() -> FeatureTestResult:
         result.add_note("ConfigurationManager initialized")
 
         # Test config loading
-        telegram_config = config.get('telegram', {})
-        gemini_config = config.get('gemini', {})
-        result.add_note(f"Config sections loaded: telegram({len(telegram_config)}), gemini({len(gemini_config)})")
+        telegram_config = config.get("telegram", {})
+        gemini_config = config.get("gemini", {})
+        result.add_note(
+            f"Config sections loaded: telegram({len(telegram_config)}), gemini({len(gemini_config)})"
+        )
 
         # Check for required fields
-        if not telegram_config.get('api_id'):
+        if not telegram_config.get("api_id"):
             result.add_warning("Telegram API ID not configured")
-        if not gemini_config.get('api_key'):
+        if not gemini_config.get("api_key"):
             result.add_warning("Gemini API key not configured")
 
         result.mark_passed()
@@ -113,9 +115,9 @@ def test_business_logic() -> FeatureTestResult:
         from core.repositories import MemberRepository, CampaignRepository, AccountRepository
 
         # Test repositories
-        member_repo = MemberRepository('members.db')
-        campaign_repo = CampaignRepository('campaigns.db')
-        account_repo = AccountRepository('accounts.db')
+        member_repo = MemberRepository("members.db")
+        campaign_repo = CampaignRepository("campaigns.db")
+        account_repo = AccountRepository("accounts.db")
 
         # Test services
         member_service = MemberService(member_repo)
@@ -126,30 +128,26 @@ def test_business_logic() -> FeatureTestResult:
 
         # Test member validation
         member = {
-            'profile_quality_score': 0.8,
-            'messaging_potential_score': 0.7,
-            'threat_score': 20
+            "profile_quality_score": 0.8,
+            "messaging_potential_score": 0.7,
+            "threat_score": 20,
         }
-        criteria = {'max_risk': 50, 'min_quality': 0.3, 'min_potential': 0.5}
+        criteria = {"max_risk": 50, "min_quality": 0.3, "min_potential": 0.5}
         valid = member_service.validate_member_for_campaign(member, criteria)
         result.add_note(f"Member validation works: member valid = {valid}")
 
         # Test campaign validation
         campaign_data = {
-            'name': 'Test Campaign',
-            'template': 'Hello {name}!',
-            'target_member_ids': [1, 2, 3],
-            'account_ids': [1]
+            "name": "Test Campaign",
+            "template": "Hello {name}!",
+            "target_member_ids": [1, 2, 3],
+            "account_ids": [1],
         }
         errors = campaign_service.validate_campaign_data(campaign_data)
         result.add_note(f"Campaign validation works: {len(errors)} errors found")
 
         # Test account validation
-        account_data = {
-            'phone_number': '+1234567890',
-            'api_id': '123456',
-            'api_hash': 'a' * 32
-        }
+        account_data = {"phone_number": "+1234567890", "api_id": "123456", "api_hash": "a" * 32}
         errors = account_service.validate_account_data(account_data)
         result.add_note(f"Account validation works: {len(errors)} errors found")
 
@@ -171,15 +169,15 @@ def test_ai_integration() -> FeatureTestResult:
         from core.config_manager import ConfigurationManager
 
         config = ConfigurationManager()
-        gemini_config = config.get('gemini', {})
-        api_key = gemini_config.get('api_key', '')
+        gemini_config = config.get("gemini", {})
+        api_key = gemini_config.get("api_key", "")
 
         if api_key:
             gemini = GeminiService(api_key)
             result.add_note("Gemini service initialized with API key")
             result.add_note("AI integration ready for production use")
         else:
-            gemini = GeminiService('')
+            gemini = GeminiService("")
             result.add_note("Gemini service initialized but no API key configured")
             result.add_warning("Configure Gemini API key for AI responses to work")
 
@@ -200,18 +198,18 @@ def test_telegram_integration() -> FeatureTestResult:
         from core.config_manager import ConfigurationManager
 
         config = ConfigurationManager()
-        telegram_config = config.get('telegram', {})
+        telegram_config = config.get("telegram", {})
 
-        api_id = telegram_config.get('api_id')
-        api_hash = telegram_config.get('api_hash')
-        phone = telegram_config.get('phone_number')
+        api_id = telegram_config.get("api_id")
+        api_hash = telegram_config.get("api_hash")
+        phone = telegram_config.get("phone_number")
 
         if api_id and api_hash and phone:
             client = TelegramClient(api_id, api_hash, phone)
             result.add_note("Telegram client initialized with credentials")
             result.add_note("Telegram integration ready for production use")
         else:
-            client = TelegramClient('', '', '')
+            client = TelegramClient("", "", "")
             result.add_note("Telegram client initialized but missing credentials")
             result.add_warning("Configure Telegram API credentials for messaging to work")
 
@@ -238,11 +236,11 @@ def test_anti_detection() -> FeatureTestResult:
         result.add_note("Anti-detection system activated successfully")
 
         # Check available methods
-        methods = [m for m in dir(anti_detection) if not m.startswith('_')]
+        methods = [m for m in dir(anti_detection) if not m.startswith("_")]
         result.add_note(f"Available methods: {len(methods)} methods")
 
         # Test some core functionality
-        if hasattr(anti_detection, 'apply_anti_detection_measures'):
+        if hasattr(anti_detection, "apply_anti_detection_measures"):
             anti_detection.apply_anti_detection_measures(action_type="test")
             result.add_note("Anti-detection measures applied")
 
@@ -261,18 +259,22 @@ def test_ui_components() -> FeatureTestResult:
     try:
         # Test main window
         from main import MainWindow
+
         result.add_note("MainWindow imports successfully")
 
         # Test core UI components
         from ui.ui_components import CampaignManagerWidget, MessageHistoryWidget
+
         result.add_note("Core UI components import successfully")
 
         # Test settings window
         from ui.settings_window import SettingsWindow
+
         result.add_note("Settings window imports successfully")
 
         # Test other UI components
         from ui.welcome_wizard import WelcomeWizard
+
         result.add_note("Welcome wizard imports successfully")
 
         result.mark_passed()
@@ -295,7 +297,7 @@ def test_campaign_management() -> FeatureTestResult:
         result.add_note("MessageTemplateEngine initialized")
 
         # Test template validation
-        template = 'Hello {name}, interested in {product}?'
+        template = "Hello {name}, interested in {product}?"
         is_valid, errors = template_engine.validate_template(template)
         result.add_note(f"Template validation works: valid={is_valid}, errors={len(errors)}")
 
@@ -350,7 +352,9 @@ def run_all_tests() -> Dict[str, FeatureTestResult]:
 
         except Exception as e:
             print(f"   ❌ TEST CRASHED: {e}")
-            result = FeatureTestResult(test_func.__name__.replace('test_', '').replace('_', ' ').title())
+            result = FeatureTestResult(
+                test_func.__name__.replace("test_", "").replace("_", " ").title()
+            )
             result.add_error(f"Test execution failed: {str(e)}")
             results[result.feature_name] = result
 

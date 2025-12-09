@@ -14,6 +14,7 @@ from typing import List, Dict, Tuple
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
 class SystemTester:
     """Comprehensive system testing for the Telegram AI Assistant"""
 
@@ -42,10 +43,14 @@ class SystemTester:
         try:
             version = sys.version_info
             if version.major >= 3 and version.minor >= 8:
-                self.log_success(f"Python version {version.major}.{version.minor}.{version.micro} - Compatible")
+                self.log_success(
+                    f"Python version {version.major}.{version.minor}.{version.micro} - Compatible"
+                )
                 return True
             else:
-                self.log_error(f"Python version {version.major}.{version.minor} is too old. Need 3.8+")
+                self.log_error(
+                    f"Python version {version.major}.{version.minor} is too old. Need 3.8+"
+                )
                 return False
         except Exception as e:
             self.log_error(f"Failed to check Python version: {e}")
@@ -55,26 +60,43 @@ class SystemTester:
         """Test all required imports"""
         required_modules = [
             # Core Python modules
-            'sys', 'os', 'json', 'logging', 'asyncio', 'time', 'random',
-            'string', 'hashlib', 'platform', 'subprocess', 'threading',
-            'sqlite3', 'pathlib', 'typing', 'collections',
-
+            "sys",
+            "os",
+            "json",
+            "logging",
+            "asyncio",
+            "time",
+            "random",
+            "string",
+            "hashlib",
+            "platform",
+            "subprocess",
+            "threading",
+            "sqlite3",
+            "pathlib",
+            "typing",
+            "collections",
             # Third-party modules
-            'pyrogram', 'tgcrypto', 'psutil',
-
+            "pyrogram",
+            "tgcrypto",
+            "psutil",
             # Local modules (with new package structure)
-            'telegram.telegram_client', 'ai.gemini_service', 'ui.settings_window',
-            'scraping.member_scraper', 'accounts.account_creator', 'anti_detection.anti_detection_system'
+            "telegram.telegram_client",
+            "ai.gemini_service",
+            "ui.settings_window",
+            "scraping.member_scraper",
+            "accounts.account_creator",
+            "anti_detection.anti_detection_system",
         ]
 
         success_count = 0
 
         for module in required_modules:
             try:
-                if '.' in module:
+                if "." in module:
                     # Handle submodules like PyQt6.QtWidgets
-                    parts = module.split('.')
-                    mod = importlib.import_module('.'.join(parts[:-1]))
+                    parts = module.split(".")
+                    mod = importlib.import_module(".".join(parts[:-1]))
                     getattr(mod, parts[-1])
                 else:
                     importlib.import_module(module)
@@ -96,10 +118,13 @@ class SystemTester:
         try:
             # Test google.generativeai import
             import google.generativeai as genai
+
             self.log_success("Google Generative AI module available")
             return True
         except ImportError:
-            self.log_error("Google Generative AI not available - install with: pip install google-generativeai")
+            self.log_error(
+                "Google Generative AI not available - install with: pip install google-generativeai"
+            )
             return False
         except Exception as e:
             self.log_warning(f"AI service test warning: {e}")
@@ -108,16 +133,36 @@ class SystemTester:
     def test_qt_components(self) -> bool:
         """Test all PyQt6 components used in the application"""
         required_widgets = [
-            'QApplication', 'QMainWindow', 'QWidget', 'QVBoxLayout', 'QHBoxLayout',
-            'QLabel', 'QPushButton', 'QTextEdit', 'QStatusBar', 'QSplitter',
-            'QListWidget', 'QListWidgetItem', 'QMessageBox', 'QSystemTrayIcon',
-            'QMenu', 'QProgressBar', 'QComboBox', 'QGroupBox', 'QDialog',
-            'QTabWidget', 'QFormLayout', 'QLineEdit', 'QCheckBox', 'QSpinBox',
-            'QScrollArea', 'QFrame'
+            "QApplication",
+            "QMainWindow",
+            "QWidget",
+            "QVBoxLayout",
+            "QHBoxLayout",
+            "QLabel",
+            "QPushButton",
+            "QTextEdit",
+            "QStatusBar",
+            "QSplitter",
+            "QListWidget",
+            "QListWidgetItem",
+            "QMessageBox",
+            "QSystemTrayIcon",
+            "QMenu",
+            "QProgressBar",
+            "QComboBox",
+            "QGroupBox",
+            "QDialog",
+            "QTabWidget",
+            "QFormLayout",
+            "QLineEdit",
+            "QCheckBox",
+            "QSpinBox",
+            "QScrollArea",
+            "QFrame",
         ]
 
-        required_core = ['Qt', 'QTimer', 'pyqtSignal', 'QThread', 'QObject']
-        required_gui = ['QFont', 'QPalette', 'QColor', 'QIcon']
+        required_core = ["Qt", "QTimer", "pyqtSignal", "QThread", "QObject"]
+        required_gui = ["QFont", "QPalette", "QColor", "QIcon"]
 
         success_count = 0
         total_count = len(required_widgets) + len(required_core) + len(required_gui)
@@ -125,6 +170,7 @@ class SystemTester:
         try:
             # Test widgets
             from PyQt6 import QtWidgets
+
             for widget in required_widgets:
                 if hasattr(QtWidgets, widget):
                     success_count += 1
@@ -133,6 +179,7 @@ class SystemTester:
 
             # Test core
             from PyQt6 import QtCore
+
             for item in required_core:
                 if hasattr(QtCore, item):
                     success_count += 1
@@ -141,6 +188,7 @@ class SystemTester:
 
             # Test gui
             from PyQt6 import QtGui
+
             for item in required_gui:
                 if hasattr(QtGui, item):
                     success_count += 1
@@ -167,15 +215,26 @@ class SystemTester:
             # Test database creation
             import tempfile
             import os
-            temp_db = tempfile.NamedTemporaryFile(delete=False, suffix='.db')
+
+            temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
             temp_db.close()
             db = MemberDatabase(temp_db.name)  # Use temporary file for testing
 
             # Test basic operations
             db.save_channel("test_channel", "Test Channel", 100, False)
             current_time = datetime.now()
-            db.save_member(12345, "testuser", "Test", "User", "+1234567890",
-                          current_time, current_time, "member", "test_channel", 50)
+            db.save_member(
+                12345,
+                "testuser",
+                "Test",
+                "User",
+                "+1234567890",
+                current_time,
+                current_time,
+                "member",
+                "test_channel",
+                50,
+            )
 
             channels = db.get_all_channels()
             if channels and len(channels) > 0:
@@ -212,7 +271,7 @@ class SystemTester:
             ads = AntiDetectionSystem()
             status = ads.get_system_status()
 
-            if status and 'anti_detection_active' in status:
+            if status and "anti_detection_active" in status:
                 self.log_success("Anti-detection system initialized successfully")
                 return True
             else:
@@ -232,7 +291,7 @@ class SystemTester:
             db = MemberDatabase(":memory:")
             ac = AccountCreator(db)
 
-            if hasattr(ac, 'phone_provider') and hasattr(ac, 'device_fingerprint'):
+            if hasattr(ac, "phone_provider") and hasattr(ac, "device_fingerprint"):
                 self.log_success("Account creator initialized successfully")
                 return True
             else:
@@ -252,13 +311,13 @@ class SystemTester:
             try:
                 import psutil
             except ImportError:
-                missing_packages.append('psutil')
+                missing_packages.append("psutil")
 
             if missing_packages:
                 self.log_warning(f"Installing missing packages: {', '.join(missing_packages)}")
                 for package in missing_packages:
                     try:
-                        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+                        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
                         self.log_success(f"Installed {package}")
                     except subprocess.CalledProcessError:
                         self.log_error(f"Failed to install {package}")
@@ -279,7 +338,7 @@ class SystemTester:
             db = MemberDatabase(":memory:")
             am = AccountManager(db)
 
-            if hasattr(am, 'accounts') and hasattr(am, 'account_status'):
+            if hasattr(am, "accounts") and hasattr(am, "account_status"):
                 self.log_success("Account manager initialized successfully")
                 return True
             else:
@@ -297,6 +356,7 @@ class SystemTester:
             try:
                 from main import MainWindow
                 from settings_window import SettingsWindow
+
                 self.log_success("GUI classes imported successfully")
             except Exception as e:
                 self.log_error(f"GUI class import failed: {e}")
@@ -305,21 +365,45 @@ class SystemTester:
             # Test that all required PyQt6 widgets are available as classes
             try:
                 from PyQt6.QtWidgets import (
-                    QComboBox, QProgressBar, QListWidget, QTextEdit,
-                    QLineEdit, QCheckBox, QSpinBox, QPushButton,
-                    QLabel, QGroupBox, QTabWidget, QDialog, QVBoxLayout, QHBoxLayout
+                    QComboBox,
+                    QProgressBar,
+                    QListWidget,
+                    QTextEdit,
+                    QLineEdit,
+                    QCheckBox,
+                    QSpinBox,
+                    QPushButton,
+                    QLabel,
+                    QGroupBox,
+                    QTabWidget,
+                    QDialog,
+                    QVBoxLayout,
+                    QHBoxLayout,
                 )
 
                 # Just check that these are classes, don't instantiate
                 widget_classes = [
-                    QComboBox, QProgressBar, QListWidget, QTextEdit,
-                    QLineEdit, QCheckBox, QSpinBox, QPushButton,
-                    QLabel, QGroupBox, QTabWidget, QDialog, QVBoxLayout, QHBoxLayout
+                    QComboBox,
+                    QProgressBar,
+                    QListWidget,
+                    QTextEdit,
+                    QLineEdit,
+                    QCheckBox,
+                    QSpinBox,
+                    QPushButton,
+                    QLabel,
+                    QGroupBox,
+                    QTabWidget,
+                    QDialog,
+                    QVBoxLayout,
+                    QHBoxLayout,
                 ]
 
                 for widget_class in widget_classes:
-                    if not hasattr(widget_class, '__init__'):
-                        self.log_error(f"Widget class {widget_class.__name__} is not a proper class")
+                    if not hasattr(widget_class, "__init__"):
+                        self.log_error(
+                            f"Widget class {widget_class.__name__} is not a proper class"
+                        )
                         return False
 
                 self.log_success("All GUI widget classes verified")
@@ -392,13 +476,13 @@ class SystemTester:
     def get_summary(self) -> Dict:
         """Get test summary"""
         return {
-            'total_tests': len(self.errors) + len(self.warnings) + len(self.successes),
-            'errors': len(self.errors),
-            'warnings': len(self.warnings),
-            'successes': len(self.successes),
-            'error_list': self.errors,
-            'warning_list': self.warnings,
-            'success_list': self.successes
+            "total_tests": len(self.errors) + len(self.warnings) + len(self.successes),
+            "errors": len(self.errors),
+            "warnings": len(self.warnings),
+            "successes": len(self.successes),
+            "error_list": self.errors,
+            "warning_list": self.warnings,
+            "success_list": self.successes,
         }
 
 

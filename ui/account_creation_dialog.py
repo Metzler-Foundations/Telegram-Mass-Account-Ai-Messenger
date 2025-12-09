@@ -6,9 +6,19 @@ Account Creation Dialog - Streamlined account creation interface.
 import logging
 from typing import Optional, Dict, Any
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QLineEdit, QComboBox, QProgressBar, QMessageBox, QGroupBox,
-    QFormLayout, QTextEdit, QCheckBox
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QComboBox,
+    QProgressBar,
+    QMessageBox,
+    QGroupBox,
+    QFormLayout,
+    QTextEdit,
+    QCheckBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
@@ -77,11 +87,21 @@ class AccountCreationDialog(QDialog):
 
         # Country selection
         self.country_combo = QComboBox()
-        self.country_combo.addItems([
-            "US - United States", "GB - United Kingdom", "DE - Germany",
-            "FR - France", "IT - Italy", "ES - Spain", "BR - Brazil",
-            "RU - Russia", "IN - India", "CA - Canada", "AU - Australia"
-        ])
+        self.country_combo.addItems(
+            [
+                "US - United States",
+                "GB - United Kingdom",
+                "DE - Germany",
+                "FR - France",
+                "IT - Italy",
+                "ES - Spain",
+                "BR - Brazil",
+                "RU - Russia",
+                "IN - India",
+                "CA - Canada",
+                "AU - Australia",
+            ]
+        )
         self.country_combo.setCurrentText("US - United States")
         details_layout.addRow("Country:", self.country_combo)
 
@@ -96,9 +116,9 @@ class AccountCreationDialog(QDialog):
 
         # Provider selection
         self.provider_combo = QComboBox()
-        self.provider_combo.addItems([
-            "daisysms", "sms-activate", "sms-hub", "5sim", "smspool", "textverified"
-        ])
+        self.provider_combo.addItems(
+            ["daisysms", "sms-activate", "sms-hub", "5sim", "smspool", "textverified"]
+        )
         provider_layout.addRow("SMS Provider:", self.provider_combo)
 
         # API Key
@@ -152,6 +172,7 @@ class AccountCreationDialog(QDialog):
         """Load existing SMS provider settings."""
         try:
             from core.config_manager import ConfigurationManager
+
             config = ConfigurationManager()
 
             # Load SMS provider settings
@@ -218,33 +239,38 @@ class AccountCreationDialog(QDialog):
             main_window = self.parent()
             if not main_window:
                 raise Exception("Main window not available")
-            
+
             # Check for account_manager (preferred) or account_creator (fallback)
-            if not hasattr(main_window, 'account_manager') and not hasattr(main_window, 'account_creator'):
+            if not hasattr(main_window, "account_manager") and not hasattr(
+                main_window, "account_creator"
+            ):
                 raise Exception("Account manager/creator not available")
 
             # Load API credentials from secrets_manager
             try:
                 from core.secrets_manager import get_secrets_manager
+
                 secrets = get_secrets_manager()
-                api_id = secrets.get_secret('telegram_api_id', required=True)
-                api_hash = secrets.get_secret('telegram_api_hash', required=True)
+                api_id = secrets.get_secret("telegram_api_id", required=True)
+                api_hash = secrets.get_secret("telegram_api_hash", required=True)
             except Exception as e:
                 logger.error(f"Failed to load API credentials: {e}")
-                self._show_error(f"Failed to load Telegram API credentials. Please configure them in Settings.")
+                self._show_error(
+                    f"Failed to load Telegram API credentials. Please configure them in Settings."
+                )
                 return
 
             # Prepare config with correct key names and API credentials
             config = {
-                'account_name': self.name_edit.text().strip(),
-                'phone_number': self.phone_edit.text().strip() or None,
-                'country': self.country_combo.currentText().split(" - ")[0],
-                'phone_provider': self.provider_combo.currentText(),  # Fixed: was 'sms_provider'
-                'provider_api_key': self.api_key_edit.text().strip(),  # Fixed: was 'api_key'
-                'api_id': api_id,  # Fixed: Added missing API credentials
-                'api_hash': api_hash,  # Fixed: Added missing API credentials
-                'use_proxy': self.use_proxy_checkbox.isChecked(),
-                'start_warmup': self.warmup_checkbox.isChecked()
+                "account_name": self.name_edit.text().strip(),
+                "phone_number": self.phone_edit.text().strip() or None,
+                "country": self.country_combo.currentText().split(" - ")[0],
+                "phone_provider": self.provider_combo.currentText(),  # Fixed: was 'sms_provider'
+                "provider_api_key": self.api_key_edit.text().strip(),  # Fixed: was 'api_key'
+                "api_id": api_id,  # Fixed: Added missing API credentials
+                "api_hash": api_hash,  # Fixed: Added missing API credentials
+                "use_proxy": self.use_proxy_checkbox.isChecked(),
+                "start_warmup": self.warmup_checkbox.isChecked(),
             }
 
             # Start creation (this should be async)
@@ -259,40 +285,44 @@ class AccountCreationDialog(QDialog):
         """Perform the actual account creation asynchronously."""
         import asyncio
         import threading
-        
+
         def run_async_creation():
             """Run account creation in background thread with event loop."""
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            
+
             try:
                 main_window = self.parent()
                 if not main_window:
                     raise Exception("Main window not available")
-                
+
                 # Use account_manager if available (preferred), otherwise account_creator
-                if hasattr(main_window, 'account_manager') and main_window.account_manager:
+                if hasattr(main_window, "account_manager") and main_window.account_manager:
                     # Pass gemini_service via config so AccountManager can use it
                     # Fixed: AccountManager doesn't have direct access to gemini_service
-                    if hasattr(main_window, 'gemini_service') and main_window.gemini_service:
-                        config['_gemini_service'] = main_window.gemini_service
+                    if hasattr(main_window, "gemini_service") and main_window.gemini_service:
+                        config["_gemini_service"] = main_window.gemini_service
                     # Use account_manager.create_account (handles everything)
-                    result = loop.run_until_complete(main_window.account_manager.create_account(config))
-                elif hasattr(main_window, 'account_creator') and main_window.account_creator:
+                    result = loop.run_until_complete(
+                        main_window.account_manager.create_account(config)
+                    )
+                elif hasattr(main_window, "account_creator") and main_window.account_creator:
                     # Fallback to direct account_creator (already has gemini_service)
-                    result = loop.run_until_complete(main_window.account_creator.create_new_account(config))
+                    result = loop.run_until_complete(
+                        main_window.account_creator.create_new_account(config)
+                    )
                 else:
                     raise Exception("Account manager/creator not available")
-                
+
                 # Update UI on main thread
-                if result.get('success'):
-                    account_data = result.get('account', {})
-                    account_data['account_name'] = config.get('account_name', 'Unknown')
+                if result.get("success"):
+                    account_data = result.get("account", {})
+                    account_data["account_name"] = config.get("account_name", "Unknown")
                     QTimer.singleShot(0, lambda: self._complete_creation(account_data))
                 else:
-                    error_msg = result.get('error', 'Account creation failed')
+                    error_msg = result.get("error", "Account creation failed")
                     QTimer.singleShot(0, lambda: self._show_error(error_msg))
-                    
+
             except Exception as e:
                 logger.error(f"Async creation failed: {e}", exc_info=True)
                 error_msg = f"Account creation failed: {e}"
@@ -312,7 +342,7 @@ class AccountCreationDialog(QDialog):
                 finally:
                     loop.close()
                     asyncio.set_event_loop(None)
-        
+
         # Start background thread
         self.status_label.setText("Account creation in progress...")
         creation_thread = threading.Thread(target=run_async_creation, daemon=True)
@@ -328,10 +358,11 @@ class AccountCreationDialog(QDialog):
 
         # Show success message
         QMessageBox.information(
-            self, "Success",
+            self,
+            "Success",
             f"Account '{account_data['account_name']}' created successfully!\n\n"
             f"Phone: {account_data['phone_number']}\n\n"
-            "The account will appear in the accounts list."
+            "The account will appear in the accounts list.",
         )
 
         self.accept()

@@ -16,6 +16,7 @@ import math
 @dataclass
 class ScrapingRisk:
     """Risk assessment for scraping operations."""
+
     level: str  # 'low', 'medium', 'high', 'critical'
     score: float
     factors: List[str]
@@ -30,6 +31,7 @@ class ScrapingRisk:
 @dataclass
 class AccountHealth:
     """Health metrics for scraping accounts."""
+
     account_id: str
     flood_wait_count: int = 0
     last_flood_wait: Optional[datetime] = None
@@ -40,13 +42,14 @@ class AccountHealth:
     successful_requests: int = 0
     avg_response_time: float = 0.0
     is_active: bool = True
-    ban_risk_level: str = 'low'
+    ban_risk_level: str = "low"
     last_health_check: Optional[datetime] = None
 
 
 @dataclass
 class SessionMetrics:
     """Metrics for scraping sessions."""
+
     session_id: str
     start_time: datetime
     end_time: Optional[datetime] = None
@@ -68,6 +71,7 @@ class SessionMetrics:
 @dataclass
 class GeographicProfile:
     """Geographic distribution of scraped members."""
+
     country_distribution: Dict[str, int]
     city_distribution: Dict[str, int]
     timezone_distribution: Dict[str, int]
@@ -91,6 +95,7 @@ class GeographicProfile:
 
 class ScrapingMethod(Enum):
     """Methods for member scraping."""
+
     MEMBERS = "members"
     PARTICIPANTS = "participants"
     ADMIN_LIST = "admin_list"
@@ -100,6 +105,7 @@ class ScrapingMethod(Enum):
 
 class JobStatus(Enum):
     """Status of scraping jobs."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -110,6 +116,7 @@ class JobStatus(Enum):
 @dataclass
 class ScrapingJob:
     """Represents a scraping job."""
+
     job_id: str
     group_id: int
     method: ScrapingMethod
@@ -132,6 +139,7 @@ class ScrapingJob:
 @dataclass
 class ScrapingConfig:
     """Configuration for scraping operations."""
+
     batch_size: int = 100
     delay_between_batches: float = 1.0
     max_concurrent_groups: int = 5
@@ -144,10 +152,7 @@ class ScrapingConfig:
 
 
 def calculate_risk_score(
-    flood_waits: int,
-    errors: int,
-    total_requests: int,
-    time_window_hours: int = 24
+    flood_waits: int, errors: int, total_requests: int, time_window_hours: int = 24
 ) -> ScrapingRisk:
     """
     Calculate scraping risk score based on recent activity.
@@ -163,10 +168,7 @@ def calculate_risk_score(
     """
     if total_requests == 0:
         return ScrapingRisk(
-            level='low',
-            score=0.0,
-            factors=[],
-            recommendations=['No recent activity to assess']
+            level="low", score=0.0, factors=[], recommendations=["No recent activity to assess"]
         )
 
     # Calculate risk factors
@@ -197,19 +199,14 @@ def calculate_risk_score(
 
     # Determine risk level
     if risk_score >= 70:
-        level = 'critical'
+        level = "critical"
     elif risk_score >= 50:
-        level = 'high'
+        level = "high"
     elif risk_score >= 30:
-        level = 'medium'
+        level = "medium"
     else:
-        level = 'low'
+        level = "low"
 
     return ScrapingRisk(
-        level=level,
-        score=min(risk_score, 100.0),
-        factors=factors,
-        recommendations=recommendations
+        level=level, score=min(risk_score, 100.0), factors=factors, recommendations=recommendations
     )
-
-

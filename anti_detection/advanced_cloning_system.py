@@ -30,14 +30,16 @@ logger = logging.getLogger(__name__)
 
 class CloneSafetyLevel(Enum):
     """Safety levels for cloning operations."""
+
     ULTRA_SAFE = "ultra_safe"  # Maximum delays, minimal changes
-    SAFE = "safe"              # Balanced safety and speed
-    MODERATE = "moderate"      # Faster but still cautious
+    SAFE = "safe"  # Balanced safety and speed
+    MODERATE = "moderate"  # Faster but still cautious
     AGGRESSIVE = "aggressive"  # Fast cloning, higher risk
 
 
 class CloneComponent(Enum):
     """Components that can be cloned."""
+
     PROFILE_INFO = "profile_info"
     PROFILE_PHOTO = "profile_photo"
     BIO = "bio"
@@ -53,6 +55,7 @@ class CloneComponent(Enum):
 @dataclass
 class CloneJob:
     """Represents a cloning job."""
+
     job_id: str
     source_username: str
     target_phone_number: str
@@ -73,6 +76,7 @@ class CloneJob:
 @dataclass
 class CloneConfig:
     """Configuration for cloning operations."""
+
     # Timing configurations
     min_delay_between_components: int = 300  # 5 minutes
     max_delay_between_components: int = 1800  # 30 minutes
@@ -95,7 +99,11 @@ class CloneConfig:
 class AdvancedCloningSystem:
     """Advanced system for safely cloning Telegram accounts with anti-detection measures."""
 
-    def __init__(self, gemini_service: Optional[GeminiService] = None, account_manager: Optional['AccountManager'] = None):
+    def __init__(
+        self,
+        gemini_service: Optional[GeminiService] = None,
+        account_manager: Optional["AccountManager"] = None,
+    ):
         self.gemini_service = gemini_service
         self.account_manager = account_manager
         self.config = CloneConfig()
@@ -111,6 +119,7 @@ class AdvancedCloningSystem:
         # Import DeviceFingerprint here to avoid circular import
         try:
             from account_creator import DeviceFingerprint
+
             self.device_fingerprint = DeviceFingerprint()
         except ImportError:
             self.device_fingerprint = None
@@ -122,13 +131,21 @@ class AdvancedCloningSystem:
         # Session management for source account access
         self.source_sessions: Dict[str, Dict] = {}
 
-    async def clone_account(self, source_username: str, target_phone_number: str,
-                          components: List[CloneComponent] = None,
-                          safety_level: CloneSafetyLevel = CloneSafetyLevel.SAFE) -> str:
+    async def clone_account(
+        self,
+        source_username: str,
+        target_phone_number: str,
+        components: List[CloneComponent] = None,
+        safety_level: CloneSafetyLevel = CloneSafetyLevel.SAFE,
+    ) -> str:
         """Start an account cloning job."""
         if components is None:
-            components = [CloneComponent.PROFILE_INFO, CloneComponent.PROFILE_PHOTO,
-                         CloneComponent.BIO, CloneComponent.USERNAME]
+            components = [
+                CloneComponent.PROFILE_INFO,
+                CloneComponent.PROFILE_PHOTO,
+                CloneComponent.BIO,
+                CloneComponent.USERNAME,
+            ]
 
         job_id = f"clone_{source_username}_{target_phone_number}_{int(time.time())}"
 
@@ -138,7 +155,7 @@ class AdvancedCloningSystem:
             target_phone_number=target_phone_number,
             components=components,
             safety_level=safety_level,
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
 
         self.active_jobs[job_id] = job
@@ -176,17 +193,21 @@ class AdvancedCloningSystem:
                 self._move_job_to_failed(job)
                 return
 
-            job.cloned_data['source_data'] = source_data
+            job.cloned_data["source_data"] = source_data
             job.progress = 20
 
             # Step 2: Prepare cloning components
             job.status = "preparing_components"
-            clone_components = self._prepare_clone_components(source_data, job.components, job.safety_level)
+            clone_components = self._prepare_clone_components(
+                source_data, job.components, job.safety_level
+            )
             job.progress = 30
 
             # Step 3: Execute cloning on target account
             job.status = "cloning_to_target"
-            success = await self._clone_to_target_account(job.target_phone_number, clone_components, job.safety_level)
+            success = await self._clone_to_target_account(
+                job.target_phone_number, clone_components, job.safety_level
+            )
 
             if success:
                 job.status = "completed"
@@ -204,7 +225,9 @@ class AdvancedCloningSystem:
             job.error_message = str(e)
             self._move_job_to_failed(job)
 
-    async def _gather_source_data(self, username: str, safety_level: CloneSafetyLevel) -> Optional[Dict[str, Any]]:
+    async def _gather_source_data(
+        self, username: str, safety_level: CloneSafetyLevel
+    ) -> Optional[Dict[str, Any]]:
         """Gather data from source account with anti-detection measures."""
         try:
             # Create a temporary client for data gathering
@@ -230,23 +253,27 @@ class AdvancedCloningSystem:
                     return None
 
                 source_data = {
-                    'username': user.username,
-                    'first_name': user.first_name,
-                    'last_name': user.last_name,
-                    'bio': getattr(user, 'bio', None),
-                    'photo': user.photo,
-                    'is_premium': getattr(user, 'is_premium', False),
-                    'phone_number': getattr(user, 'phone_number', None),
-                    'collected_at': datetime.now().isoformat()
+                    "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "bio": getattr(user, "bio", None),
+                    "photo": user.photo,
+                    "is_premium": getattr(user, "is_premium", False),
+                    "phone_number": getattr(user, "phone_number", None),
+                    "collected_at": datetime.now().isoformat(),
                 }
 
                 # Gather additional data based on safety level
                 if safety_level in [CloneSafetyLevel.MODERATE, CloneSafetyLevel.AGGRESSIVE]:
                     # Get profile photos
-                    source_data['profile_photos'] = await self._get_profile_photos_safe(temp_client, user.id)
+                    source_data["profile_photos"] = await self._get_profile_photos_safe(
+                        temp_client, user.id
+                    )
 
                     # Get common chats (if accessible)
-                    source_data['common_chats'] = await self._get_common_chats_safe(temp_client, user.id)
+                    source_data["common_chats"] = await self._get_common_chats_safe(
+                        temp_client, user.id
+                    )
 
                 # Apply safety delay before finishing
                 await self._apply_safety_delay(safety_level, "data_gathering_end")
@@ -260,36 +287,47 @@ class AdvancedCloningSystem:
                         await temp_client.disconnect()
                         logger.info("Temporary scraping client disconnected")
                     except Exception as cleanup_error:
-                        logger.warning(f"Failed to disconnect temporary scraping client: {cleanup_error}")
+                        logger.warning(
+                            f"Failed to disconnect temporary scraping client: {cleanup_error}"
+                        )
 
         except Exception as e:
             logger.error(f"Failed to gather source data for {username}: {e}")
             return None
 
-    def _prepare_clone_components(self, source_data: Dict, components: List[CloneComponent],
-                                safety_level: CloneSafetyLevel) -> Dict[str, Any]:
+    def _prepare_clone_components(
+        self, source_data: Dict, components: List[CloneComponent], safety_level: CloneSafetyLevel
+    ) -> Dict[str, Any]:
         """Prepare cloning components with modifications for safety."""
         clone_components = {}
 
         for component in components:
             if component == CloneComponent.PROFILE_INFO:
-                clone_components['profile_info'] = self._prepare_profile_info(source_data, safety_level)
+                clone_components["profile_info"] = self._prepare_profile_info(
+                    source_data, safety_level
+                )
 
             elif component == CloneComponent.PROFILE_PHOTO:
-                clone_components['profile_photo'] = self._prepare_profile_photo(source_data, safety_level)
+                clone_components["profile_photo"] = self._prepare_profile_photo(
+                    source_data, safety_level
+                )
 
             elif component == CloneComponent.BIO:
-                clone_components['bio'] = self._prepare_bio(source_data, safety_level)
+                clone_components["bio"] = self._prepare_bio(source_data, safety_level)
 
             elif component == CloneComponent.USERNAME:
-                clone_components['username'] = self._prepare_username(source_data, safety_level)
+                clone_components["username"] = self._prepare_username(source_data, safety_level)
 
             # Add other components as needed
 
         return clone_components
 
-    async def _clone_to_target_account(self, target_phone_number: str, clone_components: Dict[str, Any],
-                                     safety_level: CloneSafetyLevel) -> bool:
+    async def _clone_to_target_account(
+        self,
+        target_phone_number: str,
+        clone_components: Dict[str, Any],
+        safety_level: CloneSafetyLevel,
+    ) -> bool:
         """Clone prepared components to target account."""
         try:
             # Get target account client
@@ -314,7 +352,9 @@ class AdvancedCloningSystem:
                     await self._apply_safety_delay(safety_level, f"component_{component_name}")
 
                     # Clone the component
-                    success = await self._clone_component(target_client, component_name, component_data, safety_level)
+                    success = await self._clone_component(
+                        target_client, component_name, component_data, safety_level
+                    )
 
                     if not success:
                         logger.warning(f"Failed to clone component {component_name}")
@@ -330,28 +370,37 @@ class AdvancedCloningSystem:
                 if created_temp_session and target_client:
                     try:
                         await target_client.disconnect()
-                        logger.info(f"Disconnected temporary target client for {target_phone_number}")
+                        logger.info(
+                            f"Disconnected temporary target client for {target_phone_number}"
+                        )
                     except Exception as cleanup_error:
-                        logger.warning(f"Failed to disconnect target client {target_phone_number}: {cleanup_error}")
+                        logger.warning(
+                            f"Failed to disconnect target client {target_phone_number}: {cleanup_error}"
+                        )
 
         except Exception as e:
             logger.error(f"Failed to clone to target account {target_phone_number}: {e}")
             return False
 
-    async def _clone_component(self, client: Client, component_name: str, component_data: Any,
-                             safety_level: CloneSafetyLevel) -> bool:
+    async def _clone_component(
+        self,
+        client: Client,
+        component_name: str,
+        component_data: Any,
+        safety_level: CloneSafetyLevel,
+    ) -> bool:
         """Clone a specific component to the target account."""
         try:
-            if component_name == 'profile_info':
+            if component_name == "profile_info":
                 return await self._clone_profile_info(client, component_data, safety_level)
 
-            elif component_name == 'profile_photo':
+            elif component_name == "profile_photo":
                 return await self._clone_profile_photo(client, component_data, safety_level)
 
-            elif component_name == 'bio':
+            elif component_name == "bio":
                 return await self._clone_bio(client, component_data, safety_level)
 
-            elif component_name == 'username':
+            elif component_name == "username":
                 return await self._clone_username(client, component_data, safety_level)
 
             else:
@@ -362,43 +411,48 @@ class AdvancedCloningSystem:
             logger.error(f"Failed to clone component {component_name}: {e}")
             return False
 
-    def _prepare_profile_info(self, source_data: Dict, safety_level: CloneSafetyLevel) -> Dict[str, Any]:
+    def _prepare_profile_info(
+        self, source_data: Dict, safety_level: CloneSafetyLevel
+    ) -> Dict[str, Any]:
         """Prepare profile info for cloning with modifications."""
         profile_info = {
-            'first_name': source_data.get('first_name'),
-            'last_name': source_data.get('last_name')
+            "first_name": source_data.get("first_name"),
+            "last_name": source_data.get("last_name"),
         }
 
         # Apply modifications based on safety level
         if safety_level == CloneSafetyLevel.ULTRA_SAFE:
             # Make significant changes to avoid exact matches
-            profile_info['first_name'] = self._modify_name_for_safety(profile_info['first_name'], safety_level)
-            if profile_info['last_name']:
-                profile_info['last_name'] = self._modify_name_for_safety(profile_info['last_name'], safety_level)
+            profile_info["first_name"] = self._modify_name_for_safety(
+                profile_info["first_name"], safety_level
+            )
+            if profile_info["last_name"]:
+                profile_info["last_name"] = self._modify_name_for_safety(
+                    profile_info["last_name"], safety_level
+                )
 
         elif safety_level == CloneSafetyLevel.SAFE:
             # Make minor modifications
-            profile_info['first_name'] = self._add_noise_to_name(profile_info['first_name'])
+            profile_info["first_name"] = self._add_noise_to_name(profile_info["first_name"])
 
         # For MODERATE and AGGRESSIVE, use names as-is
 
         return profile_info
 
-    def _prepare_profile_photo(self, source_data: Dict, safety_level: CloneSafetyLevel) -> Dict[str, Any]:
+    def _prepare_profile_photo(
+        self, source_data: Dict, safety_level: CloneSafetyLevel
+    ) -> Dict[str, Any]:
         """Prepare profile photo for cloning."""
-        photo_data = {
-            'photo': source_data.get('photo'),
-            'photo_path': None
-        }
+        photo_data = {"photo": source_data.get("photo"), "photo_path": None}
 
         return photo_data
 
     def _prepare_bio(self, source_data: Dict, safety_level: CloneSafetyLevel) -> Dict[str, Any]:
         """Prepare bio for cloning with AI modifications."""
-        bio = source_data.get('bio', '')
+        bio = source_data.get("bio", "")
 
         if not bio:
-            return {'bio': None}
+            return {"bio": None}
 
         # For now, use bio as-is (AI modification would need async context)
         # This will be handled during cloning if needed
@@ -406,27 +460,35 @@ class AdvancedCloningSystem:
 
         # Ensure bio length is within limits
         if len(modified_bio) > self.config.bio_max_length:
-            modified_bio = modified_bio[:self.config.bio_max_length - 3] + "..."
+            modified_bio = modified_bio[: self.config.bio_max_length - 3] + "..."
 
-        return {'bio': modified_bio, 'needs_ai_modification': safety_level in [CloneSafetyLevel.ULTRA_SAFE, CloneSafetyLevel.SAFE] and self.gemini_service}
+        return {
+            "bio": modified_bio,
+            "needs_ai_modification": safety_level
+            in [CloneSafetyLevel.ULTRA_SAFE, CloneSafetyLevel.SAFE]
+            and self.gemini_service,
+        }
 
-    def _prepare_username(self, source_data: Dict, safety_level: CloneSafetyLevel) -> Dict[str, Any]:
+    def _prepare_username(
+        self, source_data: Dict, safety_level: CloneSafetyLevel
+    ) -> Dict[str, Any]:
         """Prepare username for cloning with visually similar generation."""
-        username = source_data.get('username')
+        username = source_data.get("username")
 
         if not username:
-            return {'username': None}
+            return {"username": None}
 
         # Use advanced username generator for visually similar usernames
         # This will be checked for availability during cloning
-        return {'username': username, 'source_username': username}
+        return {"username": username, "source_username": username}
 
-    async def _clone_profile_info(self, client: Client, profile_data: Dict, safety_level: CloneSafetyLevel) -> bool:
+    async def _clone_profile_info(
+        self, client: Client, profile_data: Dict, safety_level: CloneSafetyLevel
+    ) -> bool:
         """Clone profile info to target account."""
         try:
             await client.update_profile(
-                first_name=profile_data.get('first_name'),
-                last_name=profile_data.get('last_name')
+                first_name=profile_data.get("first_name"), last_name=profile_data.get("last_name")
             )
             logger.info("✅ Cloned profile info")
             return True
@@ -434,10 +496,12 @@ class AdvancedCloningSystem:
             logger.error(f"Failed to clone profile info: {e}")
             return False
 
-    async def _clone_profile_photo(self, client: Client, photo_data: Dict, safety_level: CloneSafetyLevel) -> bool:
+    async def _clone_profile_photo(
+        self, client: Client, photo_data: Dict, safety_level: CloneSafetyLevel
+    ) -> bool:
         """Clone profile photo to target account."""
         try:
-            photo = photo_data.get('photo')
+            photo = photo_data.get("photo")
             if not photo:
                 return True  # No photo to clone
 
@@ -461,16 +525,18 @@ class AdvancedCloningSystem:
             logger.error(f"Failed to clone profile photo: {e}")
             return False
 
-    async def _clone_bio(self, client: Client, bio_data: Dict, safety_level: CloneSafetyLevel) -> bool:
+    async def _clone_bio(
+        self, client: Client, bio_data: Dict, safety_level: CloneSafetyLevel
+    ) -> bool:
         """Clone bio to target account."""
         try:
-            bio = bio_data.get('bio')
-            needs_ai_mod = bio_data.get('needs_ai_modification', False)
-            
+            bio = bio_data.get("bio")
+            needs_ai_mod = bio_data.get("needs_ai_modification", False)
+
             # Apply AI modification if needed (now in async context)
             if needs_ai_mod and self.gemini_service and bio:
                 bio = await self._modify_bio_with_ai(bio, safety_level)
-            
+
             if bio:
                 await client.update_profile(bio=bio)
                 logger.info("✅ Cloned bio")
@@ -479,21 +545,25 @@ class AdvancedCloningSystem:
             logger.error(f"Failed to clone bio: {e}")
             return False
 
-    async def _clone_username(self, client: Client, username_data: Dict, safety_level: CloneSafetyLevel) -> bool:
+    async def _clone_username(
+        self, client: Client, username_data: Dict, safety_level: CloneSafetyLevel
+    ) -> bool:
         """Clone username to target account with availability checking."""
         try:
-            source_username = username_data.get('source_username') or username_data.get('username')
+            source_username = username_data.get("source_username") or username_data.get("username")
             if not source_username:
                 return True  # No username to set is not an error
-            
+
             # Generate visually similar username and check availability
             available_username = await self.username_generator.find_available_similar_username(
                 client, source_username, max_attempts=100
             )
-            
+
             if available_username:
                 await client.set_username(available_username)
-                logger.info(f"✅ Set visually similar username: {available_username} (from {source_username})")
+                logger.info(
+                    f"✅ Set visually similar username: {available_username} (from {source_username})"
+                )
                 return True
             else:
                 logger.warning(f"Could not find available similar username for {source_username}")
@@ -525,7 +595,7 @@ class AdvancedCloningSystem:
                     phone = random.choice(online_accounts)
                     try:
                         client = self.account_manager.active_clients.get(phone)
-                        if client and hasattr(client, 'client'):
+                        if client and hasattr(client, "client"):
                             # Ensure it's connected
                             if not client.client.is_connected:
                                 await client.client.connect()
@@ -536,7 +606,7 @@ class AdvancedCloningSystem:
 
             # Fallback: Create a new session (discouraged but necessary if no accounts)
             logger.warning("Creating new temporary session for scraping (not recommended)")
-            
+
             session_name = f"scraper_{int(time.time())}_{random.randint(1000, 9999)}"
             api_id = os.getenv("TELEGRAM_API_ID", "")
             api_hash = os.getenv("TELEGRAM_API_HASH", "")
@@ -545,11 +615,7 @@ class AdvancedCloningSystem:
                 logger.error("Missing Telegram API credentials.")
                 return None, False
 
-            client = Client(
-                session_name,
-                api_id=api_id,
-                api_hash=api_hash
-            )
+            client = Client(session_name, api_id=api_id, api_hash=api_hash)
             await client.connect()
             return client, True
 
@@ -561,11 +627,11 @@ class AdvancedCloningSystem:
         """Get client for target account."""
         try:
             # Try to get client from AccountManager if available
-            if hasattr(self, 'account_manager') and self.account_manager:
+            if hasattr(self, "account_manager") and self.account_manager:
                 # Check active clients first
                 if phone_number in self.account_manager.active_clients:
                     client_wrapper = self.account_manager.active_clients[phone_number]
-                    if hasattr(client_wrapper, 'client'):
+                    if hasattr(client_wrapper, "client"):
                         return client_wrapper.client, False
 
             # Fallback: Try to load from session file directly if not active
@@ -588,14 +654,14 @@ class AdvancedCloningSystem:
         try:
             if not photo_object:
                 return None
-            
+
             # Apply download delay
             await asyncio.sleep(self.config.photo_download_delay)
-            
+
             # Create download directory
             download_path = Path("downloads/cloned_photos")
             download_path.mkdir(parents=True, exist_ok=True)
-            
+
             # Use Pyrogram's download_media
             # photo_object can be a Photo object or File ID
             # We need a client instance to download
@@ -605,13 +671,13 @@ class AdvancedCloningSystem:
 
             file_path = await client.download_media(
                 message=photo_object.big_file_id,
-                file_name=str(download_path / f"photo_{int(time.time())}.jpg")
+                file_name=str(download_path / f"photo_{int(time.time())}.jpg"),
             )
-            
+
             if file_path:
                 logger.debug(f"Profile photo downloaded to: {file_path}")
                 return file_path
-                
+
             return None
         except Exception as e:
             logger.error(f"Failed to download profile photo: {e}")
@@ -624,7 +690,7 @@ class AdvancedCloningSystem:
             # photos is async generator or list? get_chat_photos returns async generator
             photo_list = []
             async for photo in photos:
-                photo_list.append({'photo': photo})
+                photo_list.append({"photo": photo})
             return photo_list
         except Exception as e:
             logger.warning(f"Failed to get profile photos: {e}")
@@ -634,15 +700,16 @@ class AdvancedCloningSystem:
         """Get common chats safely."""
         try:
             common = await client.get_common_chats(user_id)
-            return [{'id': chat.id, 'title': chat.title} for chat in common]
+            return [{"id": chat.id, "title": chat.title} for chat in common]
         except Exception as e:
             logger.warning(f"Failed to get common chats: {e}")
             return []
 
     async def _apply_safety_delay(self, safety_level: CloneSafetyLevel, operation: str):
         """Apply safety delay based on safety level."""
-        base_delay = random.uniform(self.config.min_delay_between_components,
-                                   self.config.max_delay_between_components)
+        base_delay = random.uniform(
+            self.config.min_delay_between_components, self.config.max_delay_between_components
+        )
 
         # Adjust delay based on safety level
         if safety_level == CloneSafetyLevel.ULTRA_SAFE:
@@ -666,10 +733,10 @@ class AdvancedCloningSystem:
             if len(name) > 3:
                 # Change middle characters
                 chars = list(name)
-                for i in range(1, len(chars)-1):
+                for i in range(1, len(chars) - 1):
                     if random.random() < 0.3:  # 30% chance
                         chars[i] = self._get_similar_char(chars[i])
-                return ''.join(chars)
+                return "".join(chars)
 
         return name
 
@@ -688,7 +755,7 @@ class AdvancedCloningSystem:
         """Modify bio using AI for safety."""
         if not self.gemini_service or not bio:
             return bio
-        
+
         try:
             prompt = f"""Modify this Telegram bio to make it unique while keeping the same general meaning and style. 
             Keep it under 70 characters. Return only the modified bio, nothing else.
@@ -696,21 +763,23 @@ class AdvancedCloningSystem:
             Original bio: {bio}
             
             Modified bio:"""
-            
-            modified_bio = await self.gemini_service.generate_reply(prompt, chat_id="bio_modification")
-            
+
+            modified_bio = await self.gemini_service.generate_reply(
+                prompt, chat_id="bio_modification"
+            )
+
             # Clean up the response
             if modified_bio:
                 modified_bio = modified_bio.strip().strip('"').strip("'")
                 if len(modified_bio) > 70:
                     modified_bio = modified_bio[:67] + "..."
-            
+
             logger.debug(f"AI modified bio: {bio} -> {modified_bio}")
             return modified_bio if modified_bio else bio
         except Exception as e:
             logger.warning(f"Failed to modify bio with AI: {e}")
             return bio
-    
+
     async def _set_profile_photo_stealth(self, client: Client, photo_path: str):
         """
         Set profile photo in a way that avoids showing "updated 1 day ago" message.
@@ -719,36 +788,36 @@ class AdvancedCloningSystem:
         try:
             # First, set the profile photo
             await client.set_profile_photo(photo=photo_path)
-            
+
             # Wait a moment for the update to process
             await asyncio.sleep(2)
-            
+
             # Get current profile to make a minimal update
             me = await client.get_me()
-            current_bio = getattr(me, 'bio', '') or ''
-            
+            current_bio = getattr(me, "bio", "") or ""
+
             # Make a tiny, invisible change to bio (add/remove a space at end, or add invisible char)
             # This resets the "last updated" timestamp without being noticeable
             if current_bio:
                 # Add a zero-width space at the end (invisible)
-                new_bio = current_bio + '\u200B'  # Zero-width space
+                new_bio = current_bio + "\u200B"  # Zero-width space
             else:
                 # If no bio, set a minimal one
-                new_bio = ' '  # Single space (minimal)
-            
+                new_bio = " "  # Single space (minimal)
+
             # Update profile with the modified bio
             # This will reset the "last updated" timestamp
             await client.update_profile(bio=new_bio)
-            
+
             # Wait a moment
             await asyncio.sleep(1)
-            
+
             # Restore original bio (if it existed)
             if current_bio and current_bio != new_bio:
                 await client.update_profile(bio=current_bio)
-            
+
             logger.debug("Profile photo set with stealth update to avoid timestamp detection")
-            
+
         except Exception as e:
             logger.warning(f"Stealth photo update failed, falling back to normal: {e}")
             # Fallback to normal photo setting
@@ -757,14 +826,14 @@ class AdvancedCloningSystem:
     def _get_similar_char(self, char: str) -> str:
         """Get a similar character for name modification."""
         similar_chars = {
-            'a': ['a', 'á', 'ä'],
-            'e': ['e', 'é', 'ë'],
-            'i': ['i', 'í', 'ï'],
-            'o': ['o', 'ó', 'ö'],
-            'u': ['u', 'ú', 'ü'],
-            's': ['s', 'š'],
-            'c': ['c', 'ç'],
-            'n': ['n', 'ñ']
+            "a": ["a", "á", "ä"],
+            "e": ["e", "é", "ë"],
+            "i": ["i", "í", "ï"],
+            "o": ["o", "ó", "ö"],
+            "u": ["u", "ú", "ü"],
+            "s": ["s", "š"],
+            "c": ["c", "ç"],
+            "n": ["n", "ñ"],
         }
 
         char_lower = char.lower()

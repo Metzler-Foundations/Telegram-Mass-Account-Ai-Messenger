@@ -8,8 +8,14 @@ import logging
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
-    QGridLayout, QGroupBox, QScrollArea
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QScrollArea,
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
@@ -23,32 +29,34 @@ logger = logging.getLogger(__name__)
 
 class MetricCard(QFrame):
     """Widget displaying a single metric with REAL data."""
-    
+
     def __init__(self, title: str, icon: str = "", parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
         ThemeManager.apply_to_widget(self, "card")
-        
+
         c = ThemeManager._get_palette()
-        
+
         layout = QVBoxLayout(self)
-        
+
         # Header
         header_layout = QHBoxLayout()
-        
+
         icon_label = QLabel(icon)
         icon_font = QFont()
         icon_font.setPointSize(20)
         icon_label.setFont(icon_font)
         header_layout.addWidget(icon_label)
-        
+
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"font-size: 12px; color: {c['TEXT_SECONDARY']}; font-weight: 600; text-transform: uppercase;")
+        title_label.setStyleSheet(
+            f"font-size: 12px; color: {c['TEXT_SECONDARY']}; font-weight: 600; text-transform: uppercase;"
+        )
         header_layout.addWidget(title_label)
         header_layout.addStretch()
-        
+
         layout.addLayout(header_layout)
-        
+
         # Value
         self.value_label = QLabel("Loading...")
         value_font = QFont()
@@ -57,7 +65,7 @@ class MetricCard(QFrame):
         self.value_label.setFont(value_font)
         self.value_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-weight: 800;")
         layout.addWidget(self.value_label)
-        
+
         # Subtext
         self.subtext_label = QLabel("")
         self.subtext_label.setStyleSheet(f"font-size: 11px; color: {c['TEXT_SECONDARY']};")
@@ -67,11 +75,15 @@ class MetricCard(QFrame):
         self.trend_label = QLabel("")
         self.trend_label.setObjectName("metric_spark")
         self.trend_label.setProperty("state", "info")
-        self.trend_label.setStyleSheet(f"font-size: 11px; color: {c['ACCENT_PRIMARY']}; font-weight: 600;")
+        self.trend_label.setStyleSheet(
+            f"font-size: 11px; color: {c['ACCENT_PRIMARY']}; font-weight: 600;"
+        )
         self.trend_label.setVisible(False)
         layout.addWidget(self.trend_label)
-    
-    def set_value(self, value: str, subtext: str = "", trend: Optional[str] = None, trend_state: str = "info"):
+
+    def set_value(
+        self, value: str, subtext: str = "", trend: Optional[str] = None, trend_state: str = "info"
+    ):
         """Update the metric value with optional trend sparkline text."""
         self.value_label.setText(value)
         self.subtext_label.setText(subtext)
@@ -89,7 +101,7 @@ class MetricCard(QFrame):
 
 class AnalyticsDashboard(QWidget):
     """Analytics dashboard with REAL data from database."""
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._last_refresh_at: Optional[datetime] = None
@@ -102,29 +114,30 @@ class AnalyticsDashboard(QWidget):
         self.refresh_timer = QTimer(self)
         self.refresh_timer.timeout.connect(self.refresh_all_metrics)
         self.refresh_timer.start(30000)  # 30 seconds
-        
+
         # Initial load
         self.refresh_all_metrics()
-    
+
     def setup_ui(self):
         """Setup the UI."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
-        
+
         # Title and header
         header_layout = QHBoxLayout()
-        
+
         title = QLabel("Real-Time Analytics")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
         title.setFont(title_font)
         header_layout.addWidget(title)
-        
+
         header_layout.addStretch()
-        
+
         # Export button
         from PyQt6.QtWidgets import QPushButton
+
         export_btn = QPushButton("Export All")
         export_btn.setObjectName("secondary")
         export_btn.clicked.connect(self.export_dashboard_data)
@@ -134,28 +147,32 @@ class AnalyticsDashboard(QWidget):
         self.last_updated_chip.setObjectName("status_chip")
         self.last_updated_chip.setProperty("state", "warn")
         header_layout.addWidget(self.last_updated_chip)
-        
+
         layout.addLayout(header_layout)
-        
+
         # Empty state widget (initially hidden)
         from PyQt6.QtWidgets import QFrame
+
         self.empty_state_widget = QFrame()
         ThemeManager.apply_to_widget(self.empty_state_widget, "card")
         c = ThemeManager._get_palette()
-        self.empty_state_widget.setStyleSheet(self.empty_state_widget.styleSheet() + """
+        self.empty_state_widget.setStyleSheet(
+            self.empty_state_widget.styleSheet()
+            + """
             QFrame {
                 padding: 32px;
             }
-        """)
+        """
+        )
         empty_layout = QVBoxLayout(self.empty_state_widget)
-        
+
         empty_icon = QLabel("")
         empty_icon_font = QFont()
         empty_icon_font.setPointSize(48)
         empty_icon.setFont(empty_icon_font)
         empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_layout.addWidget(empty_icon)
-        
+
         empty_title = QLabel("No Data Available")
         empty_title_font = QFont()
         empty_title_font.setPointSize(18)
@@ -164,125 +181,135 @@ class AnalyticsDashboard(QWidget):
         empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_title.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; margin-top: 20px;")
         empty_layout.addWidget(empty_title)
-        
-        self.empty_message = QLabel("Start by creating accounts and running campaigns to see analytics here.")
+
+        self.empty_message = QLabel(
+            "Start by creating accounts and running campaigns to see analytics here."
+        )
         self.empty_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_message.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 12px; margin-top: 10px;")
+        self.empty_message.setStyleSheet(
+            f"color: {c['TEXT_DISABLED']}; font-size: 12px; margin-top: 10px;"
+        )
         self.empty_message.setWordWrap(True)
         empty_layout.addWidget(self.empty_message)
-        
+
         empty_layout.addStretch()
         self.empty_state_widget.setVisible(False)
         layout.addWidget(self.empty_state_widget)
-        
+
         # Scroll area (for actual data)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        
+
         content = QWidget()
         content_layout = QVBoxLayout(content)
         self.loading_overlay = LoadingOverlay(content, "Refreshing analytics…")
-        
+
         # Overview metrics
         overview_group = QGroupBox("Overview")
         overview_layout = QGridLayout()
-        
+
         self.total_members_card = MetricCard("Total Members", "")
         overview_layout.addWidget(self.total_members_card, 0, 0)
-        
+
         self.total_accounts_card = MetricCard("Active Accounts", "")
         overview_layout.addWidget(self.total_accounts_card, 0, 1)
-        
+
         self.total_campaigns_card = MetricCard("Total Campaigns", "")
         overview_layout.addWidget(self.total_campaigns_card, 0, 2)
-        
+
         self.messages_sent_card = MetricCard("Messages Sent", "")
         overview_layout.addWidget(self.messages_sent_card, 1, 0)
-        
+
         self.success_rate_card = MetricCard("Success Rate", "")
         overview_layout.addWidget(self.success_rate_card, 1, 1)
-        
+
         self.accounts_warmed_card = MetricCard("Warmed Accounts", "")
         overview_layout.addWidget(self.accounts_warmed_card, 1, 2)
-        
+
         overview_group.setLayout(overview_layout)
         content_layout.addWidget(overview_group)
-        
+
         # Campaign metrics
         campaign_group = QGroupBox("Campaign Performance")
         campaign_layout = QGridLayout()
-        
+
         self.active_campaigns_card = MetricCard("Running", "")
         campaign_layout.addWidget(self.active_campaigns_card, 0, 0)
-        
+
         self.completed_campaigns_card = MetricCard("Completed", "")
         campaign_layout.addWidget(self.completed_campaigns_card, 0, 1)
-        
+
         self.campaign_success_card = MetricCard("Campaign Success", "")
         campaign_layout.addWidget(self.campaign_success_card, 0, 2)
-        
+
         self.failed_messages_card = MetricCard("Failed Messages", "")
         campaign_layout.addWidget(self.failed_messages_card, 1, 0)
-        
+
         self.avg_delivery_card = MetricCard("Avg Delivery Rate", "")
         campaign_layout.addWidget(self.avg_delivery_card, 1, 1)
-        
+
         self.messages_today_card = MetricCard("Messages Today", "")
         campaign_layout.addWidget(self.messages_today_card, 1, 2)
-        
+
         campaign_group.setLayout(campaign_layout)
         content_layout.addWidget(campaign_group)
-        
+
         # Template Variant Analytics (A/B Testing)
         variant_group = QGroupBox("Template Variant Performance (A/B Testing)")
         variant_layout = QVBoxLayout()
-        
+
         # Info label
         variant_info = QLabel("Performance breakdown by message template variant")
-        variant_info.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 11px; margin-bottom: 5px;")
+        variant_info.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-size: 11px; margin-bottom: 5px;"
+        )
         variant_layout.addWidget(variant_info)
-        
+
         # Variant stats container - will be populated dynamically
         from PyQt6.QtWidgets import QTextEdit
+
         self.variant_stats_display = QTextEdit()
         self.variant_stats_display.setReadOnly(True)
         self.variant_stats_display.setMaximumHeight(150)
         # Global theme handles QTextEdit
-        self.variant_stats_display.setStyleSheet(f"font-family: monospace; color: {c['TEXT_SECONDARY']};")
+        self.variant_stats_display.setStyleSheet(
+            f"font-family: monospace; color: {c['TEXT_SECONDARY']};"
+        )
         variant_layout.addWidget(self.variant_stats_display)
-        
+
         variant_group.setLayout(variant_layout)
         content_layout.addWidget(variant_group)
-        
+
         # Member insights
         member_group = QGroupBox("Member Insights")
         member_layout = QGridLayout()
-        
+
         self.members_with_username_card = MetricCard("With Username", "")
         member_layout.addWidget(self.members_with_username_card, 0, 0)
-        
+
         self.verified_members_card = MetricCard("Verified", "")
         member_layout.addWidget(self.verified_members_card, 0, 1)
-        
+
         self.premium_members_card = MetricCard("Premium", "")
         member_layout.addWidget(self.premium_members_card, 0, 2)
-        
+
         self.active_members_card = MetricCard("Active Recently", "")
         member_layout.addWidget(self.active_members_card, 1, 0)
-        
+
         self.channels_tracked_card = MetricCard("Channels Tracked", "")
         member_layout.addWidget(self.channels_tracked_card, 1, 1)
-        
+
         self.avg_per_channel_card = MetricCard("Avg Per Channel", "")
         member_layout.addWidget(self.avg_per_channel_card, 1, 2)
-        
+
         member_group.setLayout(member_layout)
         content_layout.addWidget(member_group)
-        
+
         # Cost Trends Chart
         try:
             from ui.cost_trend_chart import CostTrendChart
+
             self.cost_chart = CostTrendChart()
             content_layout.addWidget(self.cost_chart)
         except Exception as e:
@@ -290,11 +317,12 @@ class AnalyticsDashboard(QWidget):
             cost_error_label = QLabel("💰 Cost trend charts unavailable")
             cost_error_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; padding: 20px;")
             content_layout.addWidget(cost_error_label)
-        
+
         # Risk Distribution Chart
         try:
             from ui.risk_distribution_chart import RiskDistributionChart
             from monitoring.account_risk_monitor import get_risk_monitor
+
             risk_monitor = get_risk_monitor()
             self.risk_chart = RiskDistributionChart(risk_monitor=risk_monitor)
             content_layout.addWidget(self.risk_chart)
@@ -303,22 +331,26 @@ class AnalyticsDashboard(QWidget):
             risk_error_label = QLabel("Risk distribution charts unavailable")
             risk_error_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; padding: 20px;")
             content_layout.addWidget(risk_error_label)
-        
+
         # Last update timestamp
         self.last_update_label = QLabel()
-        self.last_update_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px; padding: 10px;")
+        self.last_update_label.setStyleSheet(
+            f"color: {c['TEXT_DISABLED']}; font-size: 11px; padding: 10px;"
+        )
         content_layout.addWidget(self.last_update_label)
 
         # Empty-state and degraded-mode banner
         self.partial_data_label = QLabel()
-        self.partial_data_label.setStyleSheet(f"color: {c['ACCENT_WARNING']}; font-size: 11px; padding: 4px 10px;")
+        self.partial_data_label.setStyleSheet(
+            f"color: {c['ACCENT_WARNING']}; font-size: 11px; padding: 4px 10px;"
+        )
         self.partial_data_label.setVisible(False)
         content_layout.addWidget(self.partial_data_label)
-        
+
         content_layout.addStretch()
         scroll.setWidget(content)
         layout.addWidget(scroll)
-    
+
     def refresh_all_metrics(self):
         """Refresh ALL metrics with REAL database data."""
         now = datetime.now()
@@ -334,20 +366,28 @@ class AnalyticsDashboard(QWidget):
             errors: List[str] = []
 
             # Get REAL data from database with defensive fallbacks
-            member_stats = self._safe_fetch(self.get_real_member_stats, self._empty_member_stats(), "member stats", errors)
-            campaign_stats = self._safe_fetch(self.get_real_campaign_stats, self._empty_campaign_stats(), "campaign stats", errors)
-            account_stats = self._safe_fetch(self.get_real_account_stats, self._empty_account_stats(), "account stats", errors)
-            
+            member_stats = self._safe_fetch(
+                self.get_real_member_stats, self._empty_member_stats(), "member stats", errors
+            )
+            campaign_stats = self._safe_fetch(
+                self.get_real_campaign_stats, self._empty_campaign_stats(), "campaign stats", errors
+            )
+            account_stats = self._safe_fetch(
+                self.get_real_account_stats, self._empty_account_stats(), "account stats", errors
+            )
+
             # Check if we have any real data
             has_data = (
-                member_stats['total'] > 0 or 
-                campaign_stats['total'] > 0 or 
-                account_stats['total'] > 0
+                member_stats["total"] > 0
+                or campaign_stats["total"] > 0
+                or account_stats["total"] > 0
             )
-            
+
             # Show/hide empty state
             if not has_data:
-                self._show_empty_state("No data available yet. Create accounts or campaigns to begin.")
+                self._show_empty_state(
+                    "No data available yet. Create accounts or campaigns to begin."
+                )
                 return
             else:
                 self._hide_empty_state()
@@ -356,121 +396,106 @@ class AnalyticsDashboard(QWidget):
             self.total_members_card.set_value(
                 f"{member_stats['total']:,}",
                 f"{member_stats['new_today']} added today",
-                trend=f"+{member_stats['new_today']:,} today" if member_stats['new_today'] else None,
-                trend_state="ok" if member_stats['new_today'] >= 0 else "warn"
+                trend=(
+                    f"+{member_stats['new_today']:,} today" if member_stats["new_today"] else None
+                ),
+                trend_state="ok" if member_stats["new_today"] >= 0 else "warn",
             )
-            
+
             self.total_accounts_card.set_value(
                 f"{account_stats['active']}/{account_stats['total']}",
-                f"{account_stats['percentage']:.0f}% active"
+                f"{account_stats['percentage']:.0f}% active",
             )
-            
+
             self.total_campaigns_card.set_value(
-                f"{campaign_stats['total']:,}",
-                f"{campaign_stats['running']} running now"
+                f"{campaign_stats['total']:,}", f"{campaign_stats['running']} running now"
             )
-            
+
             self.messages_sent_card.set_value(
-                f"{campaign_stats['total_sent']:,}",
-                f"{campaign_stats['sent_today']} today"
+                f"{campaign_stats['total_sent']:,}", f"{campaign_stats['sent_today']} today"
             )
-            
+
             # Calculate success rate
-            total_attempts = campaign_stats['total_sent'] + campaign_stats['total_failed']
+            total_attempts = campaign_stats["total_sent"] + campaign_stats["total_failed"]
             if total_attempts > 0:
-                success_rate = (campaign_stats['total_sent'] / total_attempts) * 100
+                success_rate = (campaign_stats["total_sent"] / total_attempts) * 100
             else:
                 success_rate = 0
-            
+
             self.success_rate_card.set_value(
-                f"{success_rate:.1f}%",
-                f"{campaign_stats['total_failed']:,} failed"
+                f"{success_rate:.1f}%", f"{campaign_stats['total_failed']:,} failed"
             )
-            
+
             self.accounts_warmed_card.set_value(
                 f"{account_stats['warmed_up']}/{account_stats['total']}",
                 f"{account_stats['warmup_pct']:.0f}% ready",
                 trend=f"{account_stats['warmup_pct']:.0f}% warmed",
-                trend_state="info"
+                trend_state="info",
             )
-            
+
             # Update campaign cards
             self.active_campaigns_card.set_value(
-                f"{campaign_stats['running']:,}",
-                "Active campaigns"
+                f"{campaign_stats['running']:,}", "Active campaigns"
             )
-            
+
             self.completed_campaigns_card.set_value(
                 f"{campaign_stats['completed']:,}",
-                f"{campaign_stats['completion_rate']:.0f}% completion rate"
+                f"{campaign_stats['completion_rate']:.0f}% completion rate",
             )
-            
-            self.campaign_success_card.set_value(
-                f"{success_rate:.0f}%",
-                "Overall success"
-            )
-            
+
+            self.campaign_success_card.set_value(f"{success_rate:.0f}%", "Overall success")
+
             self.failed_messages_card.set_value(
-                f"{campaign_stats['total_failed']:,}",
-                f"{campaign_stats['failed_today']} today"
+                f"{campaign_stats['total_failed']:,}", f"{campaign_stats['failed_today']} today"
             )
-            
+
             # Average delivery rate
-            self.avg_delivery_card.set_value(
-                f"{success_rate:.1f}%",
-                "Avg across all campaigns"
-            )
-            
+            self.avg_delivery_card.set_value(f"{success_rate:.1f}%", "Avg across all campaigns")
+
             self.messages_today_card.set_value(
                 f"{campaign_stats['sent_today']:,}",
                 f"{campaign_stats['yesterday_sent']} yesterday",
                 trend=self._format_delta(
-                    campaign_stats['sent_today'] - campaign_stats['yesterday_sent'],
-                    "vs yesterday"
+                    campaign_stats["sent_today"] - campaign_stats["yesterday_sent"], "vs yesterday"
                 ),
-                trend_state=self._delta_state(campaign_stats['sent_today'] - campaign_stats['yesterday_sent'])
+                trend_state=self._delta_state(
+                    campaign_stats["sent_today"] - campaign_stats["yesterday_sent"]
+                ),
             )
-            
+
             # Update member cards
             self.members_with_username_card.set_value(
                 f"{member_stats['with_username']:,}",
-                f"{member_stats['username_pct']:.0f}% have username"
+                f"{member_stats['username_pct']:.0f}% have username",
             )
-            
+
             self.verified_members_card.set_value(
-                f"{member_stats['verified']:,}",
-                f"{member_stats['verified_pct']:.1f}% verified"
+                f"{member_stats['verified']:,}", f"{member_stats['verified_pct']:.1f}% verified"
             )
-            
+
             self.premium_members_card.set_value(
-                f"{member_stats['premium']:,}",
-                f"{member_stats['premium_pct']:.1f}% premium"
+                f"{member_stats['premium']:,}", f"{member_stats['premium_pct']:.1f}% premium"
             )
-            
+
             self.active_members_card.set_value(
-                f"{member_stats['active_30d']:,}",
-                "Active in last 30 days"
+                f"{member_stats['active_30d']:,}", "Active in last 30 days"
             )
-            
+
             self.channels_tracked_card.set_value(
-                f"{member_stats['total_channels']:,}",
-                "Unique channels"
+                f"{member_stats['total_channels']:,}", "Unique channels"
             )
-            
-            if member_stats['total_channels'] > 0:
-                avg_per_channel = member_stats['total'] / member_stats['total_channels']
+
+            if member_stats["total_channels"] > 0:
+                avg_per_channel = member_stats["total"] / member_stats["total_channels"]
             else:
                 avg_per_channel = 0
-            
-            self.avg_per_channel_card.set_value(
-                f"{avg_per_channel:.0f}",
-                "Members per channel"
-            )
-            
+
+            self.avg_per_channel_card.set_value(f"{avg_per_channel:.0f}", "Members per channel")
+
             # Update template variant analytics
-            if 'variant_breakdown' in campaign_stats and campaign_stats['variant_breakdown']:
+            if "variant_breakdown" in campaign_stats and campaign_stats["variant_breakdown"]:
                 variant_text = "Template Variant Performance:\n\n"
-                for variant, stats in sorted(campaign_stats['variant_breakdown'].items()):
+                for variant, stats in sorted(campaign_stats["variant_breakdown"].items()):
                     variant_text += f"{variant}:\n"
                     variant_text += f"   Total: {stats['total']:,} | "
                     variant_text += f"Sent: {stats['sent']:,} | "
@@ -491,8 +516,9 @@ class AnalyticsDashboard(QWidget):
                     f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
                 self.partial_data_label.setText(
-                    "Database unavailable for " + ', '.join(errors) +
-                    ". Showing cached defaults. Check DB connections and retry."
+                    "Database unavailable for "
+                    + ", ".join(errors)
+                    + ". Showing cached defaults. Check DB connections and retry."
                 )
                 self.partial_data_label.setVisible(True)
                 self._set_last_updated_chip("Partial data", "warn")
@@ -522,45 +548,41 @@ class AnalyticsDashboard(QWidget):
     def _empty_member_stats() -> Dict[str, float]:
         """Provide zeroed-out member stats to keep the UI stable on failures."""
         return {
-            'total': 0,
-            'new_today': 0,
-            'with_username': 0,
-            'username_pct': 0.0,
-            'verified': 0,
-            'verified_pct': 0.0,
-            'premium': 0,
-            'premium_pct': 0.0,
-            'active_30d': 0,
-            'total_channels': 0
+            "total": 0,
+            "new_today": 0,
+            "with_username": 0,
+            "username_pct": 0.0,
+            "verified": 0,
+            "verified_pct": 0.0,
+            "premium": 0,
+            "premium_pct": 0.0,
+            "active_30d": 0,
+            "total_channels": 0,
         }
 
     @staticmethod
     def _empty_campaign_stats() -> Dict[str, float]:
         """Provide zeroed-out campaign stats to keep the UI stable on failures."""
         return {
-            'total': 0,
-            'running': 0,
-            'completed': 0,
-            'completion_rate': 0.0,
-            'total_sent': 0,
-            'sent_today': 0,
-            'failed_today': 0,
-            'total_failed': 0,
-            'yesterday_sent': 0
+            "total": 0,
+            "running": 0,
+            "completed": 0,
+            "completion_rate": 0.0,
+            "total_sent": 0,
+            "sent_today": 0,
+            "failed_today": 0,
+            "total_failed": 0,
+            "yesterday_sent": 0,
         }
 
     @staticmethod
     def _empty_account_stats() -> Dict[str, float]:
         """Provide zeroed-out account stats to keep the UI stable on failures."""
-        return {
-            'total': 0,
-            'active': 0,
-            'percentage': 0.0,
-            'warmed_up': 0,
-            'warmup_pct': 0.0
-        }
+        return {"total": 0, "active": 0, "percentage": 0.0, "warmed_up": 0, "warmup_pct": 0.0}
 
-    def _safe_fetch(self, func, default: Dict[str, float], name: str, errors: List[str]) -> Dict[str, float]:
+    def _safe_fetch(
+        self, func, default: Dict[str, float], name: str, errors: List[str]
+    ) -> Dict[str, float]:
         """Run a stats function and fall back gracefully if it fails."""
         try:
             return func()
@@ -568,71 +590,75 @@ class AnalyticsDashboard(QWidget):
             logger.warning(f"Falling back to defaults for {name}: {e}", exc_info=True)
             errors.append(name)
             return default
-    
+
     def get_real_member_stats(self) -> Dict:
         """Get REAL member statistics from database."""
         raw_stats = member_queries.get_member_statistics()
-        total = max(raw_stats.get('total', 0), 1)
+        total = max(raw_stats.get("total", 0), 1)
 
         return {
-            'total': raw_stats.get('total', 0),
-            'new_today': raw_stats.get('new_today', 0),
-            'with_username': raw_stats.get('with_username', 0),
-            'username_pct': (raw_stats.get('with_username', 0) / total) * 100,
-            'verified': raw_stats.get('verified', 0),
-            'verified_pct': (raw_stats.get('verified', 0) / total) * 100,
-            'premium': raw_stats.get('premium', 0),
-            'premium_pct': (raw_stats.get('premium', 0) / total) * 100,
-            'active_30d': raw_stats.get('active_30d', 0),
-            'total_channels': raw_stats.get('total_channels', 0)
+            "total": raw_stats.get("total", 0),
+            "new_today": raw_stats.get("new_today", 0),
+            "with_username": raw_stats.get("with_username", 0),
+            "username_pct": (raw_stats.get("with_username", 0) / total) * 100,
+            "verified": raw_stats.get("verified", 0),
+            "verified_pct": (raw_stats.get("verified", 0) / total) * 100,
+            "premium": raw_stats.get("premium", 0),
+            "premium_pct": (raw_stats.get("premium", 0) / total) * 100,
+            "active_30d": raw_stats.get("active_30d", 0),
+            "total_channels": raw_stats.get("total_channels", 0),
         }
-    
+
     def get_real_campaign_stats(self) -> Dict:
         """Get REAL campaign statistics from database."""
         campaign_data = campaign_queries.get_campaign_stats()
-        
+
         # Get campaigns for additional stats
         all_campaigns = campaign_queries.get_all_campaigns()
-        
+
         # Today's stats
         today = datetime.now().date()
         yesterday = today - timedelta(days=1)
-        
+
         sent_today = 0
         failed_today = 0
         yesterday_sent = 0
-        
+
         for campaign in all_campaigns:
-            created = datetime.fromisoformat(campaign['created_at']).date() if campaign.get('created_at') else None
-            
+            created = (
+                datetime.fromisoformat(campaign["created_at"]).date()
+                if campaign.get("created_at")
+                else None
+            )
+
             if created == today:
-                sent_today += campaign.get('sent_count', 0)
-                failed_today += campaign.get('failed_count', 0)
+                sent_today += campaign.get("sent_count", 0)
+                failed_today += campaign.get("failed_count", 0)
             elif created == yesterday:
-                yesterday_sent += campaign.get('sent_count', 0)
-        
+                yesterday_sent += campaign.get("sent_count", 0)
+
         stats = {
-            'total': campaign_data.get('total_campaigns', 0),
-            'running': campaign_data.get('running', 0),
-            'completed': campaign_data.get('completed', 0),
-            'total_sent': campaign_data.get('total_sent', 0),
-            'total_failed': campaign_data.get('total_failed', 0),
-            'sent_today': sent_today,
-            'failed_today': failed_today,
-            'yesterday_sent': yesterday_sent
+            "total": campaign_data.get("total_campaigns", 0),
+            "running": campaign_data.get("running", 0),
+            "completed": campaign_data.get("completed", 0),
+            "total_sent": campaign_data.get("total_sent", 0),
+            "total_failed": campaign_data.get("total_failed", 0),
+            "sent_today": sent_today,
+            "failed_today": failed_today,
+            "yesterday_sent": yesterday_sent,
         }
-        
+
         # Completion rate
-        if stats['total'] > 0:
-            stats['completion_rate'] = (stats['completed'] / stats['total']) * 100
+        if stats["total"] > 0:
+            stats["completion_rate"] = (stats["completed"] / stats["total"]) * 100
         else:
-            stats['completion_rate'] = 0
-        
+            stats["completion_rate"] = 0
+
         # Get template variant analytics
-        stats['variant_breakdown'] = self.get_template_variant_analytics()
-        
+        stats["variant_breakdown"] = self.get_template_variant_analytics()
+
         return stats
-    
+
     def _show_empty_state(self, message: str = "No data available"):
         """Show empty state and hide data widgets."""
         self._showing_empty_state = True
@@ -641,29 +667,31 @@ class AnalyticsDashboard(QWidget):
         if self.loading_overlay:
             self.loading_overlay.hide_loading()
         self._set_last_updated_chip("No data", "warn")
-        
+
         # Hide scroll area with data
         for child in self.findChildren(QScrollArea):
             child.setVisible(False)
-    
+
     def _hide_empty_state(self):
         """Hide empty state and show data widgets."""
         self._showing_empty_state = False
         self.empty_state_widget.setVisible(False)
-        
+
         # Show scroll area with data
         for child in self.findChildren(QScrollArea):
             child.setVisible(True)
-    
+
     def get_template_variant_analytics(self) -> Dict[str, Dict[str, int]]:
         """Get analytics breakdown by template variant."""
         try:
             import sqlite3
-            conn = sqlite3.connect('campaigns.db')
+
+            conn = sqlite3.connect("campaigns.db")
             conn.row_factory = sqlite3.Row
-            
+
             # Query variant performance
-            cursor = conn.execute('''
+            cursor = conn.execute(
+                """
                 SELECT 
                     COALESCE(template_variant, 'default') as variant,
                     status,
@@ -676,59 +704,60 @@ class AnalyticsDashboard(QWidget):
                 WHERE template_variant IS NOT NULL OR status != 'pending'
                 GROUP BY COALESCE(template_variant, 'default'), status
                 ORDER BY variant, status
-            ''')
-            
+            """
+            )
+
             variant_stats = {}
             for row in cursor:
-                variant = row['variant']
-                status = row['status']
-                count = row['count']
-                
+                variant = row["variant"]
+                status = row["status"]
+                count = row["count"]
+
                 if variant not in variant_stats:
                     variant_stats[variant] = {
-                        'total': 0,
-                        'sent': 0,
-                        'failed': 0,
-                        'blocked': 0,
-                        'pending': 0,
-                        'success_rate': 0.0
+                        "total": 0,
+                        "sent": 0,
+                        "failed": 0,
+                        "blocked": 0,
+                        "pending": 0,
+                        "success_rate": 0.0,
                     }
-                
-                variant_stats[variant]['total'] += count
+
+                variant_stats[variant]["total"] += count
                 if status in variant_stats[variant]:
                     variant_stats[variant][status] += count
-            
+
             # Calculate success rates
             for variant, stats in variant_stats.items():
-                if stats['total'] > 0:
-                    stats['success_rate'] = (stats['sent'] / stats['total']) * 100
-            
+                if stats["total"] > 0:
+                    stats["success_rate"] = (stats["sent"] / stats["total"]) * 100
+
             conn.close()
             return variant_stats
-            
+
         except Exception as e:
             logger.error(f"Failed to get template variant analytics: {e}")
             return {}
-    
+
     def get_real_account_stats(self) -> Dict:
         """Get REAL account statistics from database."""
         account_data = account_queries.get_account_stats()
-        
+
         stats = {
-            'total': account_data.get('total_accounts', 0),
-            'active': account_data.get('active', 0),
-            'warmed_up': account_data.get('warmed_up', 0),
-            'total_messages': account_data.get('total_messages', 0)
+            "total": account_data.get("total_accounts", 0),
+            "active": account_data.get("active", 0),
+            "warmed_up": account_data.get("warmed_up", 0),
+            "total_messages": account_data.get("total_messages", 0),
         }
-        
+
         # Percentages
-        if stats['total'] > 0:
-            stats['percentage'] = (stats['active'] / stats['total']) * 100
-            stats['warmup_pct'] = (stats['warmed_up'] / stats['total']) * 100
+        if stats["total"] > 0:
+            stats["percentage"] = (stats["active"] / stats["total"]) * 100
+            stats["warmup_pct"] = (stats["warmed_up"] / stats["total"]) * 100
         else:
-            stats['percentage'] = 0
-            stats['warmup_pct'] = 0
-        
+            stats["percentage"] = 0
+            stats["warmup_pct"] = 0
+
         return stats
 
     @staticmethod
@@ -756,91 +785,85 @@ class AnalyticsDashboard(QWidget):
         self.last_updated_chip.style().unpolish(self.last_updated_chip)
         self.last_updated_chip.style().polish(self.last_updated_chip)
         self.last_updated_chip.update()
-    
+
     def export_dashboard_data(self):
         """Export all dashboard data."""
         try:
             from PyQt6.QtWidgets import QFileDialog, QMessageBox, QInputDialog
             from utils.export_manager import get_export_manager
             from datetime import datetime
-            
+
             # Ask for export type
             export_options = [
                 "Campaigns Only",
-                "Accounts Only", 
+                "Accounts Only",
                 "Members Only",
                 "Risk Data Only",
                 "Cost Data Only",
-                "Complete Export (All Data)"
+                "Complete Export (All Data)",
             ]
             export_choice, ok = QInputDialog.getItem(
                 self, "Export Dashboard Data", "Select what to export:", export_options, 5, False
             )
-            
+
             if not ok:
                 return
-            
+
             # Get save directory
             save_dir = QFileDialog.getExistingDirectory(
                 self, "Select Export Directory", "", QFileDialog.Option.ShowDirsOnly
             )
-            
+
             if not save_dir:
                 return
-            
+
             exporter = get_export_manager()
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             exported_files = []
-            
+
             try:
                 if "Campaigns" in export_choice or "Complete" in export_choice:
                     file_path = f"{save_dir}/campaigns_{timestamp}.csv"
                     count = exporter.export_campaigns_to_csv(file_path, include_messages=True)
                     if count > 0:
                         exported_files.append(file_path)
-                
+
                 if "Accounts" in export_choice or "Complete" in export_choice:
                     file_path = f"{save_dir}/accounts_{timestamp}.csv"
                     count = exporter.export_accounts_to_csv(file_path)
                     if count > 0:
                         exported_files.append(file_path)
-                
+
                 if "Members" in export_choice or "Complete" in export_choice:
                     file_path = f"{save_dir}/members_{timestamp}.csv"
                     count = exporter.export_members_to_csv(file_path)
                     if count > 0:
                         exported_files.append(file_path)
-                
+
                 if "Risk" in export_choice or "Complete" in export_choice:
                     file_path = f"{save_dir}/risk_data_{timestamp}.csv"
                     count = exporter.export_risk_data_to_csv(file_path)
                     if count > 0:
                         exported_files.append(file_path)
-                
+
                 if "Cost" in export_choice or "Complete" in export_choice:
                     file_path = f"{save_dir}/cost_data_{timestamp}.csv"
                     count = exporter.export_cost_data_to_csv(file_path)
                     if count > 0:
                         exported_files.append(file_path)
-                
+
                 if exported_files:
                     QMessageBox.information(
-                        self, "Export Successful",
-                        f"Exported {len(exported_files)} file(s) to:\n{save_dir}"
+                        self,
+                        "Export Successful",
+                        f"Exported {len(exported_files)} file(s) to:\n{save_dir}",
                     )
                 else:
-                    QMessageBox.warning(
-                        self, "Export Warning",
-                        "No data found to export."
-                    )
-            
+                    QMessageBox.warning(self, "Export Warning", "No data found to export.")
+
             except Exception as e:
                 logger.error(f"Export failed: {e}")
-                QMessageBox.critical(
-                    self, "Export Error",
-                    f"Failed to export data:\n{str(e)}"
-                )
-                
+                QMessageBox.critical(self, "Export Error", f"Failed to export data:\n{str(e)}")
+
         except Exception as e:
             logger.error(f"Failed to setup export: {e}")
-

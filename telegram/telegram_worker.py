@@ -1,6 +1,7 @@
 """
 Telegram Worker - Thread-based Telegram client operations.
 """
+
 import asyncio
 import logging
 from typing import TYPE_CHECKING
@@ -23,6 +24,7 @@ TELEGRAM_MESSAGE_TIMEOUT = 30  # seconds
 
 class WorkerSignals(QObject):
     """Signals for the worker thread."""
+
     log_message = pyqtSignal(str)
     status_update = pyqtSignal(str, str)  # message, color
     auth_required = pyqtSignal()
@@ -34,7 +36,13 @@ class WorkerSignals(QObject):
 class TelegramWorker(QThread):
     """Worker thread for running Telegram client operations."""
 
-    def __init__(self, telegram_client: TelegramClient, gemini_service: GeminiService, rate_limiter: RateLimiter = None, network_recovery: NetworkRecoveryManager = None):
+    def __init__(
+        self,
+        telegram_client: TelegramClient,
+        gemini_service: GeminiService,
+        rate_limiter: RateLimiter = None,
+        network_recovery: NetworkRecoveryManager = None,
+    ):
         super().__init__()
         self.telegram_client = telegram_client
         self.gemini_service = gemini_service
@@ -62,25 +70,29 @@ class TelegramWorker(QThread):
 
                 # Check if we should attempt recovery
                 if self.connection_attempts > 0:
-                    if not self.network_recovery.should_attempt_recovery('telegram'):
+                    if not self.network_recovery.should_attempt_recovery("telegram"):
                         self.signals.log_message.emit("Maximum connection attempts exceeded")
                         break
 
-                    delay = self.network_recovery.get_recovery_delay('telegram')
+                    delay = self.network_recovery.get_recovery_delay("telegram")
                     if delay > 0:
-                        self.signals.log_message.emit(f"Waiting {delay:.1f}s before reconnection attempt")
+                        self.signals.log_message.emit(
+                            f"Waiting {delay:.1f}s before reconnection attempt"
+                        )
                         await asyncio.sleep(delay)
 
                 # Initialize client
                 success = await self.telegram_client.initialize()
                 if not success:
                     self.connection_attempts += 1
-                    self.network_recovery.record_recovery_attempt('telegram')
-                    self.signals.log_message.emit(f"Failed to initialize Telegram client (attempt {self.connection_attempts})")
+                    self.network_recovery.record_recovery_attempt("telegram")
+                    self.signals.log_message.emit(
+                        f"Failed to initialize Telegram client (attempt {self.connection_attempts})"
+                    )
                     continue
 
                 # Reset recovery state on success
-                self.network_recovery.record_successful_connection('telegram')
+                self.network_recovery.record_successful_connection("telegram")
                 self.connection_attempts = 0
 
                 self.signals.auth_success.emit()
@@ -109,8 +121,10 @@ class TelegramWorker(QThread):
             except (asyncio.TimeoutError, ConnectionError, OSError) as e:
                 # Network-related errors - attempt recovery
                 self.connection_attempts += 1
-                self.network_recovery.record_recovery_attempt('telegram')
-                self.signals.log_message.emit(f"Network error (attempt {self.connection_attempts}): {e}")
+                self.network_recovery.record_recovery_attempt("telegram")
+                self.signals.log_message.emit(
+                    f"Network error (attempt {self.connection_attempts}): {e}"
+                )
                 self.signals.status_update.emit(f"Network Error: Reconnecting...", "orange")
 
             except Exception as e:
@@ -127,19 +141,25 @@ class TelegramWorker(QThread):
         """Generate a reply using Gemini AI with rate limiting."""
         try:
             # Check rate limit before generating reply
-            if not self.rate_limiter.is_allowed('message'):
-                remaining = self.rate_limiter.get_remaining_requests('message')
+            if not self.rate_limiter.is_allowed("message"):
+                remaining = self.rate_limiter.get_remaining_requests("message")
                 backoff_remaining = self.rate_limiter.get_backoff_remaining()
                 circuit_remaining = self.rate_limiter.get_circuit_breaker_remaining()
 
                 if backoff_remaining > 0:
-                    self.signals.log_message.emit(f"Rate limit backoff active, {backoff_remaining:.0f}s remaining")
+                    self.signals.log_message.emit(
+                        f"Rate limit backoff active, {backoff_remaining:.0f}s remaining"
+                    )
                     return "I'm taking a short break, please try again in a moment."
                 elif circuit_remaining > 0:
-                    self.signals.log_message.emit(f"Circuit breaker active, {circuit_remaining:.0f}s remaining")
+                    self.signals.log_message.emit(
+                        f"Circuit breaker active, {circuit_remaining:.0f}s remaining"
+                    )
                     return "I'm experiencing some issues, please try again later."
                 else:
-                    self.signals.log_message.emit(f"Rate limit exceeded, {remaining} message requests remaining")
+                    self.signals.log_message.emit(
+                        f"Rate limit exceeded, {remaining} message requests remaining"
+                    )
                     return "I'm a bit busy right now, can you ask again in a minute?"
 
             # Use asyncio.run_coroutine_threadsafe to run in the main event loop
@@ -150,8 +170,7 @@ class TelegramWorker(QThread):
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
             future = asyncio.run_coroutine_threadsafe(
-                self.gemini_service.generate_reply(message, chat_id),
-                loop
+                self.gemini_service.generate_reply(message, chat_id), loop
             )
             reply = future.result(timeout=TELEGRAM_MESSAGE_TIMEOUT)
 
@@ -172,7 +191,7 @@ class TelegramWorker(QThread):
     def stop(self):
         """Stop the worker thread gracefully."""
         self.running = False
-        if hasattr(self, 'telegram_client') and self.telegram_client:
+        if hasattr(self, "telegram_client") and self.telegram_client:
             # Stop the client gracefully
             try:
                 try:
@@ -181,10 +200,7 @@ class TelegramWorker(QThread):
                     # No running loop, create new one
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
-                asyncio.run_coroutine_threadsafe(
-                    self.telegram_client.stop(),
-                    loop
-                )
+                asyncio.run_coroutine_threadsafe(self.telegram_client.stop(), loop)
             except Exception as e:
                 self.signals.log_message.emit(f"Error stopping Telegram client: {e}")
 

@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AuditEvent:
     """Audit event data structure."""
+
     event_type: str
     user: str = None
     session_id: str = None
@@ -93,16 +94,13 @@ class SecurityAuditLogger:
                 return f.read()
 
         # Generate new RSA key pair for integrity
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048
-        )
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
         # Save private key securely
         pem = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
+            encryption_algorithm=serialization.NoEncryption(),
         )
 
         with open(key_file, "wb") as f:
@@ -117,14 +115,14 @@ class SecurityAuditLogger:
                 "hostname": socket.gethostname(),
                 "username": getpass.getuser(),
                 "pid": os.getpid(),
-                "platform": os.uname().sysname if hasattr(os, 'uname') else "unknown"
+                "platform": os.uname().sysname if hasattr(os, "uname") else "unknown",
             }
         except Exception:
             return {
                 "hostname": "unknown",
                 "username": "unknown",
                 "pid": os.getpid(),
-                "platform": "unknown"
+                "platform": "unknown",
             }
 
     def _get_current_log_file(self) -> Path:
@@ -200,8 +198,10 @@ class SecurityAuditLogger:
                 self._last_integrity_hash = event.integrity_hash
 
                 # Log to application logger
-                logger.info(f"AUDIT: {event.event_type} - {event.operation or 'unknown'} "
-                          f"on {event.resource or 'unknown'} - Success: {event.success}")
+                logger.info(
+                    f"AUDIT: {event.event_type} - {event.operation or 'unknown'} "
+                    f"on {event.resource or 'unknown'} - Success: {event.success}"
+                )
 
             except Exception as e:
                 logger.error(f"Failed to write audit log: {e}")
@@ -215,11 +215,13 @@ class SecurityAuditLogger:
             success=success,
             details={"source": source},
             user=user,
-            risk_level="medium"
+            risk_level="medium",
         )
         self.log_event(event)
 
-    def log_credential_modification(self, key: str, operation: str, success: bool = True, user: str = None):
+    def log_credential_modification(
+        self, key: str, operation: str, success: bool = True, user: str = None
+    ):
         """Log credential modification operations."""
         event = AuditEvent(
             event_type="credential_modification",
@@ -227,7 +229,7 @@ class SecurityAuditLogger:
             resource=f"secret:{key}",
             success=success,
             user=user,
-            risk_level="high"
+            risk_level="high",
         )
         self.log_event(event)
 
@@ -239,11 +241,13 @@ class SecurityAuditLogger:
             resource=f"api:{provider}",
             success=success,
             user=user,
-            risk_level="medium"
+            risk_level="medium",
         )
         self.log_event(event)
 
-    def log_authentication_attempt(self, method: str, success: bool = True, user: str = None, details: Dict = None):
+    def log_authentication_attempt(
+        self, method: str, success: bool = True, user: str = None, details: Dict = None
+    ):
         """Log authentication attempts."""
         event = AuditEvent(
             event_type="authentication",
@@ -251,11 +255,13 @@ class SecurityAuditLogger:
             success=success,
             details=details or {},
             user=user,
-            risk_level="high" if not success else "low"
+            risk_level="high" if not success else "low",
         )
         self.log_event(event)
 
-    def log_security_violation(self, violation_type: str, details: Dict[str, Any], user: str = None):
+    def log_security_violation(
+        self, violation_type: str, details: Dict[str, Any], user: str = None
+    ):
         """Log security violations."""
         event = AuditEvent(
             event_type="security_violation",
@@ -263,7 +269,7 @@ class SecurityAuditLogger:
             success=False,
             details=details,
             user=user,
-            risk_level="critical"
+            risk_level="critical",
         )
         self.log_event(event)
 
@@ -300,7 +306,9 @@ class SecurityAuditLogger:
                     # Recalculate hash using the previous hash in the chain
                     json_data = json.dumps(event_data, sort_keys=True, default=str)
                     message = f"{previous_hash}{json_data}".encode()
-                    calculated_hash = hmac.new(self.integrity_key[:32], message, hashlib.sha256).hexdigest()
+                    calculated_hash = hmac.new(
+                        self.integrity_key[:32], message, hashlib.sha256
+                    ).hexdigest()
 
                     if stored_hash != calculated_hash:
                         logger.error(f"Integrity violation in {log_file}: hash mismatch")
@@ -369,6 +377,7 @@ class SecurityAuditLogger:
 # Global audit logger instance
 _audit_logger = None
 
+
 def get_audit_logger() -> SecurityAuditLogger:
     """Get global audit logger instance."""
     global _audit_logger
@@ -376,17 +385,21 @@ def get_audit_logger() -> SecurityAuditLogger:
         _audit_logger = SecurityAuditLogger()
     return _audit_logger
 
+
 def audit_credential_access(key: str, source: str, success: bool = True, user: str = None):
     """Convenience function for logging credential access."""
     get_audit_logger().log_credential_access(key, source, success, user)
+
 
 def audit_credential_modification(key: str, operation: str, success: bool = True, user: str = None):
     """Convenience function for logging credential modifications."""
     get_audit_logger().log_credential_modification(key, operation, success, user)
 
+
 def audit_api_validation(provider: str, success: bool = True, user: str = None):
     """Convenience function for logging API validations."""
     get_audit_logger().log_api_key_validation(provider, success, user)
+
 
 def audit_security_violation(violation_type: str, details: Dict[str, Any], user: str = None):
     """Convenience function for logging security violations."""

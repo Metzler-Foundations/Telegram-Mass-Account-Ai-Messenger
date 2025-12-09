@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Any
 try:
     import google.generativeai as genai
     from google.generativeai.types import HarmCategory, HarmBlockThreshold
+
     GEMINI_AVAILABLE = True
 except Exception as exc:  # noqa: BLE001
     GEMINI_AVAILABLE = False
@@ -27,11 +28,16 @@ from monitoring.performance_monitor import get_resilience_manager
 
 class GeminiService:
     """Service for interacting with Google Gemini AI.
-    
+
     Supports both shared brain configuration and per-account custom prompts.
     """
 
-    def __init__(self, api_key: str, brain_config: Dict[str, Any] = None, performance: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        api_key: str,
+        brain_config: Dict[str, Any] = None,
+        performance: Optional[Dict[str, Any]] = None,
+    ):
         """Initialize the Gemini service.
 
         Args:
@@ -56,13 +62,13 @@ class GeminiService:
         if self.low_power:
             history_cap = min(history_cap, 20)
         self.max_history_length = history_cap  # Maximum messages to keep in history per chat
-        
+
         # Per-account brain configuration
         self.brain_config = brain_config or {}
         self.custom_generation_config = None
-        
+
         # Apply brain config if provided
-        if brain_config and not brain_config.get('use_shared_brain', True):
+        if brain_config and not brain_config.get("use_shared_brain", True):
             self._apply_brain_config(brain_config)
 
         self._initialize_model()
@@ -78,14 +84,13 @@ class GeminiService:
         """Set up circuit breakers and fallback strategies for Gemini AI operations."""
         # Circuit breaker for Gemini API calls
         self.gemini_circuit_breaker = self.resilience_manager.get_circuit_breaker(
-            "gemini_api_calls",
-            failure_threshold=5,
-            recovery_timeout=60,
-            success_threshold=2
+            "gemini_api_calls", failure_threshold=5, recovery_timeout=60, success_threshold=2
         )
 
         # Fallback strategies for text generation
-        generation_fallback = self.resilience_manager.get_fallback_strategy("gemini_text_generation")
+        generation_fallback = self.resilience_manager.get_fallback_strategy(
+            "gemini_text_generation"
+        )
 
         # Primary: Full Gemini generation with history
         async def primary_generation(prompt, chat_id, **kwargs):
@@ -130,21 +135,21 @@ class GeminiService:
                 raise ValueError("Gemini API key missing")
 
             genai.configure(api_key=self.api_key)
-            
+
             # Use custom generation config if set, otherwise use defaults
             perf_ai = self.performance.get("ai", {}) if isinstance(self.performance, dict) else {}
             max_tokens = perf_ai.get("max_tokens", 1024)
             if self.low_power:
                 max_tokens = min(max_tokens, 768)
             default_config = {
-                'temperature': perf_ai.get('temperature', 0.7),
-                'top_p': perf_ai.get('top_p', 0.8),
-                'top_k': perf_ai.get('top_k', 40),
-                'max_output_tokens': max_tokens,
+                "temperature": perf_ai.get("temperature", 0.7),
+                "top_p": perf_ai.get("top_p", 0.8),
+                "top_k": perf_ai.get("top_k", 40),
+                "max_output_tokens": max_tokens,
             }
-            
+
             gen_config = self.custom_generation_config or default_config
-            
+
             # Resolve model name with optional override
             model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
 
@@ -157,51 +162,53 @@ class GeminiService:
                     HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
                     HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
                     HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                }
+                },
             )
             logger.info("Gemini model initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini model: {e}")
             self.model = None
             self.offline_mode = True
-    
+
     def _apply_brain_config(self, brain_config: Dict[str, Any]) -> None:
         """Apply per-account brain configuration.
-        
+
         Args:
             brain_config: Brain configuration dictionary
         """
         # Set custom prompt if provided
-        custom_prompt = brain_config.get('custom_prompt', '')
+        custom_prompt = brain_config.get("custom_prompt", "")
         if custom_prompt:
             self.brain_prompt = custom_prompt
             logger.info("Applied custom brain prompt from brain_config")
-        
+
         # Build custom generation config
         self.custom_generation_config = {
-            'temperature': brain_config.get('gemini_temperature', 0.8),
-            'top_p': brain_config.get('gemini_top_p', 0.9),
-            'top_k': brain_config.get('gemini_top_k', 40),
-            'max_output_tokens': brain_config.get('gemini_max_tokens', 1000),
+            "temperature": brain_config.get("gemini_temperature", 0.8),
+            "top_p": brain_config.get("gemini_top_p", 0.9),
+            "top_k": brain_config.get("gemini_top_k", 40),
+            "max_output_tokens": brain_config.get("gemini_max_tokens", 1000),
         }
-        
-        logger.info(f"Applied custom brain config: temp={self.custom_generation_config['temperature']}, "
-                   f"top_p={self.custom_generation_config['top_p']}")
-    
+
+        logger.info(
+            f"Applied custom brain config: temp={self.custom_generation_config['temperature']}, "
+            f"top_p={self.custom_generation_config['top_p']}"
+        )
+
     def update_brain_config(self, brain_config: Dict[str, Any]) -> None:
         """Update the brain configuration and reinitialize the model.
-        
+
         Args:
             brain_config: New brain configuration
         """
         self.brain_config = brain_config
-        
-        if brain_config and not brain_config.get('use_shared_brain', True):
+
+        if brain_config and not brain_config.get("use_shared_brain", True):
             self._apply_brain_config(brain_config)
         else:
             # Reset to defaults
             self.custom_generation_config = None
-        
+
         # Reinitialize model with new config
         self._initialize_model()
         logger.info("Brain configuration updated")
@@ -261,7 +268,9 @@ class GeminiService:
         context_parts.append(f"User: {new_message}")
 
         # Add instruction for response
-        context_parts.append("\nAssistant: Please respond naturally and helpfully based on the system instructions above.")
+        context_parts.append(
+            "\nAssistant: Please respond naturally and helpfully based on the system instructions above."
+        )
 
         return "\n\n".join(context_parts)
 
@@ -276,20 +285,21 @@ class GeminiService:
         if chat_id not in self.conversation_history:
             self.conversation_history[chat_id] = []
 
-        self.conversation_history[chat_id].append({
-            "role": role,
-            "content": content
-        })
+        self.conversation_history[chat_id].append({"role": role, "content": content})
 
         # Trim history if it gets too long
         if len(self.conversation_history[chat_id]) > self.max_history_length:
             # Keep only the most recent messages
-            self.conversation_history[chat_id] = self.conversation_history[chat_id][-self.max_history_length:]
+            self.conversation_history[chat_id] = self.conversation_history[chat_id][
+                -self.max_history_length :
+            ]
 
         # Periodic cleanup of old conversation histories (keep only active chats)
         self._cleanup_old_histories()
 
-    async def generate_reply(self, message: str, chat_id: int, max_retries: int = 3) -> Optional[str]:
+    async def generate_reply(
+        self, message: str, chat_id: int, max_retries: int = 3
+    ) -> Optional[str]:
         """Generate a reply using Gemini AI with resilience features and anti-detection measures.
 
         Args:
@@ -312,9 +322,10 @@ class GeminiService:
             result, fallback_used = await self.resilience_manager.execute_with_resilience(
                 f"gemini_generation_{chat_id}",
                 self._generate_reply_operation,
-                message, chat_id,
+                message,
+                chat_id,
                 circuit_breaker=True,
-                fallback=True
+                fallback=True,
             )
 
             if fallback_used:
@@ -334,7 +345,7 @@ class GeminiService:
 
         # Anti-detection: Advanced rate limiting with randomization
         current_time = time.time()
-        if hasattr(self, '_last_request_time'):
+        if hasattr(self, "_last_request_time"):
             time_since_last = current_time - self._last_request_time
             min_interval = RandomizationUtils.get_interval_range()
             if time_since_last < min_interval:
@@ -356,86 +367,120 @@ class GeminiService:
         if self.custom_generation_config:
             # Use custom config with slight randomization
             generation_config = {
-                'temperature': self.custom_generation_config['temperature'] * random.uniform(0.95, 1.05),
-                'top_p': self.custom_generation_config['top_p'],
-                'top_k': self.custom_generation_config['top_k'],
-                'max_output_tokens': self.custom_generation_config['max_output_tokens'],
+                "temperature": self.custom_generation_config["temperature"]
+                * random.uniform(0.95, 1.05),
+                "top_p": self.custom_generation_config["top_p"],
+                "top_k": self.custom_generation_config["top_k"],
+                "max_output_tokens": self.custom_generation_config["max_output_tokens"],
             }
         else:
             # Anti-detection: Vary model parameters slightly
             generation_config = {
-                'temperature': RandomizationUtils.get_gemini_temperature(),
-                'top_p': RandomizationUtils.get_gemini_top_p(),
-                'top_k': RandomizationUtils.get_gemini_top_k(),
-                'max_output_tokens': RandomizationUtils.get_gemini_max_tokens(),
+                "temperature": RandomizationUtils.get_gemini_temperature(),
+                "top_p": RandomizationUtils.get_gemini_top_p(),
+                "top_k": RandomizationUtils.get_gemini_top_k(),
+                "max_output_tokens": RandomizationUtils.get_gemini_max_tokens(),
             }
 
         # Generate response with anti-detection timeout and comprehensive error handling
         max_retries = 3
         retry_delays = [1, 2, 4]  # Exponential backoff
-        
+
         last_exception = None
         for attempt in range(max_retries):
             try:
                 response = await asyncio.wait_for(
                     self.model.generate_content_async(context, generation_config=generation_config),
-                    timeout=RandomizationUtils.get_api_timeout()
+                    timeout=RandomizationUtils.get_api_timeout(),
                 )
                 break  # Success, exit retry loop
-                
+
             except asyncio.TimeoutError as e:
                 last_exception = e
-                logger.warning(f"Gemini API timeout for chat {chat_id} (attempt {attempt + 1}/{max_retries})")
+                logger.warning(
+                    f"Gemini API timeout for chat {chat_id} (attempt {attempt + 1}/{max_retries})"
+                )
                 if attempt < max_retries - 1:
                     await asyncio.sleep(retry_delays[attempt])
                     continue
                 else:
-                    logger.error(f"Gemini API timeout after {max_retries} attempts for chat {chat_id}")
+                    logger.error(
+                        f"Gemini API timeout after {max_retries} attempts for chat {chat_id}"
+                    )
                     raise Exception("Gemini API timeout - please try again later") from e
-                    
+
             except Exception as e:
                 last_exception = e
                 error_str = str(e).lower()
-                
+
                 # Handle specific API errors
                 if "quota" in error_str or "rate limit" in error_str:
                     logger.error(f"Gemini API quota/rate limit exceeded for chat {chat_id}: {e}")
-                    raise Exception("AI service is currently overloaded. Please try again in a few moments.") from e
-                    
-                elif "api key" in error_str or "authentication" in error_str or "invalid" in error_str:
+                    raise Exception(
+                        "AI service is currently overloaded. Please try again in a few moments."
+                    ) from e
+
+                elif (
+                    "api key" in error_str
+                    or "authentication" in error_str
+                    or "invalid" in error_str
+                ):
                     logger.error(f"Gemini API authentication error for chat {chat_id}: {e}")
-                    raise Exception("AI service configuration error. Please contact support.") from e
-                    
+                    raise Exception(
+                        "AI service configuration error. Please contact support."
+                    ) from e
+
                 elif "safety" in error_str or "blocked" in error_str:
                     logger.warning(f"Gemini content safety block for chat {chat_id}: {e}")
-                    raise Exception("Message could not be processed due to content policy. Please rephrase your message.") from e
-                    
+                    raise Exception(
+                        "Message could not be processed due to content policy. Please rephrase your message."
+                    ) from e
+
                 elif "model" in error_str and "not found" in error_str:
                     logger.error(f"Gemini model not found for chat {chat_id}: {e}")
-                    raise Exception("AI service is temporarily unavailable. Please try again later.") from e
-                    
+                    raise Exception(
+                        "AI service is temporarily unavailable. Please try again later."
+                    ) from e
+
                 # For retryable errors, retry with backoff
-                elif "server" in error_str or "unavailable" in error_str or "503" in error_str or "500" in error_str:
-                    logger.warning(f"Gemini API server error for chat {chat_id} (attempt {attempt + 1}/{max_retries}): {e}")
+                elif (
+                    "server" in error_str
+                    or "unavailable" in error_str
+                    or "503" in error_str
+                    or "500" in error_str
+                ):
+                    logger.warning(
+                        f"Gemini API server error for chat {chat_id} (attempt {attempt + 1}/{max_retries}): {e}"
+                    )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(retry_delays[attempt])
                         continue
                     else:
-                        logger.error(f"Gemini API server error after {max_retries} attempts for chat {chat_id}")
-                        raise Exception("AI service is temporarily unavailable. Please try again later.") from e
-                
+                        logger.error(
+                            f"Gemini API server error after {max_retries} attempts for chat {chat_id}"
+                        )
+                        raise Exception(
+                            "AI service is temporarily unavailable. Please try again later."
+                        ) from e
+
                 # For unknown errors, log and raise with user-friendly message
                 else:
-                    logger.error(f"Gemini API unexpected error for chat {chat_id}: {e}", exc_info=True)
+                    logger.error(
+                        f"Gemini API unexpected error for chat {chat_id}: {e}", exc_info=True
+                    )
                     if attempt < max_retries - 1:
                         await asyncio.sleep(retry_delays[attempt])
                         continue
                     else:
-                        raise Exception("AI service encountered an error. Please try again later.") from e
+                        raise Exception(
+                            "AI service encountered an error. Please try again later."
+                        ) from e
         else:
             # If we exhaust retries without success
             if last_exception:
-                raise Exception("AI service is temporarily unavailable. Please try again later.") from last_exception
+                raise Exception(
+                    "AI service is temporarily unavailable. Please try again later."
+                ) from last_exception
 
         # Record performance metrics
         response_time = time.time() - start_time
@@ -456,7 +501,9 @@ class GeminiService:
             if random.random() > 0.1:  # 90% chance to save
                 self._add_to_history(chat_id, "assistant", reply_text)
 
-            logger.info(f"Generated anti-detection reply for chat {chat_id}: {len(reply_text)} chars")
+            logger.info(
+                f"Generated anti-detection reply for chat {chat_id}: {len(reply_text)} chars"
+            )
             return reply_text
         else:
             raise Exception("Empty response from Gemini API")
@@ -467,26 +514,28 @@ class GeminiService:
         """Apply subtle formatting variations to avoid detection."""
         # Occasionally vary punctuation
         if random.random() < 0.2:  # 20% chance
-            if reply_text.endswith('.'):
-                reply_text = reply_text[:-1] + '!' if random.random() < 0.5 else reply_text[:-1] + '...'
+            if reply_text.endswith("."):
+                reply_text = (
+                    reply_text[:-1] + "!" if random.random() < 0.5 else reply_text[:-1] + "..."
+                )
 
         # Vary capitalization patterns occasionally
         if random.random() < 0.1:  # 10% chance
             words = reply_text.split()
             if len(words) > 2:
                 # Randomly capitalize a word
-                idx = random.randint(0, len(words)-1)
+                idx = random.randint(0, len(words) - 1)
                 words[idx] = words[idx].capitalize()
-                reply_text = ' '.join(words)
+                reply_text = " ".join(words)
 
         # Occasionally add filler words
         filler_words = ["well", "you know", "like", "actually", "hmm"]
         if random.random() < 0.05 and len(reply_text.split()) > 3:  # 5% chance
             words = reply_text.split()
-            insert_pos = random.randint(1, len(words)-1)
+            insert_pos = random.randint(1, len(words) - 1)
             filler = random.choice(filler_words)
             words.insert(insert_pos, filler)
-            reply_text = ' '.join(words)
+            reply_text = " ".join(words)
 
         return reply_text
 
@@ -511,7 +560,7 @@ class GeminiService:
         return {
             "message_count": len(history),
             "chat_id": chat_id,
-            "has_brain_prompt": bool(self.brain_prompt)
+            "has_brain_prompt": bool(self.brain_prompt),
         }
 
     def update_api_key(self, new_api_key: str) -> bool:
@@ -531,7 +580,9 @@ class GeminiService:
             logger.error(f"Failed to update API key: {e}")
             return False
 
-    def _cleanup_old_histories(self, max_chats: int = 100, max_age_hours: int = 24, max_memory_mb: float = 50.0):
+    def _cleanup_old_histories(
+        self, max_chats: int = 100, max_age_hours: int = 24, max_memory_mb: float = 50.0
+    ):
         """Clean up old conversation histories to prevent memory leaks."""
         import time
         import sys
@@ -544,7 +595,9 @@ class GeminiService:
         memory_mb = process.memory_info().rss / 1024 / 1024
 
         if memory_mb > max_memory_mb:
-            logger.warning(f"High memory usage detected: {memory_mb:.1f}MB, cleaning up conversation histories")
+            logger.warning(
+                f"High memory usage detected: {memory_mb:.1f}MB, cleaning up conversation histories"
+            )
 
         # Remove chats that haven't been active recently or if memory is high
         chats_to_remove = []
@@ -554,19 +607,24 @@ class GeminiService:
                 continue
 
             # Check if the last message is too old
-            last_message_time = history[-1].get('timestamp', 0)
+            last_message_time = history[-1].get("timestamp", 0)
             if isinstance(last_message_time, str):
                 # Convert ISO string to timestamp if needed
                 try:
                     from datetime import datetime
-                    last_message_time = datetime.fromisoformat(last_message_time.replace('Z', '+00:00')).timestamp()
+
+                    last_message_time = datetime.fromisoformat(
+                        last_message_time.replace("Z", "+00:00")
+                    ).timestamp()
                 except (ValueError, AttributeError, TypeError) as e:
                     logger.debug(f"Could not parse last message time: {e}")
                     last_message_time = 0
 
             # Remove if too old or if memory pressure is high
             age_seconds = current_time - last_message_time
-            if age_seconds > max_age_seconds or (memory_mb > max_memory_mb and age_seconds > 3600):  # 1 hour if memory high
+            if age_seconds > max_age_seconds or (
+                memory_mb > max_memory_mb and age_seconds > 3600
+            ):  # 1 hour if memory high
                 chats_to_remove.append(chat_id)
 
         # Remove old chats
@@ -578,8 +636,8 @@ class GeminiService:
             # Sort by last activity and keep only the most recent
             sorted_chats = sorted(
                 self.conversation_history.items(),
-                key=lambda x: x[1][-1].get('timestamp', 0) if x[1] else 0,
-                reverse=True
+                key=lambda x: x[1][-1].get("timestamp", 0) if x[1] else 0,
+                reverse=True,
             )
 
             # Keep fewer chats if memory is high
@@ -587,30 +645,33 @@ class GeminiService:
             self.conversation_history = dict(sorted_chats[:keep_count])
 
             if chats_to_remove or len(sorted_chats) > keep_count:
-                logger.info(f"Cleaned up conversation histories: removed {len(chats_to_remove)} old chats, "
-                          f"kept {len(self.conversation_history)} active chats, "
-                          f"memory usage: {memory_mb:.1f}MB")
+                logger.info(
+                    f"Cleaned up conversation histories: removed {len(chats_to_remove)} old chats, "
+                    f"kept {len(self.conversation_history)} active chats, "
+                    f"memory usage: {memory_mb:.1f}MB"
+                )
 
 
-def create_gemini_service_for_account(api_key: str, account_data: Dict[str, Any], 
-                                       shared_prompt: str = "") -> GeminiService:
+def create_gemini_service_for_account(
+    api_key: str, account_data: Dict[str, Any], shared_prompt: str = ""
+) -> GeminiService:
     """Factory function to create a GeminiService configured for a specific account.
-    
+
     Args:
         api_key: Gemini API key
         account_data: Account data dictionary containing brain_config
         shared_prompt: The shared/global brain prompt
-        
+
     Returns:
         Configured GeminiService instance
     """
-    brain_config = account_data.get('brain_config', {})
-    
+    brain_config = account_data.get("brain_config", {})
+
     # Create service with brain config
     service = GeminiService(api_key=api_key, brain_config=brain_config)
-    
+
     # Set the appropriate prompt
-    if brain_config.get('use_shared_brain', True):
+    if brain_config.get("use_shared_brain", True):
         # Use shared prompt
         if shared_prompt:
             service.set_brain_prompt(shared_prompt)
@@ -618,8 +679,9 @@ def create_gemini_service_for_account(api_key: str, account_data: Dict[str, Any]
         # Custom prompt should already be set from brain_config
         # But if not, try to get default based on account type
         if not service.brain_prompt:
-            account_type = account_data.get('account_type', 'reactive')
+            account_type = account_data.get("account_type", "reactive")
             from accounts.account_manager import DEFAULT_BRAIN_PROMPTS, AccountType
+
             try:
                 default_prompt = DEFAULT_BRAIN_PROMPTS.get(AccountType(account_type), "")
                 if default_prompt:
@@ -630,5 +692,5 @@ def create_gemini_service_for_account(api_key: str, account_data: Dict[str, Any]
                     account_type,
                     exc,
                 )
-    
+
     return service

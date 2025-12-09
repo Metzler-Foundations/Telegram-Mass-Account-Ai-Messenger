@@ -17,36 +17,43 @@ logger = logging.getLogger(__name__)
 
 class ApplicationError(Exception):
     """Base exception for application-specific errors."""
+
     pass
 
 
 class DatabaseError(ApplicationError):
     """Database operation errors."""
+
     pass
 
 
 class NetworkError(ApplicationError):
     """Network and API communication errors."""
+
     pass
 
 
 class AuthenticationError(ApplicationError):
     """Authentication and authorization errors."""
+
     pass
 
 
 class ValidationError(ApplicationError):
     """Data validation errors."""
+
     pass
 
 
 class ConfigurationError(ApplicationError):
     """Configuration and setup errors."""
+
     pass
 
 
 class ResourceError(ApplicationError):
     """Resource management errors (memory, file handles, etc.)."""
+
     pass
 
 
@@ -55,7 +62,7 @@ def handle_errors(
     log_level: int = logging.ERROR,
     default_message: str = "An error occurred",
     reraise: bool = True,
-    return_on_error: Any = None
+    return_on_error: Any = None,
 ) -> Callable:
     """
     Decorator for standardized error handling.
@@ -70,6 +77,7 @@ def handle_errors(
     Returns:
         Decorated function
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -87,15 +95,15 @@ def handle_errors(
                 if not reraise:
                     return return_on_error
                 raise
+
         return wrapper
+
     return decorator
 
 
 @contextmanager
 def error_context(
-    operation: str,
-    *expected_exceptions: Type[Exception],
-    log_level: int = logging.ERROR
+    operation: str, *expected_exceptions: Type[Exception], log_level: int = logging.ERROR
 ):
     """
     Context manager for error handling in code blocks.
@@ -122,7 +130,7 @@ def safe_call(
     default: Any = None,
     exceptions: Tuple[Type[Exception], ...] = (Exception,),
     log_errors: bool = True,
-    **kwargs
+    **kwargs,
 ) -> Any:
     """
     Safely call a function with error handling.
@@ -147,11 +155,7 @@ def safe_call(
 
 
 def validate_and_raise(
-    condition: bool,
-    error_class: Type[ApplicationError],
-    message: str,
-    *args,
-    **kwargs
+    condition: bool, error_class: Type[ApplicationError], message: str, *args, **kwargs
 ) -> None:
     """
     Validate a condition and raise an exception if it fails.
@@ -180,36 +184,44 @@ def log_exception(exc: Exception, level: int = logging.ERROR) -> None:
 
 # Specific error handling patterns for common operations
 
+
 def handle_database_operation(operation_name: str):
     """Decorator for database operations."""
     return handle_errors(
-        sqlite3.Error, DatabaseError,
-        default_message=f"Database operation '{operation_name}' failed"
+        sqlite3.Error,
+        DatabaseError,
+        default_message=f"Database operation '{operation_name}' failed",
     )
 
 
 def handle_network_operation(operation_name: str):
     """Decorator for network operations."""
     return handle_errors(
-        aiohttp.ClientError, asyncio.TimeoutError, NetworkError,
-        default_message=f"Network operation '{operation_name}' failed"
+        aiohttp.ClientError,
+        asyncio.TimeoutError,
+        NetworkError,
+        default_message=f"Network operation '{operation_name}' failed",
     )
 
 
 def handle_ui_operation(operation_name: str):
     """Decorator for UI operations."""
     return handle_errors(
-        RuntimeError, AttributeError, TypeError,
+        RuntimeError,
+        AttributeError,
+        TypeError,
         default_message=f"UI operation '{operation_name}' failed",
-        log_level=logging.WARNING
+        log_level=logging.WARNING,
     )
 
 
 def handle_file_operation(operation_name: str):
     """Decorator for file operations."""
     return handle_errors(
-        OSError, IOError, PermissionError,
-        default_message=f"File operation '{operation_name}' failed"
+        OSError,
+        IOError,
+        PermissionError,
+        default_message=f"File operation '{operation_name}' failed",
     )
 
 
@@ -221,10 +233,13 @@ try:
 except ImportError:
     # Define dummy classes for type hints when modules aren't available
     class sqlite3:
-        class Error(Exception): pass
+        class Error(Exception):
+            pass
 
     class aiohttp:
-        class ClientError(Exception): pass
+        class ClientError(Exception):
+            pass
 
     class asyncio:
-        class TimeoutError(Exception): pass
+        class TimeoutError(Exception):
+            pass

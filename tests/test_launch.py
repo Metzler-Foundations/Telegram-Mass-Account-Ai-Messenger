@@ -12,27 +12,28 @@ from pathlib import Path
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
 def test_imports():
     """Test that all modules can be imported successfully."""
     print("🔍 Testing imports...")
 
     modules_to_test = [
-        ('telegram.telegram_client', 'TelegramClient'),
-        ('ai.gemini_service', 'GeminiService'),
-        ('accounts.account_creator', 'AccountCreator'),
-        ('scraping.member_scraper', 'MemberDatabase'),
-        ('anti_detection.anti_detection_system', 'AntiDetectionSystem'),
-        ('integrations.api_key_manager', 'APIKeyManager'),
-        ('campaigns.dm_campaign_manager', 'DMCampaignManager'),
-        ('accounts.account_manager', 'AccountManager'),
-        ('ui.settings_window', 'SettingsWindow'),
-        ('ui.ui_redesign', 'DISCORD_THEME'),
+        ("telegram.telegram_client", "TelegramClient"),
+        ("ai.gemini_service", "GeminiService"),
+        ("accounts.account_creator", "AccountCreator"),
+        ("scraping.member_scraper", "MemberDatabase"),
+        ("anti_detection.anti_detection_system", "AntiDetectionSystem"),
+        ("integrations.api_key_manager", "APIKeyManager"),
+        ("campaigns.dm_campaign_manager", "DMCampaignManager"),
+        ("accounts.account_manager", "AccountManager"),
+        ("ui.settings_window", "SettingsWindow"),
+        ("ui.ui_redesign", "DISCORD_THEME"),
     ]
 
     success_count = 0
     for module_name, class_name in modules_to_test:
         try:
-            parts = module_name.split('.')
+            parts = module_name.split(".")
             module = __import__(module_name, fromlist=[parts[-1]])
             if hasattr(module, class_name):
                 print(f"✅ {module_name}.{class_name} imported successfully")
@@ -44,10 +45,12 @@ def test_imports():
 
     return success_count == len(modules_to_test)
 
+
 def test_theme():
     """Test that the premium theme loads correctly."""
     try:
         from ui.ui_redesign import DISCORD_THEME
+
         print("✅ Ultra-premium Discord theme loaded successfully")
         print(f"   Theme size: {len(DISCORD_THEME)} characters")
         return True
@@ -55,10 +58,12 @@ def test_theme():
         print(f"❌ Theme loading failed: {e}")
         return False
 
+
 def test_config():
     """Test configuration loading."""
     try:
         from pathlib import Path
+
         config_file = Path("config.json")
         if config_file.exists():
             print("✅ Configuration file found")
@@ -78,14 +83,17 @@ def test_config():
         print(f"❌ Configuration test failed: {e}")
         return False
 
+
 def test_services():
     """Test service initialization."""
     try:
         from member_scraper import MemberDatabase
+
         db = MemberDatabase()
         print("✅ MemberDatabase service initialized")
 
         from account_manager import AccountManager
+
         manager = AccountManager(db)
         print("✅ AccountManager service initialized")
 
@@ -94,16 +102,19 @@ def test_services():
         print(f"❌ Service initialization failed: {e}")
         return False
 
+
 async def test_ai_service():
     """Test AI service (async)."""
     try:
         from gemini_service import GeminiService
+
         service = GeminiService("")
         print("✅ GeminiService initialized (API key needed for full functionality)")
         return True
     except Exception as e:
         print(f"❌ AI service test failed: {e}")
         return False
+
 
 def main():
     """Main test function."""
@@ -157,22 +168,7 @@ def main():
         print("⚠️  Some tests failed. Check the errors above.")
         return False
 
+
 if __name__ == "__main__":
     success = main()
     sys.exit(0 if success else 1)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

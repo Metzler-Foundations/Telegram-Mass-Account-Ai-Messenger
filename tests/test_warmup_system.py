@@ -11,6 +11,7 @@ import os
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
 async def test_warmup_system():
     """Test the warmup system components."""
     try:
@@ -19,6 +20,7 @@ async def test_warmup_system():
         # Test API Key Manager
         print("Testing API Key Manager...")
         from integrations.api_key_manager import APIKeyManager
+
         api_manager = APIKeyManager()
         print("✅ API Key Manager initialized")
 
@@ -31,6 +33,7 @@ async def test_warmup_system():
 
         # Test Account Warmup Service (without dependencies that require main.py)
         print("Testing Account Warmup Service...")
+
         # We'll create a mock account manager for testing
         class MockAccountManager:
             def __init__(self):
@@ -43,7 +46,11 @@ async def test_warmup_system():
         mock_account_manager = MockAccountManager()
 
         # Test the warmup service structure (without Gemini for now)
-        from accounts.account_warmup_service import AccountWarmupService, WarmupStage, WarmupPriority
+        from accounts.account_warmup_service import (
+            AccountWarmupService,
+            WarmupStage,
+            WarmupPriority,
+        )
 
         # Create warmup service without Gemini for testing
         warmup_service = AccountWarmupService(mock_account_manager)
@@ -81,8 +88,10 @@ async def test_warmup_system():
     except Exception as e:
         print(f"❌ Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
+
 
 if __name__ == "__main__":
     success = asyncio.run(test_warmup_system())

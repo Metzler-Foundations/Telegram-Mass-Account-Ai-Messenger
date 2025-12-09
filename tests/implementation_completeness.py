@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 def ensure_database_schema_complete():
     """Ensure ALL database tables have complete schema."""
-    
+
     schemas = {
-        'members.db': [
+        "members.db": [
             """
             CREATE TABLE IF NOT EXISTS members (
                 user_id INTEGER PRIMARY KEY,
@@ -92,9 +92,9 @@ def ensure_database_schema_complete():
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_accounts_warmup ON accounts(is_warmed_up)
-            """
+            """,
         ],
-        'campaigns.db': [
+        "campaigns.db": [
             """
             CREATE TABLE IF NOT EXISTS campaigns (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,23 +156,23 @@ def ensure_database_schema_complete():
             """
             CREATE INDEX IF NOT EXISTS idx_campaigns_status 
             ON campaigns(status)
-            """
-        ]
+            """,
+        ],
     }
-    
+
     for db_name, schema_list in schemas.items():
         try:
             conn = sqlite3.connect(db_name)
             cursor = conn.cursor()
-            
+
             for schema in schema_list:
                 cursor.execute(schema)
-            
+
             conn.commit()
             conn.close()
-            
+
             logger.info(f"✅ Database schema complete for {db_name}")
-            
+
         except Exception as e:
             logger.error(f"Failed to ensure schema for {db_name}: {e}")
 
@@ -181,63 +181,63 @@ def add_missing_config_fields():
     """Add missing fields to config.json with REAL defaults."""
     import json
     from pathlib import Path
-    
+
     try:
         config_file = Path("config.json")
-        
+
         if config_file.exists():
-            with open(config_file, 'r') as f:
+            with open(config_file, "r") as f:
                 config = json.load(f)
         else:
             config = {}
-        
+
         # Add proxies section if missing
-        if 'proxies' not in config:
-            config['proxies'] = {
-                'proxy_list': [],
-                'use_proxy': False,
-                'require_proxy': False,
-                'max_failures': 3,
-                'cooldown_minutes': 30
+        if "proxies" not in config:
+            config["proxies"] = {
+                "proxy_list": [],
+                "use_proxy": False,
+                "require_proxy": False,
+                "max_failures": 3,
+                "cooldown_minutes": 30,
             }
-        
+
         # Add account creation defaults if missing
-        if 'account_creation' not in config:
-            config['account_creation'] = {
-                'phone_provider': 'sms-activate',
-                'provider_api_key': '',
-                'country': 'US',
-                'use_proxy': True,
-                'realistic_timing': True,
-                'auto_warmup': True,
-                'warmup_days': 7
+        if "account_creation" not in config:
+            config["account_creation"] = {
+                "phone_provider": "sms-activate",
+                "provider_api_key": "",
+                "country": "US",
+                "use_proxy": True,
+                "realistic_timing": True,
+                "auto_warmup": True,
+                "warmup_days": 7,
             }
-        
+
         # Add campaign defaults if missing
-        if 'campaigns' not in config:
-            config['campaigns'] = {
-                'default_delay': 60,
-                'max_retries': 3,
-                'track_analytics': True,
-                'auto_pause_on_error': True
+        if "campaigns" not in config:
+            config["campaigns"] = {
+                "default_delay": 60,
+                "max_retries": 3,
+                "track_analytics": True,
+                "auto_pause_on_error": True,
             }
-        
+
         # Add analytics defaults if missing
-        if 'analytics' not in config:
-            config['analytics'] = {
-                'enabled': True,
-                'refresh_interval': 30,
-                'track_detailed': True,
-                'export_daily': False
+        if "analytics" not in config:
+            config["analytics"] = {
+                "enabled": True,
+                "refresh_interval": 30,
+                "track_detailed": True,
+                "export_daily": False,
             }
-        
+
         # Save updated config
-        with open(config_file, 'w') as f:
+        with open(config_file, "w") as f:
             json.dump(config, f, indent=2)
-        
+
         logger.info("✅ Config file updated with complete fields")
         return True
-        
+
     except Exception as e:
         logger.error(f"Failed to update config: {e}")
         return False
@@ -246,27 +246,27 @@ def add_missing_config_fields():
 def verify_all_imports():
     """Verify all imports work and modules are accessible."""
     missing = []
-    
+
     modules_to_check = [
-        'user_helpers',
-        'welcome_wizard',
-        'retry_helper',
-        'ui_enhancements',
-        'app_launcher',
-        'progress_tracker',
-        'resume_manager',
-        'template_tester',
-        'member_filter',
-        'data_export',
-        'database_queries',
-        'analytics_dashboard',
-        'proxy_monitor',
-        'campaign_tracker',
-        'warmup_tracker',
-        'system_integration',
-        'integration_connector'
+        "user_helpers",
+        "welcome_wizard",
+        "retry_helper",
+        "ui_enhancements",
+        "app_launcher",
+        "progress_tracker",
+        "resume_manager",
+        "template_tester",
+        "member_filter",
+        "data_export",
+        "database_queries",
+        "analytics_dashboard",
+        "proxy_monitor",
+        "campaign_tracker",
+        "warmup_tracker",
+        "system_integration",
+        "integration_connector",
     ]
-    
+
     for module in modules_to_check:
         try:
             __import__(module)
@@ -274,59 +274,59 @@ def verify_all_imports():
         except ImportError as e:
             logger.error(f"❌ {module} import failed: {e}")
             missing.append(module)
-    
+
     return missing
 
 
 def initialize_all_databases():
     """Initialize ALL databases with complete schemas."""
     logger.info("Initializing ALL databases with REAL schemas...")
-    
+
     ensure_database_schema_complete()
-    
+
     from campaign_tracker import initialize_campaign_database
+
     initialize_campaign_database()
-    
+
     logger.info("✅ ALL databases initialized")
 
 
 def run_completeness_check() -> Dict[str, Any]:
     """Run complete system check and return status."""
     results = {
-        'databases': True,
-        'config': True,
-        'imports': True,
-        'missing_modules': [],
-        'errors': []
+        "databases": True,
+        "config": True,
+        "imports": True,
+        "missing_modules": [],
+        "errors": [],
     }
-    
+
     # Check databases
     try:
         ensure_database_schema_complete()
     except Exception as e:
-        results['databases'] = False
-        results['errors'].append(f"Database schema: {e}")
-    
+        results["databases"] = False
+        results["errors"].append(f"Database schema: {e}")
+
     # Check config
     try:
         add_missing_config_fields()
     except Exception as e:
-        results['config'] = False
-        results['errors'].append(f"Config update: {e}")
-    
+        results["config"] = False
+        results["errors"].append(f"Config update: {e}")
+
     # Check imports
     missing = verify_all_imports()
     if missing:
-        results['imports'] = False
-        results['missing_modules'] = missing
-    
+        results["imports"] = False
+        results["missing_modules"] = missing
+
     # Overall status
-    results['complete'] = results['databases'] and results['config'] and results['imports']
-    
+    results["complete"] = results["databases"] and results["config"] and results["imports"]
+
     return results
 
 
 # Run initialization on import
 initialize_all_databases()
 add_missing_config_fields()
-

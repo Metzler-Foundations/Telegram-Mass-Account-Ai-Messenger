@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from telegram.telegram_client import TelegramClient
 
+
 async def test_auth():
     """Test Telegram authentication"""
     print("🔍 Testing Telegram Authentication")
@@ -58,12 +59,6 @@ async def test_auth():
     finally:
         await client.stop()
 
+
 if __name__ == "__main__":
     asyncio.run(test_auth())
-
-
-
-
-
-
-

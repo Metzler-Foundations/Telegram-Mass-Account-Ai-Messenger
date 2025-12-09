@@ -1,4 +1,4 @@
-  #!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Settings Window - Configuration interface for the Telegram bot
 """
@@ -16,12 +16,33 @@ import requests
 from concurrent.futures import ThreadPoolExecutor
 
 from PyQt6.QtWidgets import (
-    QDialog, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QLabel, QPushButton, QLineEdit, QTextEdit, QComboBox,
-    QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QTabWidget,
-    QScrollArea, QMessageBox, QFileDialog, QListWidget,
-    QListWidgetItem, QProgressBar, QInputDialog, QFrame,
-    QToolButton, QApplication, QProgressDialog, QSizePolicy
+    QDialog,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QFormLayout,
+    QLabel,
+    QPushButton,
+    QLineEdit,
+    QTextEdit,
+    QComboBox,
+    QSpinBox,
+    QDoubleSpinBox,
+    QCheckBox,
+    QGroupBox,
+    QTabWidget,
+    QScrollArea,
+    QMessageBox,
+    QFileDialog,
+    QListWidget,
+    QListWidgetItem,
+    QProgressBar,
+    QInputDialog,
+    QFrame,
+    QToolButton,
+    QApplication,
+    QProgressDialog,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QCoreApplication
 from PyQt6.QtGui import QIcon, QFont
@@ -40,12 +61,12 @@ logger = logging.getLogger(__name__)
 
 class SetupWizardManager:
     """Manages setup wizard state and progression."""
-    
+
     STEP_TELEGRAM = 0
     STEP_GEMINI = 1
     STEP_SMS_PROVIDER = 2
     STEP_OPTIONAL = 3
-    
+
     def __init__(self, settings_data: Dict[str, Any]):
         self.settings_data = settings_data
         self.wizard_complete_file = Path(".wizard_complete")
@@ -63,86 +84,94 @@ class SetupWizardManager:
             if not self._has_critical_settings():
                 return True
             return False
-        
+
         # No wizard completion marker, check settings
         if not self._has_critical_settings():
             return True
-            
+
         return False
-    
+
     def _has_critical_settings(self) -> bool:
         """Check if all critical settings are present."""
         telegram = self.settings_data.get("telegram", {})
-        if not telegram.get("api_id") or not telegram.get("api_hash") or not telegram.get("phone_number"):
+        if (
+            not telegram.get("api_id")
+            or not telegram.get("api_hash")
+            or not telegram.get("phone_number")
+        ):
             return False
-        
+
         gemini = self.settings_data.get("gemini", {})
         if not gemini.get("api_key"):
             return False
-        
+
         sms = self.settings_data.get("sms_providers", {})
         if not sms.get("provider") or sms.get("provider") == "None" or not sms.get("api_key"):
             return False
-        
+
         return True
-    
+
     def get_starting_step(self) -> int:
         """Determine which step to start from based on what's already configured."""
         telegram = self.settings_data.get("telegram", {})
-        if not telegram.get("api_id") or not telegram.get("api_hash") or not telegram.get("phone_number"):
+        if (
+            not telegram.get("api_id")
+            or not telegram.get("api_hash")
+            or not telegram.get("phone_number")
+        ):
             return self.STEP_TELEGRAM
-        
+
         gemini = self.settings_data.get("gemini", {})
         if not gemini.get("api_key"):
             return self.STEP_GEMINI
-        
+
         sms = self.settings_data.get("sms_providers", {})
         if not sms.get("provider") or sms.get("provider") == "None" or not sms.get("api_key"):
             return self.STEP_SMS_PROVIDER
-        
+
         return self.STEP_OPTIONAL
-    
+
     def is_step_complete(self, step: int, settings: Dict[str, Any]) -> tuple[bool, List[str]]:
         """Check if a step is complete and return validation errors."""
         errors = []
-        
+
         if step == self.STEP_TELEGRAM:
             telegram = settings.get("telegram", {})
             valid, msg = ValidationHelper.validate_api_id(telegram.get("api_id", ""))
             if not valid:
                 errors.append(msg)
-            
+
             valid, msg = ValidationHelper.validate_api_hash(telegram.get("api_hash", ""))
             if not valid:
                 errors.append(msg)
-            
+
             valid, msg = ValidationHelper.validate_phone_number(telegram.get("phone_number", ""))
             if not valid:
                 errors.append(msg)
-        
+
         elif step == self.STEP_GEMINI:
             gemini = settings.get("gemini", {})
             valid, msg = ValidationHelper.validate_gemini_api_key(gemini.get("api_key", ""))
             if not valid:
                 errors.append(msg)
-        
+
         elif step == self.STEP_SMS_PROVIDER:
             sms = settings.get("sms_providers", {})
             provider = sms.get("provider", "")
             api_key = sms.get("api_key", "")
-            
+
             if not provider or provider == "None":
                 errors.append("Please select an SMS provider")
-            
+
             if not api_key:
                 errors.append("SMS provider API key is required")
             elif len(api_key) < 10:
                 errors.append("SMS provider API key seems too short")
-        
+
         # Step 3 (Optional) is always valid
-        
+
         return len(errors) == 0, errors
-    
+
     def mark_wizard_complete(self):
         """Mark wizard as completed with metadata."""
         if not self._can_write_config():
@@ -150,6 +179,7 @@ class SetupWizardManager:
 
         try:
             import datetime
+
             completion_data = {
                 "completed": True,
                 "timestamp": datetime.datetime.now().isoformat(),
@@ -158,11 +188,13 @@ class SetupWizardManager:
                     "telegram_api",
                     "gemini_ai",
                     "sms_provider",
-                    "optional_settings"
-                ]
+                    "optional_settings",
+                ],
             }
-            temp_path = self.wizard_complete_file.with_suffix(self.wizard_complete_file.suffix + ".tmp")
-            with open(temp_path, 'w') as f:
+            temp_path = self.wizard_complete_file.with_suffix(
+                self.wizard_complete_file.suffix + ".tmp"
+            )
+            with open(temp_path, "w") as f:
                 json.dump(completion_data, f, indent=2)
             temp_path.replace(self.wizard_complete_file)
             logger.info("Wizard marked as complete with metadata")
@@ -183,10 +215,12 @@ class SetupWizardManager:
                 "current_step": step,
                 "completed_steps": list(range(step)),
                 "timestamp": datetime.datetime.now().isoformat(),
-                "partial_settings": settings
+                "partial_settings": settings,
             }
-            temp_path = self.wizard_progress_file.with_suffix(self.wizard_progress_file.suffix + ".tmp")
-            with open(temp_path, 'w') as f:
+            temp_path = self.wizard_progress_file.with_suffix(
+                self.wizard_progress_file.suffix + ".tmp"
+            )
+            with open(temp_path, "w") as f:
                 json.dump(progress_data, f, indent=2)
             temp_path.replace(self.wizard_progress_file)
             logger.info(f"Saved wizard progress at step {step}")
@@ -206,7 +240,7 @@ class SetupWizardManager:
         """Load saved progress if exists."""
         try:
             if self.wizard_progress_file.exists():
-                with open(self.wizard_progress_file, 'r') as f:
+                with open(self.wizard_progress_file, "r") as f:
                     progress = json.load(f)
                 if self._is_progress_metadata_valid(progress):
                     return progress
@@ -224,24 +258,26 @@ class SetupWizardManager:
             logger.info("Cleared wizard progress")
         except Exception as e:
             logger.error(f"Failed to clear wizard progress: {e}")
-    
+
     def get_step_name(self, step: int) -> str:
         """Get human-readable name for step."""
         names = {
             self.STEP_TELEGRAM: "Telegram API",
             self.STEP_GEMINI: "Gemini AI",
             self.STEP_SMS_PROVIDER: "SMS Provider",
-            self.STEP_OPTIONAL: "Optional Settings"
+            self.STEP_OPTIONAL: "Optional Settings",
         }
         return names.get(step, "Unknown")
 
     def _load_completion_marker(self) -> Optional[Dict[str, Any]]:
         """Load and validate the wizard completion marker."""
         try:
-            with open(self.wizard_complete_file, 'r') as f:
+            with open(self.wizard_complete_file, "r") as f:
                 marker = json.load(f)
             if not self._is_completion_metadata_valid(marker):
-                logger.warning("Wizard completion marker is invalid; removing and re-running wizard")
+                logger.warning(
+                    "Wizard completion marker is invalid; removing and re-running wizard"
+                )
                 self.wizard_complete_file.unlink(missing_ok=True)
                 return None
             return marker
@@ -265,7 +301,10 @@ class SetupWizardManager:
             return False
         if marker.get("completed") is not True:
             return False
-        if not isinstance(marker.get("completed_steps"), list) or len(marker["completed_steps"]) < 3:
+        if (
+            not isinstance(marker.get("completed_steps"), list)
+            or len(marker["completed_steps"]) < 3
+        ):
             return False
         return True
 
@@ -351,7 +390,7 @@ class APISettingsWidget(QWidget):
     VALID_STYLE = None
     INVALID_STYLE = None
     NORMAL_STYLE = ""
-    
+
     @classmethod
     def _get_styles(cls):
         """Get validation styles from theme."""
@@ -397,8 +436,9 @@ class APISettingsWidget(QWidget):
             self.api_hash_edit.setStyleSheet(self.NORMAL_STYLE)
             return True
         import re
+
         valid_style, invalid_style = self._get_styles()
-        if len(text) == 32 and re.match(r'^[a-f0-9]{32}$', text.lower()):
+        if len(text) == 32 and re.match(r"^[a-f0-9]{32}$", text.lower()):
             self.api_hash_edit.setStyleSheet(valid_style)
             return True
         else:
@@ -446,37 +486,37 @@ class APISettingsWidget(QWidget):
         if not self._validate_gemini_key():
             errors.append("Gemini API key should start with 'AI' and be at least 30 characters")
         return len(errors) == 0, errors
-    
+
     def is_telegram_step_complete(self) -> tuple[bool, List[str]]:
         """Check if Telegram API step is complete (for wizard)."""
         errors = []
         api_id = self.api_id_edit.text().strip()
         api_hash = self.api_hash_edit.text().strip()
         phone = self.phone_edit.text().strip()
-        
+
         valid, msg = ValidationHelper.validate_api_id(api_id)
         if not valid:
             errors.append(msg)
-        
+
         valid, msg = ValidationHelper.validate_api_hash(api_hash)
         if not valid:
             errors.append(msg)
-        
+
         valid, msg = ValidationHelper.validate_phone_number(phone)
         if not valid:
             errors.append(msg)
-        
+
         return len(errors) == 0, errors
-    
+
     def is_gemini_step_complete(self) -> tuple[bool, List[str]]:
         """Check if Gemini API step is complete (for wizard)."""
         errors = []
         api_key = self.gemini_key_edit.text().strip()
-        
+
         valid, msg = ValidationHelper.validate_gemini_api_key(api_key)
         if not valid:
             errors.append(msg)
-        
+
         return len(errors) == 0, errors
 
     def setup_ui(self):
@@ -496,18 +536,24 @@ class APISettingsWidget(QWidget):
 
         self.api_id_edit = QLineEdit()
         self.api_id_edit.setPlaceholderText("e.g., 12345678")
-        self.api_id_edit.setToolTip("Enter your 7-8 digit API ID from my.telegram.org/apps\nExample: 12345678")
+        self.api_id_edit.setToolTip(
+            "Enter your 7-8 digit API ID from my.telegram.org/apps\nExample: 12345678"
+        )
         telegram_basic_layout.addRow("API ID:", self.api_id_edit)
 
         self.api_hash_edit = QLineEdit()
         self.api_hash_edit.setPlaceholderText("e.g., 0123456789abcdef...")
-        self.api_hash_edit.setToolTip("Enter your 32-character API Hash from my.telegram.org/apps\nExample: 0123456789abcdef0123456789abcdef")
+        self.api_hash_edit.setToolTip(
+            "Enter your 32-character API Hash from my.telegram.org/apps\nExample: 0123456789abcdef0123456789abcdef"
+        )
         self.api_hash_edit.setEchoMode(QLineEdit.EchoMode.Password)
         telegram_basic_layout.addRow("API Hash:", self.api_hash_edit)
 
         self.phone_edit = QLineEdit()
         self.phone_edit.setPlaceholderText("e.g., +1234567890")
-        self.phone_edit.setToolTip("Enter your phone number with country code\nFormat: +[country code][number]\nExample: +1234567890")
+        self.phone_edit.setToolTip(
+            "Enter your phone number with country code\nFormat: +[country code][number]\nExample: +1234567890"
+        )
         telegram_basic_layout.addRow("Phone Number:", self.phone_edit)
 
         telegram_basic_group.setLayout(telegram_basic_layout)
@@ -519,7 +565,9 @@ class APISettingsWidget(QWidget):
 
         self.gemini_key_edit = QLineEdit()
         self.gemini_key_edit.setPlaceholderText("e.g., AIzaSyABC123...")
-        self.gemini_key_edit.setToolTip("Enter your Gemini API key from aistudio.google.com/app/apikey\nFormat: Starts with 'AIza' and is 39+ characters\nExample: AIzaSyABC123XYZ...")
+        self.gemini_key_edit.setToolTip(
+            "Enter your Gemini API key from aistudio.google.com/app/apikey\nFormat: Starts with 'AIza' and is 39+ characters\nExample: AIzaSyABC123XYZ..."
+        )
         self.gemini_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         ai_basic_layout.addRow("Gemini API Key:", self.gemini_key_edit)
 
@@ -564,14 +612,9 @@ class APISettingsWidget(QWidget):
         sms_layout = QFormLayout()
 
         self.sms_service_combo = QComboBox()
-        self.sms_service_combo.addItems([
-            "None",
-            "SMS-Activate",
-            "5SIM",
-            "SMS-Hub",
-            "TextVerified",
-            "DaisySMS"
-        ])
+        self.sms_service_combo.addItems(
+            ["None", "SMS-Activate", "5SIM", "SMS-Hub", "TextVerified", "DaisySMS"]
+        )
         self.sms_service_combo.setEnabled(True)
         self.sms_service_combo.currentTextChanged.connect(self._update_checklist)
         sms_layout.addRow("SMS Service:", self.sms_service_combo)
@@ -655,7 +698,9 @@ class BrainSettingsWidget(QWidget):
 
         prompt_layout.addWidget(QLabel("Define the AI's personality and behavior:"))
         self.prompt_edit = QTextEdit()
-        self.prompt_edit.setPlaceholderText("You are a helpful, professional assistant who responds naturally and engagingly to user messages. Be friendly but not overly casual. Focus on providing value and building genuine connections.")
+        self.prompt_edit.setPlaceholderText(
+            "You are a helpful, professional assistant who responds naturally and engagingly to user messages. Be friendly but not overly casual. Focus on providing value and building genuine connections."
+        )
         prompt_layout.addWidget(self.prompt_edit)
 
         prompt_group.setLayout(prompt_layout)
@@ -691,7 +736,9 @@ class BrainSettingsWidget(QWidget):
         self.temperature_spin.setRange(0.1, 1.0)
         self.temperature_spin.setValue(0.8)
         self.temperature_spin.setSingleStep(0.1)
-        self.temperature_spin.setToolTip("Higher values make responses more creative but less focused")
+        self.temperature_spin.setToolTip(
+            "Higher values make responses more creative but less focused"
+        )
         ai_layout.addRow("Temperature:", self.temperature_spin)
 
         self.top_p_spin = QDoubleSpinBox()
@@ -829,7 +876,9 @@ class AntiDetectionSettingsWidget(QWidget):
 
         self.session_recovery_check = QCheckBox("Session recovery on restart")
         self.session_recovery_check.setChecked(True)
-        self.session_recovery_check.setToolTip("Attempt to recover sessions after application restart")
+        self.session_recovery_check.setToolTip(
+            "Attempt to recover sessions after application restart"
+        )
         behavior_layout.addWidget(self.session_recovery_check)
 
         behavior_group.setLayout(behavior_layout)
@@ -871,38 +920,40 @@ class AntiDetectionSettingsWidget(QWidget):
 
 class TelegramStepWidget(QWidget):
     """Telegram-specific step widget for wizard - shows only Telegram fields."""
-    
-    def __init__(self, api_widget: 'APISettingsWidget', parent=None):
+
+    def __init__(self, api_widget: "APISettingsWidget", parent=None):
         super().__init__(parent)
         self.api_widget = api_widget
         self.setup_ui()
-    
+
     def setup_ui(self):
         """Set up UI showing only Telegram fields."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-        
+
         # Telegram API Group
         telegram_group = QGroupBox("Telegram API Credentials")
         telegram_layout = QFormLayout()
         telegram_layout.setSpacing(12)
-        
+
         telegram_layout.addRow("API ID:", self.api_widget.api_id_edit)
         telegram_layout.addRow("API Hash:", self.api_widget.api_hash_edit)
-        
+
         # Show API Hash toggle
         show_hash_check = QCheckBox("Show API Hash")
-        show_hash_check.toggled.connect(lambda checked: self.api_widget.api_hash_edit.setEchoMode(
-            QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
-        ))
+        show_hash_check.toggled.connect(
+            lambda checked: self.api_widget.api_hash_edit.setEchoMode(
+                QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+            )
+        )
         telegram_layout.addRow("", show_hash_check)
-        
+
         telegram_layout.addRow("Phone Number:", self.api_widget.phone_edit)
-        
+
         telegram_group.setLayout(telegram_layout)
         layout.addWidget(telegram_group)
-        
+
         # Help text
         help_text = QLabel(
             "<b>Format Examples:</b><br>"
@@ -912,43 +963,47 @@ class TelegramStepWidget(QWidget):
         )
         help_text.setWordWrap(True)
         c = ThemeManager.get_colors()
-        help_text.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;")
+        help_text.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;"
+        )
         layout.addWidget(help_text)
-        
+
         layout.addStretch()
 
 
 class GeminiStepWidget(QWidget):
     """Gemini-specific step widget for wizard - shows only Gemini field."""
-    
-    def __init__(self, api_widget: 'APISettingsWidget', parent=None):
+
+    def __init__(self, api_widget: "APISettingsWidget", parent=None):
         super().__init__(parent)
         self.api_widget = api_widget
         self.setup_ui()
-    
+
     def setup_ui(self):
         """Set up UI showing only Gemini field."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-        
+
         # Gemini API Group
         gemini_group = QGroupBox("Google Gemini API Key")
         gemini_layout = QFormLayout()
         gemini_layout.setSpacing(12)
-        
+
         gemini_layout.addRow("API Key:", self.api_widget.gemini_key_edit)
-        
+
         # Show key toggle
         show_key_check = QCheckBox("Show API Key")
-        show_key_check.toggled.connect(lambda checked: self.api_widget.gemini_key_edit.setEchoMode(
-            QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
-        ))
+        show_key_check.toggled.connect(
+            lambda checked: self.api_widget.gemini_key_edit.setEchoMode(
+                QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+            )
+        )
         gemini_layout.addRow("", show_key_check)
-        
+
         gemini_group.setLayout(gemini_layout)
         layout.addWidget(gemini_group)
-        
+
         # Help text
         help_text = QLabel(
             "<b>About Gemini AI:</b><br>"
@@ -960,15 +1015,17 @@ class GeminiStepWidget(QWidget):
         )
         help_text.setWordWrap(True)
         c = ThemeManager.get_colors()
-        help_text.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;")
+        help_text.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;"
+        )
         layout.addWidget(help_text)
-        
+
         layout.addStretch()
 
 
 class SMSProviderSetupWidget(QWidget):
     """SMS Provider configuration widget with comprehensive help."""
-    
+
     # Provider information
     PROVIDERS = {
         "sms-activate": {
@@ -976,129 +1033,133 @@ class SMSProviderSetupWidget(QWidget):
             "url": "https://sms-activate.org/en/api2",
             "signup": "https://sms-activate.org/en/register",
             "recommended": True,
-            "description": "Popular service with good coverage and reliability"
+            "description": "Popular service with good coverage and reliability",
         },
         "daisysms": {
             "name": "DaisySMS",
             "url": "https://daisysms.com/docs/",
             "signup": "https://daisysms.com/",
             "recommended": False,
-            "description": "Alternative provider with competitive pricing"
+            "description": "Alternative provider with competitive pricing",
         },
         "5sim": {
             "name": "5SIM",
             "url": "https://5sim.net/en/info/api",
             "signup": "https://5sim.net/",
             "recommended": False,
-            "description": "Fast service with global number availability"
+            "description": "Fast service with global number availability",
         },
         "smshub": {
             "name": "SMS-Hub",
             "url": "https://smshub.org/en/info/api",
             "signup": "https://smshub.org/",
             "recommended": False,
-            "description": "Reliable service with good API documentation"
-        }
+            "description": "Reliable service with good API documentation",
+        },
     }
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
-        
+
     def setup_ui(self):
         """Set up the SMS Provider setup UI."""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
-        
+
         # Info section
         info_group = QGroupBox("About SMS Providers")
         info_layout = QVBoxLayout()
-        
+
         info_label = QLabel(
             "SMS providers supply phone numbers for Telegram account creation. "
             "You'll need an API key from one of the supported providers."
         )
         info_label.setWordWrap(True)
         info_layout.addWidget(info_label)
-        
+
         info_group.setLayout(info_layout)
         layout.addWidget(info_group)
-        
+
         # Provider selection
         provider_group = QGroupBox("Provider Configuration")
         provider_layout = QVBoxLayout()
         provider_layout.setSpacing(12)
-        
+
         # Provider dropdown
         provider_select_layout = QFormLayout()
         self.provider_combo = QComboBox()
-        
+
         for key, info in self.PROVIDERS.items():
             label = info["name"]
             if info.get("recommended"):
                 label += " ⭐ (Recommended)"
             self.provider_combo.addItem(label, key)
-        
+
         provider_select_layout.addRow("Provider:", self.provider_combo)
         provider_layout.addLayout(provider_select_layout)
-        
+
         # Provider description
         self.provider_description = QLabel()
         self.provider_description.setWordWrap(True)
         c = ThemeManager.get_colors()
-        self.provider_description.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-style: italic; padding: 8px;")
+        self.provider_description.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-style: italic; padding: 8px;"
+        )
         provider_layout.addWidget(self.provider_description)
-        
+
         # API Key input
         api_key_layout = QFormLayout()
         self.api_key_edit = QLineEdit()
         self.api_key_edit.setPlaceholderText("Paste your API key here...")
         self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
         api_key_layout.addRow("API Key:", self.api_key_edit)
-        
+
         show_key_check = QCheckBox("Show API Key")
-        show_key_check.toggled.connect(lambda checked: self.api_key_edit.setEchoMode(
-            QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
-        ))
+        show_key_check.toggled.connect(
+            lambda checked: self.api_key_edit.setEchoMode(
+                QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+            )
+        )
         api_key_layout.addRow("", show_key_check)
-        
+
         provider_layout.addLayout(api_key_layout)
-        
+
         # Action buttons
         button_layout = QHBoxLayout()
-        
+
         self.get_api_key_button = QPushButton("📋 Get API Key")
         self.get_api_key_button.setObjectName("primary")
         self.get_api_key_button.clicked.connect(self._open_provider_url)
         self.get_api_key_button.setToolTip("Open provider's website to get your API key")
         button_layout.addWidget(self.get_api_key_button)
-        
+
         self.signup_button = QPushButton("✨ Sign Up")
         self.signup_button.clicked.connect(self._open_signup_url)
         self.signup_button.setToolTip("Create a new account with this provider")
         button_layout.addWidget(self.signup_button)
-        
+
         self.test_button = QPushButton("🧪 Test API Key")
         self.test_button.clicked.connect(self._test_api_key)
         self.test_button.setToolTip("Verify that your API key works")
         button_layout.addWidget(self.test_button)
-        
+
         button_layout.addStretch()
         provider_layout.addLayout(button_layout)
-        
+
         # Status label
         self.status_label = QLabel()
         self.status_label.setWordWrap(True)
         provider_layout.addWidget(self.status_label)
-        
+
         provider_group.setLayout(provider_layout)
         layout.addWidget(provider_group)
-        
+
         # Setup instructions
         instructions_group = QGroupBox("Setup Instructions")
         instructions_layout = QVBoxLayout()
-        
+
         instructions_text = QLabel(
             "<ol style='line-height: 1.6;'>"
             "<li>Choose a provider from the dropdown above</li>"
@@ -1110,18 +1171,18 @@ class SMSProviderSetupWidget(QWidget):
         )
         instructions_text.setWordWrap(True)
         instructions_layout.addWidget(instructions_text)
-        
+
         instructions_group.setLayout(instructions_layout)
         layout.addWidget(instructions_group)
-        
+
         layout.addStretch()
-        
+
         # Connect signals
         self.provider_combo.currentIndexChanged.connect(self._on_provider_changed)
-        
+
         # Initialize description
         self._on_provider_changed()
-    
+
     def _on_provider_changed(self):
         """Update description when provider changes."""
         provider_key = self.provider_combo.currentData()
@@ -1130,74 +1191,76 @@ class SMSProviderSetupWidget(QWidget):
             self.provider_description.setText(f"ℹ️ {info['description']}")
         else:
             self.provider_description.setText("")
-    
+
     def _open_provider_url(self):
         """Open provider's API documentation."""
         provider_key = self.provider_combo.currentData()
         if provider_key and provider_key in self.PROVIDERS:
             url = self.PROVIDERS[provider_key]["url"]
             webbrowser.open(url)
-    
+
     def _open_signup_url(self):
         """Open provider's signup page."""
         provider_key = self.provider_combo.currentData()
         if provider_key and provider_key in self.PROVIDERS:
             url = self.PROVIDERS[provider_key]["signup"]
             webbrowser.open(url)
-    
+
     def _test_api_key(self):
         """Test the API key (basic validation for now)."""
         api_key = self.api_key_edit.text().strip()
-        
+
         c = ThemeManager.get_colors()
         if not api_key:
             self.status_label.setText("Error: Please enter an API key first")
             self.status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']};")
             return
-        
+
         if len(api_key) < 10:
             self.status_label.setText("Warning: API key seems too short")
             self.status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
             return
-        
+
         # Basic validation passed
-        self.status_label.setText("Valid: API key format looks valid (actual connectivity will be tested during account creation)")
+        self.status_label.setText(
+            "Valid: API key format looks valid (actual connectivity will be tested during account creation)"
+        )
         self.status_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']};")
-    
+
     def is_step_complete(self) -> tuple[bool, List[str]]:
         """Check if SMS provider step is complete."""
         errors = []
-        
+
         provider_key = self.provider_combo.currentData()
         if not provider_key:
             errors.append("Please select an SMS provider")
-        
+
         api_key = self.api_key_edit.text().strip()
         if not api_key:
             errors.append("SMS provider API key is required")
         elif len(api_key) < 10:
             errors.append("SMS provider API key seems too short")
-        
+
         return len(errors) == 0, errors
-    
+
     def load_settings(self, settings):
         """Load settings into UI."""
         sms_cfg = settings.get("sms_providers", {})
         provider = sms_cfg.get("provider", "sms-activate")
-        
+
         # Find and set provider
         for i in range(self.provider_combo.count()):
             if self.provider_combo.itemData(i) == provider:
                 self.provider_combo.setCurrentIndex(i)
                 break
-        
+
         self.api_key_edit.setText(sms_cfg.get("api_key", ""))
-    
+
     def save_settings(self, settings):
         """Save UI settings."""
         if "sms_providers" not in settings:
             settings["sms_providers"] = {}
-        
+
         settings["sms_providers"]["provider"] = self.provider_combo.currentData()
         settings["sms_providers"]["api_key"] = self.api_key_edit.text().strip()
 
@@ -1211,13 +1274,15 @@ class SettingsWindow(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Settings - Telegram Auto-Reply Bot")
         self.setAccessibleName("Bot Configuration Settings")
-        self.setAccessibleDescription("Dialog for configuring Telegram bot settings and preferences")
-        
+        self.setAccessibleDescription(
+            "Dialog for configuring Telegram bot settings and preferences"
+        )
+
         # Responsive sizing based on screen size
         screen = QApplication.primaryScreen().availableGeometry()
         screen_width = screen.width()
         screen_height = screen.height()
-        
+
         if screen_width < 1400 or screen_height < 800:
             # Small screens
             self.resize(750, 580)
@@ -1228,37 +1293,37 @@ class SettingsWindow(QDialog):
             self.resize(850, 650)
             self.setMinimumSize(700, 500)
             self.setMaximumSize(1100, 800)
-        
+
         self.settings_data = {}
         self.balance_cache: Dict[tuple[str, str], Dict[str, Any]] = {}
         self._user_has_interacted = False
-        
+
         # CRITICAL: Prevent dialog from closing parent window when dismissed
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-        
+
         # Set window flags to ensure it's a proper child dialog that won't close parent
         if parent:
             self.setWindowFlags(
-                Qt.WindowType.Dialog |
-                Qt.WindowType.WindowTitleHint |
-                Qt.WindowType.WindowCloseButtonHint
+                Qt.WindowType.Dialog
+                | Qt.WindowType.WindowTitleHint
+                | Qt.WindowType.WindowCloseButtonHint
             )
             self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        
+
         self.load_settings()
-        
+
         # Initialize wizard manager
         self.wizard_manager = SetupWizardManager(self.settings_data)
         self.wizard_mode = force_wizard or self.wizard_manager.is_wizard_needed()
         self.suppress_intro_warnings = self.wizard_mode or not Path(".wizard_complete").exists()
         self.current_wizard_step = 0
-        
+
         if self.wizard_mode:
             self.current_wizard_step = self.wizard_manager.get_starting_step()
 
         # Apply theme first
         self.apply_theme()
-        
+
         # Then apply dialog border (overrides theme to ensure visibility)
         self._apply_dialog_border()
 
@@ -1266,7 +1331,7 @@ class SettingsWindow(QDialog):
         self.load_ui_from_settings()
         self._setup_accessibility()
         self._apply_word_wraps()
-        
+
         # If in wizard mode, show the appropriate step
         if self.wizard_mode:
             self._show_wizard_step(self.current_wizard_step)
@@ -1294,19 +1359,19 @@ class SettingsWindow(QDialog):
         # Set window to stay on top temporarily to ensure visibility
         from PyQt6.QtCore import Qt
         from ui.theme_manager import ThemeManager
-        
+
         # Make window modal and ensure it's visible
         self.setWindowModality(Qt.WindowModality.WindowModal)
-        
+
         c = ThemeManager.get_colors()
-        
+
         # Apply a simple, visible border that won't fail parsing
         simple_border_style = f"""
             QDialog {{
                 border: 2px solid {c["ACCENT_PRIMARY"]};
             }}
         """
-        
+
         # Apply border style directly
         current_style = self.styleSheet()
         if current_style:
@@ -1314,33 +1379,37 @@ class SettingsWindow(QDialog):
             self.setStyleSheet(current_style + simple_border_style)
         else:
             self.setStyleSheet(simple_border_style)
-        
+
         # Also set background to ensure contrast using theme
         dialog_style = ThemeManager.get_dialog_style()
         self.setStyleSheet(self.styleSheet() + dialog_style)
-    
+
     def _setup_accessibility(self):
         """Set up accessibility features for the settings dialog."""
         # Set up keyboard navigation
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # Set accessible names for key elements
-        if hasattr(self, 'tab_widget'):
+        if hasattr(self, "tab_widget"):
             self.tab_widget.setAccessibleName("Settings Categories")
-            self.tab_widget.setAccessibleDescription("Tabbed interface for different settings categories")
+            self.tab_widget.setAccessibleDescription(
+                "Tabbed interface for different settings categories"
+            )
 
         # Enable screen reader support for form elements
         for child in self.findChildren(QWidget):
-            if hasattr(child, 'setAccessibleName'):
+            if hasattr(child, "setAccessibleName"):
                 # Set accessible names based on widget type and text
                 if isinstance(child, QLabel) and child.text():
                     # Labels already have text, screen readers can use that
                     pass
-                elif isinstance(child, (QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox)):
+                elif isinstance(
+                    child, (QLineEdit, QTextEdit, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox)
+                ):
                     # These widgets need accessible names
-                    if hasattr(child, 'placeholderText') and child.placeholderText():
+                    if hasattr(child, "placeholderText") and child.placeholderText():
                         child.setAccessibleName(child.placeholderText())
-                    elif hasattr(child, 'text') and child.text():
+                    elif hasattr(child, "text") and child.text():
                         child.setAccessibleName(child.text())
                     else:
                         # Set generic name based on widget type
@@ -1353,7 +1422,7 @@ class SettingsWindow(QDialog):
     def _setup_tab_order(self):
         """Set up logical tab order for the settings dialog."""
         # Focus should start at the first tab
-        if hasattr(self, 'tab_widget'):
+        if hasattr(self, "tab_widget"):
             first_tab = self.tab_widget.widget(0)
             if first_tab:
                 first_tab.setFocus()
@@ -1374,7 +1443,7 @@ class SettingsWindow(QDialog):
 
     def keyPressEvent(self, event):
         """Override to handle keyboard shortcuts in wizard mode.
-        
+
         This prevents the dialog from closing when message boxes are dismissed,
         which can happen due to key event propagation in Qt.
         """
@@ -1387,12 +1456,18 @@ class SettingsWindow(QDialog):
                     event.accept()
                     return
             # Shift+Enter = Previous step
-            elif event.key() == Qt.Key.Key_Return and event.modifiers() == Qt.KeyboardModifier.ShiftModifier:
+            elif (
+                event.key() == Qt.Key.Key_Return
+                and event.modifiers() == Qt.KeyboardModifier.ShiftModifier
+            ):
                 self.previous_step()
                 event.accept()
                 return
             # Ctrl+S = Complete wizard (on last step)
-            elif event.key() == Qt.Key.Key_S and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            elif (
+                event.key() == Qt.Key.Key_S
+                and event.modifiers() == Qt.KeyboardModifier.ControlModifier
+            ):
                 if self.current_wizard_step == SetupWizardManager.STEP_OPTIONAL:
                     self.complete_wizard()
                 event.accept()
@@ -1412,7 +1487,7 @@ class SettingsWindow(QDialog):
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
                 event.ignore()
                 return
-        
+
         super().keyPressEvent(event)
 
     def apply_theme(self):
@@ -1453,19 +1528,29 @@ class SettingsWindow(QDialog):
         # Title
         if self.wizard_mode:
             title_label = QLabel("Initial Setup Wizard")
-            title_label.setStyleSheet(f"font-size: 26px; font-weight: 700; color: {c['TEXT_BRIGHT']}; margin-bottom: 6px; letter-spacing: -0.2px;")
+            title_label.setStyleSheet(
+                f"font-size: 26px; font-weight: 700; color: {c['TEXT_BRIGHT']}; margin-bottom: 6px; letter-spacing: -0.2px;"
+            )
             layout.addWidget(title_label)
-            
+
             subtitle_label = QLabel("Let's configure the essential settings to get you started.")
-            subtitle_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.5em; margin-bottom: 18px;")
+            subtitle_label.setStyleSheet(
+                f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.5em; margin-bottom: 18px;"
+            )
             layout.addWidget(subtitle_label)
         else:
             title_label = QLabel("Bot Configuration")
-            title_label.setStyleSheet(f"font-size: 24px; font-weight: 600; color: {c['TEXT_BRIGHT']}; margin-bottom: 8px;")
+            title_label.setStyleSheet(
+                f"font-size: 24px; font-weight: 600; color: {c['TEXT_BRIGHT']}; margin-bottom: 8px;"
+            )
             layout.addWidget(title_label)
 
-            subtitle_label = QLabel("Configure API keys, account creation, anti-detection, and advanced features.")
-            subtitle_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 14px; margin-bottom: 20px;")
+            subtitle_label = QLabel(
+                "Configure API keys, account creation, anti-detection, and advanced features."
+            )
+            subtitle_label.setStyleSheet(
+                f"color: {c['TEXT_SECONDARY']}; font-size: 14px; margin-bottom: 20px;"
+            )
             layout.addWidget(subtitle_label)
 
         # Create widgets first
@@ -1473,7 +1558,7 @@ class SettingsWindow(QDialog):
         self.brain_widget = BrainSettingsWidget()
         self.anti_detection_widget = AntiDetectionSettingsWidget()
         self.sms_provider_widget = SMSProviderSetupWidget()
-        
+
         # Wizard content area or Tab widget
         if self.wizard_mode:
             # In wizard mode, show single step at a time with scrolling
@@ -1482,7 +1567,8 @@ class SettingsWindow(QDialog):
             scroll_area.setFrameShape(QFrame.Shape.NoFrame)
             scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            scroll_area.setStyleSheet("""
+            scroll_area.setStyleSheet(
+                """
                 QScrollArea {
                     background-color: transparent;
                     border: none;
@@ -1491,16 +1577,17 @@ class SettingsWindow(QDialog):
                     background-color: transparent;
                     padding: 4px 0 8px 0;
                 }
-            """)
-            
+            """
+            )
+
             self.wizard_content_widget = QWidget()
             self.wizard_content_layout = QVBoxLayout(self.wizard_content_widget)
             self.wizard_content_layout.setContentsMargins(0, 0, 0, 0)
             self.wizard_content_layout.addStretch()  # Push content to top
-            
+
             scroll_area.setWidget(self.wizard_content_widget)
             layout.addWidget(scroll_area, 1)  # Give it stretch factor
-            
+
             # Create wizard step widgets
             self._create_wizard_steps()
         else:
@@ -1546,9 +1633,9 @@ class SettingsWindow(QDialog):
             self.wizard_prev_button.setAutoDefault(False)
             self.wizard_prev_button.setDefault(False)
             button_layout.addWidget(self.wizard_prev_button)
-            
+
             button_layout.addStretch()
-            
+
             self.wizard_skip_button = QPushButton("Skip for now")
             self.wizard_skip_button.clicked.connect(self.skip_optional)
             self.wizard_skip_button.setObjectName("secondary")
@@ -1557,7 +1644,7 @@ class SettingsWindow(QDialog):
             self.wizard_skip_button.setDefault(False)
             self.wizard_skip_button.setVisible(False)  # Only show on optional step
             button_layout.addWidget(self.wizard_skip_button)
-            
+
             self.wizard_next_button = QPushButton("Next")
             self.wizard_next_button.clicked.connect(self.next_step)
             self.wizard_next_button.setObjectName("primary")
@@ -1569,9 +1656,10 @@ class SettingsWindow(QDialog):
             # Normal mode buttons
             save_button = QPushButton("Save Settings")
             save_button.setObjectName("primary")
-            
+
             # Debounce to prevent double-saves
             from utils.button_debouncer import protect_button
+
             protect_button(save_button, self.save_settings, debounce_ms=1500)
             save_button.setFixedWidth(130)
             save_button.setAutoDefault(False)
@@ -1594,7 +1682,7 @@ class SettingsWindow(QDialog):
             button_layout.addWidget(cancel_button)
 
             button_layout.addStretch()
-            
+
         layout.addWidget(button_bar)
 
     def _create_progress_indicator(self) -> QWidget:
@@ -1612,30 +1700,30 @@ class SettingsWindow(QDialog):
             }}
             """
         )
-        
+
         progress_layout = QHBoxLayout(progress_widget)
         progress_layout.setSpacing(12)
         progress_layout.setContentsMargins(4, 2, 4, 2)
-        
+
         self.progress_labels = []
         steps = [
             ("1", "Telegram API"),
             ("2", "Gemini AI"),
             ("3", "SMS Provider"),
-            ("4", "Optional")
+            ("4", "Optional"),
         ]
-        
+
         for i, (num, name) in enumerate(steps):
             if i > 0:
                 # Add arrow separator
                 arrow_label = QLabel("→")
                 arrow_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 16px;")
                 progress_layout.addWidget(arrow_label)
-            
+
             # Step container
             step_container = QHBoxLayout()
             step_container.setSpacing(8)
-            
+
             # Step number circle
             step_num = QLabel(num)
             step_num.setFixedSize(30, 30)
@@ -1644,28 +1732,28 @@ class SettingsWindow(QDialog):
                 f"background-color: {c['BG_TERTIARY']}; color: {c['TEXT_SECONDARY']}; "
                 "border-radius: 15px; font-weight: 600; font-size: 14px;"
             )
-            
+
             # Step name
             step_name = QLabel(name)
             step_name.setMinimumWidth(132)
             step_name.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-weight: 600;")
             step_name.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-            
+
             step_container.addWidget(step_num)
             step_container.addWidget(step_name)
-            
+
             # Store references
             self.progress_labels.append((step_num, step_name))
-            
+
             # Add to main layout
             container_widget = QWidget()
             container_widget.setLayout(step_container)
             progress_layout.addWidget(container_widget)
-        
+
         progress_layout.addStretch()
-        
+
         return progress_widget
-    
+
     def _update_progress_indicator(self):
         """Update the progress indicator to show current step with checkmarks."""
         c = ThemeManager.get_colors()
@@ -1694,15 +1782,15 @@ class SettingsWindow(QDialog):
                     "border-radius: 14px; font-weight: 600;"
                 )
                 name_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
-    
+
     def _create_wizard_steps(self):
         """Create wizard step widgets."""
         self.wizard_steps = []
-        
+
         # Create step-specific widgets that show only relevant fields
         self.telegram_step_widget = TelegramStepWidget(self.api_widget)
         self.gemini_step_widget = GeminiStepWidget(self.api_widget)
-        
+
         # Step 0: Telegram API
         telegram_step = self._create_wizard_step_widget(
             "Step 1: Telegram API Configuration",
@@ -1719,10 +1807,10 @@ class SettingsWindow(QDialog):
             </ol>
             <p><b>Why this is needed:</b> These credentials allow the bot to connect to Telegram on your behalf.</p>
             """,
-            help_url="https://my.telegram.org/apps"
+            help_url="https://my.telegram.org/apps",
         )
         self.wizard_steps.append(telegram_step)
-        
+
         # Step 1: Gemini AI
         gemini_step = self._create_wizard_step_widget(
             "Step 2: Gemini AI Configuration",
@@ -1739,10 +1827,10 @@ class SettingsWindow(QDialog):
             <p><b>Why this is needed:</b> Gemini powers the AI responses for your Telegram accounts.</p>
             <p><b>Free tier:</b> 60 requests/minute, 1,500 requests/day</p>
             """,
-            help_url="https://aistudio.google.com/app/apikey"
+            help_url="https://aistudio.google.com/app/apikey",
         )
         self.wizard_steps.append(gemini_step)
-        
+
         # Step 2: SMS Provider
         sms_step = self._create_wizard_step_widget(
             "Step 3: SMS Provider Configuration",
@@ -1759,10 +1847,10 @@ class SettingsWindow(QDialog):
             <p><b>Why this is needed:</b> SMS providers supply phone numbers for creating new Telegram accounts.</p>
             <p><b>Cost:</b> Typically $0.10-0.20 per phone number</p>
             """,
-            help_url=None  # Provider-specific, handled by widget
+            help_url=None,  # Provider-specific, handled by widget
         )
         self.wizard_steps.append(sms_step)
-        
+
         # Step 3: Optional settings
         optional_step = self._create_wizard_step_widget(
             "Step 4: Optional Settings (Safe to Skip)",
@@ -1782,49 +1870,61 @@ class SettingsWindow(QDialog):
             
             <p><b>💡 Recommendation:</b> Skip this step now, use defaults, and adjust later if needed.</p>
             """,
-            help_url=None
+            help_url=None,
         )
         self.wizard_steps.append(optional_step)
-    
-    def _create_wizard_step_widget(self, title: str, description: str, content_widget: QWidget, 
-                                   instructions: str = "", help_url: Optional[str] = None) -> QWidget:
+
+    def _create_wizard_step_widget(
+        self,
+        title: str,
+        description: str,
+        content_widget: QWidget,
+        instructions: str = "",
+        help_url: Optional[str] = None,
+    ) -> QWidget:
         """Create a wizard step widget with title, description, and content."""
         step_widget = QWidget()
         step_layout = QVBoxLayout(step_widget)
         step_layout.setContentsMargins(4, 4, 4, 12)
         step_layout.setSpacing(18)
-        
+
         c = ThemeManager.get_colors()
         # Title
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"font-size: 22px; font-weight: 700; color: {c['TEXT_BRIGHT']}; letter-spacing: -0.2px;")
+        title_label.setStyleSheet(
+            f"font-size: 22px; font-weight: 700; color: {c['TEXT_BRIGHT']}; letter-spacing: -0.2px;"
+        )
         step_layout.addWidget(title_label)
-        
+
         # Description
         desc_label = QLabel(description)
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.55em; letter-spacing: -0.05px;")
+        desc_label.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.55em; letter-spacing: -0.05px;"
+        )
         step_layout.addWidget(desc_label)
-        
+
         # Instructions (if provided)
         if instructions:
             instructions_group = QGroupBox("Instructions")
             instructions_layout = QVBoxLayout()
-            
+
             instructions_label = QLabel(instructions)
             instructions_label.setWordWrap(True)
             instructions_label.setTextFormat(Qt.TextFormat.RichText)
             instructions_label.setOpenExternalLinks(True)
-            instructions_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 14px; line-height: 1.6em;")
+            instructions_label.setStyleSheet(
+                f"color: {c['TEXT_SECONDARY']}; font-size: 14px; line-height: 1.6em;"
+            )
             instructions_layout.addWidget(instructions_label)
-            
+
             if help_url:
                 help_button = QPushButton("Open Setup Page")
                 help_button.setObjectName("primary")
                 help_button.setMinimumWidth(170)
                 help_button.clicked.connect(lambda: webbrowser.open(help_url))
                 instructions_layout.addWidget(help_button)
-            
+
             instructions_group.setLayout(instructions_layout)
             instructions_group.setStyleSheet(
                 f"""
@@ -1844,13 +1944,13 @@ class SettingsWindow(QDialog):
                 """
             )
             step_layout.addWidget(instructions_group)
-        
+
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setStyleSheet(f"background-color: {c['BORDER_DEFAULT']};")
         step_layout.addWidget(separator)
-        
+
         # Content widget (scroll area)
         scroll = QScrollArea()
         content_shell = QFrame()
@@ -1868,14 +1968,14 @@ class SettingsWindow(QDialog):
         shell_layout.setContentsMargins(18, 18, 18, 18)
         shell_layout.setSpacing(12)
         shell_layout.addWidget(content_widget)
-        
+
         scroll.setWidget(content_shell)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         step_layout.addWidget(scroll)
-        
+
         return step_widget
-    
+
     def _show_wizard_step(self, step: int):
         """Show the specified wizard step."""
         # Clear current content
@@ -1883,20 +1983,20 @@ class SettingsWindow(QDialog):
             child = self.wizard_content_layout.takeAt(0)
             if child.widget():
                 child.widget().setParent(None)
-        
+
         # Add new step
         if 0 <= step < len(self.wizard_steps):
             self.wizard_content_layout.addWidget(self.wizard_steps[step])
-        
+
         # Update progress indicator
         self._update_progress_indicator()
-        
+
         # Update button states
         self.wizard_prev_button.setEnabled(step > 0)
-        
+
         # Show/hide skip button (only on optional step)
         self.wizard_skip_button.setVisible(step == SetupWizardManager.STEP_OPTIONAL)
-        
+
         # Update next button text
         if step == SetupWizardManager.STEP_OPTIONAL:
             self.wizard_next_button.setText("Finish Setup")
@@ -1904,10 +2004,10 @@ class SettingsWindow(QDialog):
         else:
             self.wizard_next_button.setText("Next")
             self.wizard_next_button.setMinimumWidth(130)
-        
+
         # Auto-focus first empty required field
         QTimer.singleShot(100, lambda: self._focus_first_field(step))
-    
+
     def _focus_first_field(self, step: int):
         """Auto-focus the first empty required field for the given step."""
         try:
@@ -1921,11 +2021,11 @@ class SettingsWindow(QDialog):
                     self.api_widget.phone_edit.setFocus()
                 else:
                     self.api_widget.api_id_edit.setFocus()  # Default to first field
-            
+
             elif step == SetupWizardManager.STEP_GEMINI:
                 # Focus Gemini key field
                 self.api_widget.gemini_key_edit.setFocus()
-            
+
             elif step == SetupWizardManager.STEP_SMS_PROVIDER:
                 # Focus SMS API key field if provider is selected
                 if self.sms_provider_widget.provider_combo.currentData():
@@ -1934,13 +2034,13 @@ class SettingsWindow(QDialog):
                     self.sms_provider_widget.provider_combo.setFocus()
         except Exception as e:
             logger.warning(f"Failed to auto-focus field: {e}")
-    
+
     def next_step(self):
         """Move to the next wizard step."""
         # Validate current step using widget-specific validation
         is_valid = False
         errors = []
-        
+
         if self.current_wizard_step == SetupWizardManager.STEP_TELEGRAM:
             is_valid, errors = self.api_widget.is_telegram_step_complete()
         elif self.current_wizard_step == SetupWizardManager.STEP_GEMINI:
@@ -1950,22 +2050,26 @@ class SettingsWindow(QDialog):
         elif self.current_wizard_step == SetupWizardManager.STEP_OPTIONAL:
             # Optional step - always valid
             is_valid = True
-        
+
         if not is_valid:
             # Show validation errors with error icon (not warning)
-            error_msg = "Error: Please fix the following issues before continuing:\n\n" + "\n".join(f"• {err}" for err in errors)
+            error_msg = "Error: Please fix the following issues before continuing:\n\n" + "\n".join(
+                f"• {err}" for err in errors
+            )
             ErrorHandler.safe_critical(self, "Validation Required", error_msg)
             return
-        
+
         # Save progress after successful validation
         try:
             partial_settings = self.collect_ui_settings()
-            save_result = self.wizard_manager.save_step_progress(self.current_wizard_step, partial_settings)
-            
+            save_result = self.wizard_manager.save_step_progress(
+                self.current_wizard_step, partial_settings
+            )
+
             # Provide user feedback if save was throttled
             if save_result is False:
                 # Save was deferred due to throttling - show brief notification
-                if hasattr(self, 'status_label') and self.status_label:
+                if hasattr(self, "status_label") and self.status_label:
                     self.status_label.setText(
                         "Progress save deferred (rate limit) - will save on next action"
                     )
@@ -1973,10 +2077,11 @@ class SettingsWindow(QDialog):
                     self.status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
                     # Reset status after a moment
                     from PyQt6.QtCore import QTimer
+
                     QTimer.singleShot(3000, lambda: self.status_label.setText(""))
         except Exception as e:
             logger.warning(f"Failed to save progress: {e}")
-        
+
         # Move to next step or complete
         if self.current_wizard_step < SetupWizardManager.STEP_OPTIONAL:
             self.current_wizard_step += 1
@@ -1984,18 +2089,18 @@ class SettingsWindow(QDialog):
         else:
             # Complete wizard
             self.complete_wizard()
-    
+
     def previous_step(self):
         """Move to the previous wizard step."""
         if self.current_wizard_step > 0:
             self.current_wizard_step -= 1
             self._show_wizard_step(self.current_wizard_step)
-    
+
     def skip_optional(self):
         """Skip the optional step."""
         if self.current_wizard_step == SetupWizardManager.STEP_OPTIONAL:
             self.complete_wizard()
-    
+
     def complete_wizard(self):
         """Complete the wizard and save settings."""
         try:
@@ -2004,19 +2109,19 @@ class SettingsWindow(QDialog):
             self.wizard_prev_button.setEnabled(False)
             if self.wizard_skip_button.isVisible():
                 self.wizard_skip_button.setEnabled(False)
-            
+
             # Process events to update UI
             QApplication.processEvents()
-            
+
             # Save settings
             self.save_settings()
-            
+
             # Mark wizard as complete
             self.wizard_manager.mark_wizard_complete()
-            
+
             # Clear progress tracking
             self.wizard_manager.clear_step_progress()
-            
+
             # Show success message with security warnings and tips
             success_msg = (
                 "Setup Complete!\n\n"
@@ -2036,7 +2141,7 @@ class SettingsWindow(QDialog):
                 "• Keyboard shortcuts: Enter=Next, Shift+Enter=Previous, Ctrl+S=Complete\n"
                 "• Start with 1-2 accounts to test your setup"
             )
-            
+
             # Use QMessageBox directly instead of ErrorHandler to avoid Wayland issues
             msg_box = QMessageBox()  # No parent to prevent app closure
             msg_box.setWindowTitle("Setup Complete")
@@ -2045,10 +2150,10 @@ class SettingsWindow(QDialog):
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.setWindowModality(Qt.WindowModality.ApplicationModal)
             msg_box.exec()
-            
+
             # Close dialog after a small delay to ensure message box is processed
             QTimer.singleShot(100, lambda: self.accept())
-            
+
         except Exception as e:
             logger.error(f"Failed to complete wizard: {e}", exc_info=True)
             # Re-enable buttons on error
@@ -2056,7 +2161,7 @@ class SettingsWindow(QDialog):
             self.wizard_prev_button.setEnabled(True)
             if self.wizard_skip_button.isVisible():
                 self.wizard_skip_button.setEnabled(True)
-            
+
             # Use QMessageBox directly to avoid Wayland crashes
             msg_box = QMessageBox()  # No parent to prevent app closure
             msg_box.setWindowTitle("Save Failed")
@@ -2076,9 +2181,7 @@ class SettingsWindow(QDialog):
     def create_api_tab(self):
         """Create the wrapped API & Auth tab."""
         return self._wrap_widget_tab(
-            self.api_widget,
-            "API & Auth",
-            "Configure API keys, SMS services, and AI integrations."
+            self.api_widget, "API & Auth", "Configure API keys, SMS services, and AI integrations."
         )
 
     def create_brain_tab(self) -> QWidget:
@@ -2086,7 +2189,7 @@ class SettingsWindow(QDialog):
         return self._wrap_widget_tab(
             self.brain_widget,
             "Brain & Behavior",
-            "Fine-tune Gemini responses and conversational behavior."
+            "Fine-tune Gemini responses and conversational behavior.",
         )
 
     def create_anti_detection_tab(self) -> QWidget:
@@ -2094,7 +2197,7 @@ class SettingsWindow(QDialog):
         return self._wrap_widget_tab(
             self.anti_detection_widget,
             "Anti-Detection",
-            "Tune rate limiting and human-behavior simulation safeguards."
+            "Tune rate limiting and human-behavior simulation safeguards.",
         )
 
     def create_member_scraper_tab(self) -> QWidget:
@@ -2117,7 +2220,9 @@ class SettingsWindow(QDialog):
         # URL input
         url_layout = QHBoxLayout()
         self.channel_url_edit = QLineEdit()
-        self.channel_url_edit.setPlaceholderText("https://t.me/channelname or @channelname or channelname")
+        self.channel_url_edit.setPlaceholderText(
+            "https://t.me/channelname or @channelname or channelname"
+        )
         url_layout.addWidget(QLabel("Channel URL/ID:"))
         url_layout.addWidget(self.channel_url_edit)
 
@@ -2130,7 +2235,9 @@ class SettingsWindow(QDialog):
         self.scrape_button.clicked.connect(self.scrape_channel_members)
         self.scrape_button.setObjectName("secondary")
         self.scrape_button.setFixedHeight(32)
-        self.scrape_button.setToolTip("Start scraping members from the specified channel.\nThis may take several minutes for large channels.")
+        self.scrape_button.setToolTip(
+            "Start scraping members from the specified channel.\nThis may take several minutes for large channels."
+        )
         button_layout.addWidget(self.scrape_button)
 
         self.stop_scrape_button = QPushButton("Stop Scraping")
@@ -2220,13 +2327,17 @@ class SettingsWindow(QDialog):
         self._main_window = self.parent()
 
         # Initialize parent reference if not set
-        if not hasattr(self, '_main_window') or not self._main_window:
+        if not hasattr(self, "_main_window") or not self._main_window:
             # Try to get from parent
             parent = self.parent()
             if parent:
                 self._main_window = parent
 
-        return self._wrap_tab(scroll_area, "Member Intelligence", "Pull fresh audiences, audit engagement, and push prospects into messaging pipelines.")
+        return self._wrap_tab(
+            scroll_area,
+            "Member Intelligence",
+            "Pull fresh audiences, audit engagement, and push prospects into messaging pipelines.",
+        )
 
     def create_account_creator_tab(self) -> QWidget:
         """Create the account creator tab."""
@@ -2259,11 +2370,21 @@ class SettingsWindow(QDialog):
         # Country selection
         country_layout = QHBoxLayout()
         self.country_combo = QComboBox()
-        self.country_combo.addItems([
-            "US - United States", "GB - United Kingdom", "DE - Germany",
-            "FR - France", "IT - Italy", "ES - Spain", "BR - Brazil",
-            "RU - Russia", "IN - India", "CA - Canada", "AU - Australia"
-        ])
+        self.country_combo.addItems(
+            [
+                "US - United States",
+                "GB - United Kingdom",
+                "DE - Germany",
+                "FR - France",
+                "IT - Italy",
+                "ES - Spain",
+                "BR - Brazil",
+                "RU - Russia",
+                "IN - India",
+                "CA - Canada",
+                "AU - Australia",
+            ]
+        )
         country_layout.addWidget(QLabel("Country:"))
         country_layout.addWidget(self.country_combo)
         bulk_layout.addLayout(country_layout)
@@ -2271,9 +2392,9 @@ class SettingsWindow(QDialog):
         # Phone provider
         provider_layout = QHBoxLayout()
         self.phone_provider_combo = QComboBox()
-        self.phone_provider_combo.addItems([
-            "sms-activate", "sms-hub", "5sim", "daisysms", "smspool", "textverified"
-        ])
+        self.phone_provider_combo.addItems(
+            ["sms-activate", "sms-hub", "5sim", "daisysms", "smspool", "textverified"]
+        )
         provider_layout.addWidget(QLabel("Phone Provider:"))
         provider_layout.addWidget(self.phone_provider_combo)
         bulk_layout.addLayout(provider_layout)
@@ -2341,11 +2462,13 @@ class SettingsWindow(QDialog):
             "• Monitor progress in the results section below"
         )
         help_label.setWordWrap(True)
-        accent_hex = c['ACCENT_PRIMARY'].lstrip('#')
+        accent_hex = c["ACCENT_PRIMARY"].lstrip("#")
         accent_r = int(accent_hex[0:2], 16)
         accent_g = int(accent_hex[2:4], 16)
         accent_b = int(accent_hex[4:6], 16)
-        help_label.setStyleSheet(f"color: {c['ACCENT_PRIMARY']}; padding: 8px; background: rgba({accent_r}, {accent_g}, {accent_b}, 0.1); border-radius: 4px;")
+        help_label.setStyleSheet(
+            f"color: {c['ACCENT_PRIMARY']}; padding: 8px; background: rgba({accent_r}, {accent_g}, {accent_b}, 0.1); border-radius: 4px;"
+        )
         bulk_layout.addWidget(help_label)
 
         # Control buttons
@@ -2394,7 +2517,7 @@ class SettingsWindow(QDialog):
         # Account Type & Voice Configuration Section
         account_config_group = QGroupBox("Account Type & Voice Messages")
         account_config_layout = QVBoxLayout()
-        
+
         # Info label
         config_info = QLabel(
             "Configure default settings for new accounts. Each account can have its own type, brain, and voice settings."
@@ -2402,7 +2525,7 @@ class SettingsWindow(QDialog):
         config_info.setWordWrap(True)
         config_info.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; margin-bottom: 8px;")
         account_config_layout.addWidget(config_info)
-        
+
         # Account Type
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("Default Account Type:"))
@@ -2415,25 +2538,29 @@ class SettingsWindow(QDialog):
         type_layout.addWidget(self.account_type_combo)
         type_layout.addStretch()
         account_config_layout.addLayout(type_layout)
-        
+
         # Brain Configuration
         brain_config_layout = QVBoxLayout()
-        
-        self.use_shared_brain_checkbox = QCheckBox("Use Shared Brain (Same AI prompt for all accounts)")
+
+        self.use_shared_brain_checkbox = QCheckBox(
+            "Use Shared Brain (Same AI prompt for all accounts)"
+        )
         self.use_shared_brain_checkbox.setChecked(True)
-        self.use_shared_brain_checkbox.setToolTip("When checked, all accounts use the global brain settings from Brain & Behavior tab")
+        self.use_shared_brain_checkbox.setToolTip(
+            "When checked, all accounts use the global brain settings from Brain & Behavior tab"
+        )
         self.use_shared_brain_checkbox.stateChanged.connect(self._toggle_custom_brain)
         brain_config_layout.addWidget(self.use_shared_brain_checkbox)
-        
+
         # Custom brain prompt (hidden by default)
         self.custom_brain_container = QWidget()
         custom_brain_layout = QVBoxLayout(self.custom_brain_container)
         custom_brain_layout.setContentsMargins(0, 8, 0, 0)
-        
+
         custom_brain_label = QLabel("Custom Brain Prompt (for accounts not using shared brain):")
         custom_brain_label.setStyleSheet("font-weight: 500;")
         custom_brain_layout.addWidget(custom_brain_label)
-        
+
         self.custom_brain_edit = QTextEdit()
         self.custom_brain_edit.setPlaceholderText(
             "You are a friendly, flirty young woman (age 19) who creates exclusive content...\n\n"
@@ -2441,72 +2568,80 @@ class SettingsWindow(QDialog):
         )
         self.custom_brain_edit.setMaximumHeight(100)
         custom_brain_layout.addWidget(self.custom_brain_edit)
-        
+
         self.custom_brain_container.setVisible(False)
         brain_config_layout.addWidget(self.custom_brain_container)
-        
+
         account_config_layout.addLayout(brain_config_layout)
-        
+
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setStyleSheet(f"background: {c['BORDER_DEFAULT']}; margin: 8px 0;")
         account_config_layout.addWidget(separator)
-        
+
         # Voice Messages Configuration
         voice_section_label = QLabel("Voice Messages")
         voice_section_label.setStyleSheet("font-weight: 600; font-size: 14px; margin-top: 4px;")
         account_config_layout.addWidget(voice_section_label)
-        
-        self.enable_voice_checkbox = QCheckBox("Enable Voice Messages (requires ElevenLabs API key)")
+
+        self.enable_voice_checkbox = QCheckBox(
+            "Enable Voice Messages (requires ElevenLabs API key)"
+        )
         self.enable_voice_checkbox.setChecked(False)
-        self.enable_voice_checkbox.setToolTip("Send realistic AI-generated voice messages in conversations")
+        self.enable_voice_checkbox.setToolTip(
+            "Send realistic AI-generated voice messages in conversations"
+        )
         self.enable_voice_checkbox.stateChanged.connect(self._toggle_voice_settings)
         account_config_layout.addWidget(self.enable_voice_checkbox)
-        
+
         # Voice settings container (hidden by default)
         self.voice_settings_container = QWidget()
         voice_settings_layout = QVBoxLayout(self.voice_settings_container)
         voice_settings_layout.setContentsMargins(0, 8, 0, 0)
-        
+
         # Voice selection
         voice_select_layout = QHBoxLayout()
         voice_select_layout.addWidget(QLabel("Voice:"))
         self.voice_select_combo = QComboBox()
-        self.voice_select_combo.addItems([
-            "Rachel (Young American, 18-25)",
-            "Elli (Energetic, 18-22)", 
-            "Bella (Soft & Gentle, 20-28)",
-            "Charlotte (Sweet & Youthful, 18-25)",
-            "Sarah (Confident, 20-25)"
-        ])
+        self.voice_select_combo.addItems(
+            [
+                "Rachel (Young American, 18-25)",
+                "Elli (Energetic, 18-22)",
+                "Bella (Soft & Gentle, 20-28)",
+                "Charlotte (Sweet & Youthful, 18-25)",
+                "Sarah (Confident, 20-25)",
+            ]
+        )
         self.voice_select_combo.setToolTip("Select the voice profile for voice messages")
         voice_select_layout.addWidget(self.voice_select_combo)
         voice_select_layout.addStretch()
         voice_settings_layout.addLayout(voice_select_layout)
-        
+
         # Voice trigger mode
         trigger_layout = QHBoxLayout()
         trigger_layout.addWidget(QLabel("When to Send Voice:"))
         self.voice_trigger_combo = QComboBox()
-        self.voice_trigger_combo.addItems([
-            "Random Chance",
-            "Every Nth Message",
-            "Keyword Triggered",
-            "Smart (AI-Decides)",
-            "Always",
-            "Never"
-        ])
+        self.voice_trigger_combo.addItems(
+            [
+                "Random Chance",
+                "Every Nth Message",
+                "Keyword Triggered",
+                "Smart (AI-Decides)",
+                "Always",
+                "Never",
+            ]
+        )
         self.voice_trigger_combo.currentIndexChanged.connect(self._update_voice_trigger_options)
         trigger_layout.addWidget(self.voice_trigger_combo)
         trigger_layout.addStretch()
         voice_settings_layout.addLayout(trigger_layout)
-        
+
         # Trigger options container
         self.voice_trigger_options = QWidget()
         trigger_options_layout = QHBoxLayout(self.voice_trigger_options)
         trigger_options_layout.setContentsMargins(0, 4, 0, 0)
-        
+
         # Random chance option
         self.voice_random_label = QLabel("Chance %:")
         trigger_options_layout.addWidget(self.voice_random_label)
@@ -2515,7 +2650,7 @@ class SettingsWindow(QDialog):
         self.voice_random_spin.setValue(30)
         self.voice_random_spin.setToolTip("Percentage chance to send voice message instead of text")
         trigger_options_layout.addWidget(self.voice_random_spin)
-        
+
         # Every Nth option
         self.voice_nth_label = QLabel("Every N messages:")
         self.voice_nth_label.setVisible(False)
@@ -2525,7 +2660,7 @@ class SettingsWindow(QDialog):
         self.voice_nth_spin.setValue(3)
         self.voice_nth_spin.setVisible(False)
         trigger_options_layout.addWidget(self.voice_nth_spin)
-        
+
         # Keywords option
         self.voice_keywords_label = QLabel("Keywords:")
         self.voice_keywords_label.setVisible(False)
@@ -2534,45 +2669,51 @@ class SettingsWindow(QDialog):
         self.voice_keywords_edit.setPlaceholderText("hey, hi, interested, price")
         self.voice_keywords_edit.setVisible(False)
         trigger_options_layout.addWidget(self.voice_keywords_edit)
-        
+
         trigger_options_layout.addStretch()
         voice_settings_layout.addWidget(self.voice_trigger_options)
-        
+
         # Advanced voice options
         advanced_voice_layout = QHBoxLayout()
-        
+
         self.voice_time_boost_checkbox = QCheckBox("Prime Time Boost (6-11 PM)")
         self.voice_time_boost_checkbox.setChecked(True)
-        self.voice_time_boost_checkbox.setToolTip("Increase voice message chance during evening hours")
+        self.voice_time_boost_checkbox.setToolTip(
+            "Increase voice message chance during evening hours"
+        )
         advanced_voice_layout.addWidget(self.voice_time_boost_checkbox)
-        
+
         self.voice_rapport_boost_checkbox = QCheckBox("Rapport Boost")
         self.voice_rapport_boost_checkbox.setChecked(True)
-        self.voice_rapport_boost_checkbox.setToolTip("Send more voice messages as conversation progresses")
+        self.voice_rapport_boost_checkbox.setToolTip(
+            "Send more voice messages as conversation progresses"
+        )
         advanced_voice_layout.addWidget(self.voice_rapport_boost_checkbox)
-        
+
         advanced_voice_layout.addStretch()
         voice_settings_layout.addLayout(advanced_voice_layout)
-        
+
         # Test voice button and status
         test_voice_layout = QHBoxLayout()
-        
+
         self.test_voice_button = QPushButton("🎤 Test Voice")
         self.test_voice_button.clicked.connect(self._test_voice_generation)
-        self.test_voice_button.setToolTip("Generate a test voice message to preview the selected voice")
+        self.test_voice_button.setToolTip(
+            "Generate a test voice message to preview the selected voice"
+        )
         self.test_voice_button.setObjectName("secondary")
         test_voice_layout.addWidget(self.test_voice_button)
-        
+
         self.voice_status_label = QLabel("Voice not tested")
         self.voice_status_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-style: italic;")
         test_voice_layout.addWidget(self.voice_status_label)
-        
+
         test_voice_layout.addStretch()
         voice_settings_layout.addLayout(test_voice_layout)
-        
+
         self.voice_settings_container.setVisible(False)
         account_config_layout.addWidget(self.voice_settings_container)
-        
+
         account_config_group.setLayout(account_config_layout)
         layout.addWidget(account_config_group)
 
@@ -2626,17 +2767,19 @@ class SettingsWindow(QDialog):
         )
         c = ThemeManager.get_colors()
         proxy_info_banner.setWordWrap(True)
-        warn_hex = c['ACCENT_WARNING'].lstrip('#')
+        warn_hex = c["ACCENT_WARNING"].lstrip("#")
         warn_r = int(warn_hex[0:2], 16)
         warn_g = int(warn_hex[2:4], 16)
         warn_b = int(warn_hex[4:6], 16)
-        proxy_info_banner.setStyleSheet(f"""
+        proxy_info_banner.setStyleSheet(
+            f"""
             background: rgba({warn_r}, {warn_g}, {warn_b}, 0.15);
             padding: 10px;
             border-radius: 6px;
             border-left: 3px solid {c['ACCENT_WARNING']};
             font-weight: bold;
-        """)
+        """
+        )
         proxy_layout.addWidget(proxy_info_banner)
 
         # Proxy list display
@@ -2692,7 +2835,9 @@ class SettingsWindow(QDialog):
 
         self.use_proxy_checkbox = QCheckBox("Use proxies for account creation (recommended)")
         self.use_proxy_checkbox.setChecked(True)
-        self.use_proxy_checkbox.setToolTip("Each account will be assigned a permanent proxy from your list")
+        self.use_proxy_checkbox.setToolTip(
+            "Each account will be assigned a permanent proxy from your list"
+        )
         detection_layout.addWidget(self.use_proxy_checkbox)
 
         self.randomize_fingerprint_checkbox = QCheckBox("Randomize device fingerprints")
@@ -2726,7 +2871,11 @@ class SettingsWindow(QDialog):
         layout.addWidget(results_group)
 
         layout.addStretch()
-        return self._wrap_tab(scroll_area, "Account Factory", "Provision new Telegram identities via SMS providers, smart proxies, and hardened safety rails.")
+        return self._wrap_tab(
+            scroll_area,
+            "Account Factory",
+            "Provision new Telegram identities via SMS providers, smart proxies, and hardened safety rails.",
+        )
 
     def create_advanced_tab(self) -> QWidget:
         """Create the advanced settings tab."""
@@ -2787,7 +2936,9 @@ class SettingsWindow(QDialog):
 
         self.realistic_typing_checkbox = QCheckBox("Realistic character-by-character typing")
         self.realistic_typing_checkbox.setChecked(True)
-        self.realistic_typing_checkbox.setToolTip("Types each character individually with natural delays")
+        self.realistic_typing_checkbox.setToolTip(
+            "Types each character individually with natural delays"
+        )
         human_form.addRow(self.realistic_typing_checkbox)
 
         self.random_delays_checkbox = QCheckBox("Random delays between messages")
@@ -2802,7 +2953,11 @@ class SettingsWindow(QDialog):
         layout.addWidget(debug_group)
 
         layout.addStretch()
-        return self._wrap_tab(scroll_area, "Advanced Controls", "Dial in logging, max token limits, and human-behavior simulation toggles.")
+        return self._wrap_tab(
+            scroll_area,
+            "Advanced Controls",
+            "Dial in logging, max token limits, and human-behavior simulation toggles.",
+        )
 
     def _create_tab_content_widget(self):
         """Create a scrollable content widget for tabs."""
@@ -2828,12 +2983,16 @@ class SettingsWindow(QDialog):
         # Tab title
         title_label = QLabel(title)
         c = ThemeManager.get_colors()
-        title_label.setStyleSheet(f"font-size: 18px; font-weight: 600; color: {c['TEXT_BRIGHT']}; margin-bottom: 4px;")
+        title_label.setStyleSheet(
+            f"font-size: 18px; font-weight: 600; color: {c['TEXT_BRIGHT']}; margin-bottom: 4px;"
+        )
         tab_layout.addWidget(title_label)
 
         # Tab description
         desc_label = QLabel(description)
-        desc_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; margin-bottom: 16px;")
+        desc_label.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-size: 13px; margin-bottom: 16px;"
+        )
         desc_label.setWordWrap(True)
         tab_layout.addWidget(desc_label)
 
@@ -2871,7 +3030,7 @@ class SettingsWindow(QDialog):
         self.check_balance_button.setEnabled(False)
         cached = self._get_cached_balance(provider, api_key)
         if cached:
-            self._apply_balance_result(cached.get('balance'), cached.get('error'))
+            self._apply_balance_result(cached.get("balance"), cached.get("error"))
             return
 
         def run_balance_lookup():
@@ -2900,14 +3059,16 @@ class SettingsWindow(QDialog):
 
         self.check_balance_button.setEnabled(True)
 
-    def _get_cached_balance(self, provider: str, api_key: str, ttl_seconds: int = 300) -> Optional[Dict[str, Any]]:
+    def _get_cached_balance(
+        self, provider: str, api_key: str, ttl_seconds: int = 300
+    ) -> Optional[Dict[str, Any]]:
         """Return cached balance if it is still fresh."""
         key = (provider, api_key)
         cached = self.balance_cache.get(key)
         if not cached:
             return None
 
-        if time.time() - cached.get('timestamp', 0) > ttl_seconds:
+        if time.time() - cached.get("timestamp", 0) > ttl_seconds:
             return None
 
         return cached
@@ -2916,46 +3077,54 @@ class SettingsWindow(QDialog):
         """Persist balance in memory for quick reuse."""
         key = (provider, api_key)
         self.balance_cache[key] = {
-            'balance': balance,
-            'timestamp': time.time(),
+            "balance": balance,
+            "timestamp": time.time(),
         }
 
-    def _fetch_provider_balance(self, provider: str, api_key: str) -> tuple[Optional[str], Optional[str]]:
+    def _fetch_provider_balance(
+        self, provider: str, api_key: str
+    ) -> tuple[Optional[str], Optional[str]]:
         """Fetch provider balance with timeouts and error reporting."""
         balance = None
         error = None
         try:
-            if provider == 'sms-activate':
-                params = {'api_key': api_key, 'action': 'getBalance'}
-                resp = requests.get('https://api.sms-activate.org/stubs/handler_api.php', params=params, timeout=10)
-                if resp.status_code == 200 and 'ACCESS_BALANCE' in resp.text:
-                    balance = resp.text.split(':')[1]
-            elif provider == 'sms-hub':
-                params = {'api_key': api_key, 'action': 'getBalance'}
-                resp = requests.get('https://smshub.org/api.php', params=params, timeout=10)
-                if resp.status_code == 200 and 'ACCESS_BALANCE' in resp.text:
-                    balance = resp.text.split(':')[1]
-            elif provider == '5sim':
-                headers = {'Authorization': f'Bearer {api_key}', 'Accept': 'application/json'}
-                resp = requests.get('https://5sim.net/v1/user/profile', headers=headers, timeout=10)
+            if provider == "sms-activate":
+                params = {"api_key": api_key, "action": "getBalance"}
+                resp = requests.get(
+                    "https://api.sms-activate.org/stubs/handler_api.php", params=params, timeout=10
+                )
+                if resp.status_code == 200 and "ACCESS_BALANCE" in resp.text:
+                    balance = resp.text.split(":")[1]
+            elif provider == "sms-hub":
+                params = {"api_key": api_key, "action": "getBalance"}
+                resp = requests.get("https://smshub.org/api.php", params=params, timeout=10)
+                if resp.status_code == 200 and "ACCESS_BALANCE" in resp.text:
+                    balance = resp.text.split(":")[1]
+            elif provider == "5sim":
+                headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
+                resp = requests.get("https://5sim.net/v1/user/profile", headers=headers, timeout=10)
                 if resp.status_code == 200:
-                    balance = str(resp.json().get('balance', 0))
-            elif provider == 'daisysms':
+                    balance = str(resp.json().get("balance", 0))
+            elif provider == "daisysms":
                 # DaisySMS uses simple GET with api_key param
-                params = {'api_key': api_key, 'action': 'getBalance'}
-                resp = requests.get('https://daisysms.com/api/handler_api.php', params=params, timeout=10)
-                if resp.status_code == 200 and 'ACCESS_BALANCE' in resp.text:
-                    balance = resp.text.split(':')[1]
-            elif provider == 'smspool':
-                headers = {'Authorization': f'Bearer {api_key}'}
-                resp = requests.get('https://api.smspool.net/me', headers=headers, timeout=10)
+                params = {"api_key": api_key, "action": "getBalance"}
+                resp = requests.get(
+                    "https://daisysms.com/api/handler_api.php", params=params, timeout=10
+                )
+                if resp.status_code == 200 and "ACCESS_BALANCE" in resp.text:
+                    balance = resp.text.split(":")[1]
+            elif provider == "smspool":
+                headers = {"Authorization": f"Bearer {api_key}"}
+                resp = requests.get("https://api.smspool.net/me", headers=headers, timeout=10)
                 if resp.status_code == 200:
-                    balance = str(resp.json().get('balance', 0))
-            elif provider == 'textverified':
-                headers = {'Authorization': f'Bearer {api_key}'}
-                resp = requests.get('https://www.textverified.com/api/me', headers=headers, timeout=10)
+                    balance = str(resp.json().get("balance", 0))
+            elif provider == "textverified":
+                headers = {"Authorization": f"Bearer {api_key}"}
+                resp = requests.get(
+                    "https://www.textverified.com/api/me", headers=headers, timeout=10
+                )
                 if resp.status_code == 200:
-                    balance = str(resp.json().get('balance', 0))
+                    balance = str(resp.json().get("balance", 0))
         except Exception as exc:
             error = str(exc)
             logger.error(f"Balance check error: {exc}")
@@ -2965,15 +3134,19 @@ class SettingsWindow(QDialog):
     def _toggle_custom_brain(self, state):
         """Toggle custom brain prompt visibility."""
         self.custom_brain_container.setVisible(state != Qt.CheckState.Checked.value)
-    
+
     def _toggle_voice_settings(self, state):
         """Toggle voice settings visibility."""
         self.voice_settings_container.setVisible(state == Qt.CheckState.Checked.value)
-    
+
     def _test_voice_generation(self):
         """Test voice generation with the selected voice."""
         # Check for API key - use correct widget name
-        api_key = self.api_widget.elevenlabs_key_edit.text().strip() if hasattr(self.api_widget, 'elevenlabs_key_edit') else ""
+        api_key = (
+            self.api_widget.elevenlabs_key_edit.text().strip()
+            if hasattr(self.api_widget, "elevenlabs_key_edit")
+            else ""
+        )
         if not api_key:
             self._show_warning(
                 "Missing API Key",
@@ -2981,55 +3154,68 @@ class SettingsWindow(QDialog):
                 user_initiated=True,
             )
             return
-        
+
         # Get selected voice
         voice_id_map = {
             "Rachel (Young American, 18-25)": "rachel",
             "Elli (Energetic, 18-22)": "elli",
             "Bella (Soft & Gentle, 20-28)": "bella",
             "Charlotte (Sweet & Youthful, 18-25)": "charlotte",
-            "Sarah (Confident, 20-25)": "sarah"
+            "Sarah (Confident, 20-25)": "sarah",
         }
         selected_voice = self.voice_select_combo.currentText()
         voice_id = voice_id_map.get(selected_voice, "rachel")
-        
+
         # Update UI
         self.test_voice_button.setEnabled(False)
         c = ThemeManager.get_colors()
         self.voice_status_label.setText("Testing voice generation...")
         self.voice_status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
-        
+
         # Run test in background
         import asyncio
-        
+
         async def run_test():
             try:
                 from voice_service import VoiceService
+
                 service = VoiceService(api_key=api_key)
-                success, audio_path = await service.test_voice_generation(voice_id=voice_id, phrase_type="greeting")
+                success, audio_path = await service.test_voice_generation(
+                    voice_id=voice_id, phrase_type="greeting"
+                )
                 return success, audio_path
             except Exception as e:
                 logger.error(f"Voice test failed: {e}")
                 return False, str(e)
-        
+
         def on_complete(result):
             success, info = result
             self.test_voice_button.setEnabled(True)
-            
+
             if success:
                 c = ThemeManager.get_colors()
                 self.voice_status_label.setText(f"Success: Voice test passed")
-                self.voice_status_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-weight: 600;")
-                ErrorHandler.safe_information(self, "Voice Test Successful", 
-                    f"Voice generation is working!\n\nTest audio saved to:\n{info}")
+                self.voice_status_label.setStyleSheet(
+                    f"color: {c['ACCENT_SUCCESS']}; font-weight: 600;"
+                )
+                ErrorHandler.safe_information(
+                    self,
+                    "Voice Test Successful",
+                    f"Voice generation is working!\n\nTest audio saved to:\n{info}",
+                )
             else:
                 c = ThemeManager.get_colors()
                 self.voice_status_label.setText(f"Error: Voice test failed")
-                self.voice_status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-weight: 600;")
-                ErrorHandler.safe_warning(self, "Voice Test Failed", 
+                self.voice_status_label.setStyleSheet(
+                    f"color: {c['ACCENT_DANGER']}; font-weight: 600;"
+                )
+                ErrorHandler.safe_warning(
+                    self,
+                    "Voice Test Failed",
                     f"Could not generate voice message.\n\nError: {info}\n\n"
-                    "Please check:\n• ElevenLabs API key is correct\n• You have available credits\n• Internet connection")
-        
+                    "Please check:\n• ElevenLabs API key is correct\n• You have available credits\n• Internet connection",
+                )
+
         # Run async test
         try:
             loop = asyncio.get_event_loop()
@@ -3045,7 +3231,7 @@ class SettingsWindow(QDialog):
             # No event loop, create one
             result = asyncio.run(run_test())
             on_complete(result)
-    
+
     def _update_voice_trigger_options(self, index):
         """Update voice trigger options based on selected mode."""
         # Hide all first
@@ -3055,9 +3241,9 @@ class SettingsWindow(QDialog):
         self.voice_nth_spin.setVisible(False)
         self.voice_keywords_label.setVisible(False)
         self.voice_keywords_edit.setVisible(False)
-        
+
         mode = self.voice_trigger_combo.currentText()
-        
+
         if "Random" in mode:
             self.voice_random_label.setVisible(True)
             self.voice_random_spin.setVisible(True)
@@ -3089,9 +3275,13 @@ class SettingsWindow(QDialog):
         proxy_available = False
         proxy_count = 0
 
-        if main_window and hasattr(main_window, 'proxy_pool_manager') and main_window.proxy_pool_manager:
+        if (
+            main_window
+            and hasattr(main_window, "proxy_pool_manager")
+            and main_window.proxy_pool_manager
+        ):
             try:
-                if hasattr(main_window.proxy_pool_manager, 'get_proxy_count'):
+                if hasattr(main_window.proxy_pool_manager, "get_proxy_count"):
                     proxy_count = main_window.proxy_pool_manager.get_proxy_count()
                     proxy_available = proxy_count > 0
             except Exception as e:
@@ -3099,10 +3289,14 @@ class SettingsWindow(QDialog):
 
         if account_count >= 10:
             if proxy_available and proxy_count >= account_count:
-                self.checklist_proxies.setText(f"Proxies ({proxy_count} available, {account_count} needed)")
+                self.checklist_proxies.setText(
+                    f"Proxies ({proxy_count} available, {account_count} needed)"
+                )
                 self.checklist_proxies.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; padding: 4px;")
             else:
-                self.checklist_proxies.setText(f"Proxies ({proxy_count} available, {account_count} needed)")
+                self.checklist_proxies.setText(
+                    f"Proxies ({proxy_count} available, {account_count} needed)"
+                )
                 self.checklist_proxies.setStyleSheet(f"color: {c['ACCENT_DANGER']}; padding: 4px;")
         else:
             if proxy_available:
@@ -3123,7 +3317,7 @@ class SettingsWindow(QDialog):
     def update_proxy_count(self):
         """Update the proxy count label."""
         proxy_text = self.proxy_list_edit.toPlainText()
-        proxy_lines = [line.strip() for line in proxy_text.split('\n') if line.strip()]
+        proxy_lines = [line.strip() for line in proxy_text.split("\n") if line.strip()]
         self.proxy_count_label.setText(f"{len(proxy_lines)} proxies loaded")
 
     def load_proxy_file(self):
@@ -3138,7 +3332,9 @@ class SettingsWindow(QDialog):
                 try:
                     resolved = candidate_path.resolve(strict=True)
                 except FileNotFoundError:
-                    ErrorHandler.safe_warning(self, "File Missing", "Selected proxy file does not exist.")
+                    ErrorHandler.safe_warning(
+                        self, "File Missing", "Selected proxy file does not exist."
+                    )
                     return
 
                 try:
@@ -3151,7 +3347,7 @@ class SettingsWindow(QDialog):
                     )
                     return
 
-                with open(resolved, 'r', encoding='utf-8') as f:
+                with open(resolved, "r", encoding="utf-8") as f:
                     proxies = f.read().strip()
                     self.proxy_list_edit.setPlainText(proxies)
                     self.update_proxy_count()
@@ -3173,44 +3369,59 @@ class SettingsWindow(QDialog):
 
         # Basic input validation
         if not api_key:
-            self._show_warning("Missing API Key", "Please enter your SMS provider API key.", user_initiated=True)
+            self._show_warning(
+                "Missing API Key", "Please enter your SMS provider API key.", user_initiated=True
+            )
             return
 
         if count <= 0 or count > 100:
-            ErrorHandler.safe_warning(self, "Invalid Count", "Please enter a valid number of accounts (1-100).")
+            ErrorHandler.safe_warning(
+                self, "Invalid Count", "Please enter a valid number of accounts (1-100)."
+            )
             return
 
         # Get parent main window
         main_window = self.parent()
-        if not main_window or not hasattr(main_window, 'account_creator'):
-            ErrorHandler.safe_warning(self, "Error", "Cannot access account creator from settings dialog.")
+        if not main_window or not hasattr(main_window, "account_creator"):
+            ErrorHandler.safe_warning(
+                self, "Error", "Cannot access account creator from settings dialog."
+            )
             return
 
         if not main_window.account_creator:
-            ErrorHandler.safe_warning(self, "Error", "Account creator not initialized. Please restart the application.")
+            ErrorHandler.safe_warning(
+                self, "Error", "Account creator not initialized. Please restart the application."
+            )
             return
 
         # Validate Telegram API credentials
         api_id = ""
         api_hash = ""
-        if hasattr(main_window, 'api_widget'):
-            api_id = getattr(main_window.api_widget, 'api_id_edit', lambda: '').text().strip()
-            api_hash = getattr(main_window.api_widget, 'api_hash_edit', lambda: '').text().strip()
+        if hasattr(main_window, "api_widget"):
+            api_id = getattr(main_window.api_widget, "api_id_edit", lambda: "").text().strip()
+            api_hash = getattr(main_window.api_widget, "api_hash_edit", lambda: "").text().strip()
 
         if not api_id or not api_hash:
-            ErrorHandler.safe_warning(self, "Missing Telegram Credentials",
-                "Please enter your Telegram API ID and API Hash in the API & Auth tab first.")
+            ErrorHandler.safe_warning(
+                self,
+                "Missing Telegram Credentials",
+                "Please enter your Telegram API ID and API Hash in the API & Auth tab first.",
+            )
             return
 
         # Validate API credentials format
         if not api_id.isdigit() or len(api_id) < 6:
-            ErrorHandler.safe_warning(self, "Invalid API ID",
-                "Telegram API ID should be a numeric value (usually 7-8 digits).")
+            ErrorHandler.safe_warning(
+                self,
+                "Invalid API ID",
+                "Telegram API ID should be a numeric value (usually 7-8 digits).",
+            )
             return
 
-        if len(api_hash) != 32 or not all(c in '0123456789abcdefABCDEF' for c in api_hash):
-            ErrorHandler.safe_warning(self, "Invalid API Hash",
-                "Telegram API Hash should be 32 hexadecimal characters.")
+        if len(api_hash) != 32 or not all(c in "0123456789abcdefABCDEF" for c in api_hash):
+            ErrorHandler.safe_warning(
+                self, "Invalid API Hash", "Telegram API Hash should be 32 hexadecimal characters."
+            )
             return
 
         if not self._validate_country_support(provider, country, main_window.account_creator):
@@ -3220,21 +3431,27 @@ class SettingsWindow(QDialog):
         require_proxies = count >= 10
         if require_proxies:
             # Check if proxy pool manager is available
-            if not hasattr(main_window, 'proxy_pool_manager') or not main_window.proxy_pool_manager:
-                ErrorHandler.safe_warning(self, "Proxies Required",
+            if not hasattr(main_window, "proxy_pool_manager") or not main_window.proxy_pool_manager:
+                ErrorHandler.safe_warning(
+                    self,
+                    "Proxies Required",
                     f"For {count} accounts, proxies are required but no proxy pool manager is available.\n\n"
-                    "Please configure proxies in the Proxy Pool tab first.")
+                    "Please configure proxies in the Proxy Pool tab first.",
+                )
                 return
 
             # Check proxy availability (basic check)
             try:
                 # This would need to be async, but for validation we'll do a basic check
-                if hasattr(main_window.proxy_pool_manager, 'get_proxy_count'):
+                if hasattr(main_window.proxy_pool_manager, "get_proxy_count"):
                     proxy_count = main_window.proxy_pool_manager.get_proxy_count()
                     if proxy_count < count:
-                        ErrorHandler.safe_warning(self, "Insufficient Proxies",
+                        ErrorHandler.safe_warning(
+                            self,
+                            "Insufficient Proxies",
                             f"You have {proxy_count} proxies but need at least {count} for {count} accounts.\n\n"
-                            "Add more proxies in the Proxy Pool tab.")
+                            "Add more proxies in the Proxy Pool tab.",
+                        )
                         return
             except Exception as e:
                 logger.warning(f"Could not check proxy count: {e}")
@@ -3242,7 +3459,9 @@ class SettingsWindow(QDialog):
         # Validate voice settings if enabled
         if self.enable_voice_checkbox.isChecked():
             elevenlabs_key = ""
-            if hasattr(main_window, 'api_widget') and hasattr(main_window.api_widget, 'elevenlabs_key_edit'):
+            if hasattr(main_window, "api_widget") and hasattr(
+                main_window.api_widget, "elevenlabs_key_edit"
+            ):
                 elevenlabs_key = main_window.api_widget.elevenlabs_key_edit.text().strip()
 
             if not elevenlabs_key:
@@ -3261,7 +3480,9 @@ class SettingsWindow(QDialog):
 
         # Confirm action
         proxy_info = f"Proxies: {'Required' if require_proxies else 'Optional'}"
-        voice_info = f"Voice Messages: {'Enabled' if self.enable_voice_checkbox.isChecked() else 'Disabled'}"
+        voice_info = (
+            f"Voice Messages: {'Enabled' if self.enable_voice_checkbox.isChecked() else 'Disabled'}"
+        )
 
         if not ErrorHandler.safe_question(
             self,
@@ -3272,41 +3493,46 @@ class SettingsWindow(QDialog):
             f"{proxy_info}\n"
             f"{voice_info}\n\n"
             f"This will consume approximately {count} SMS credits.\n\n"
-            f"Continue?"
+            f"Continue?",
         ):
             return
 
         # Prepare creation configuration using the latest UI state
         settings_config = self.collect_ui_settings()
-        factory_settings = settings_config.get('account_factory', {})
-        use_proxy = factory_settings.get('use_proxy', True)
-        realistic_timing = factory_settings.get('realistic_timing', True)
+        factory_settings = settings_config.get("account_factory", {})
+        use_proxy = factory_settings.get("use_proxy", True)
+        realistic_timing = factory_settings.get("realistic_timing", True)
 
         config = {
-            'phone_provider': provider,
-            'provider_api_key': factory_settings.get('provider_api_key', api_key) or api_key,
-            'country': factory_settings.get('country', country),
-            'use_proxy': use_proxy,
-            'require_proxy': use_proxy and count >= 10,  # Require proxies for 10+ accounts when proxying is enabled
-            'api_id': settings_config.get('telegram', {}).get('api_id', ''),
-            'api_hash': settings_config.get('telegram', {}).get('api_hash', ''),
-            'realistic_timing': realistic_timing,
-            'account_type': self.account_type_combo.currentText(),
-            'enable_voice': self.enable_voice_checkbox.isChecked(),
-            'voice_config': {
-                'voice': self.voice_select_combo.currentText(),
-                'trigger_mode': self.voice_trigger_combo.currentText(),
-                'random_chance': self.voice_random_spin.value(),
-                'nth_message': self.voice_nth_spin.value(),
-                'keywords': self.voice_keywords_edit.text().strip()
-            } if self.enable_voice_checkbox.isChecked() else None,
-            'anti_detection': settings_config.get('anti_detection', {}),
-            'proxy_pool': settings_config.get('proxy_pool', {}),
-            'brain': settings_config.get('brain', {}),
-            'account_defaults': settings_config.get('account_defaults', {}),
-            'randomize_fingerprint': factory_settings.get('randomize_fingerprint', True),
-            'vary_platform': factory_settings.get('vary_platform', True),
-            'manual_proxies': factory_settings.get('proxies', []),
+            "phone_provider": provider,
+            "provider_api_key": factory_settings.get("provider_api_key", api_key) or api_key,
+            "country": factory_settings.get("country", country),
+            "use_proxy": use_proxy,
+            "require_proxy": use_proxy
+            and count >= 10,  # Require proxies for 10+ accounts when proxying is enabled
+            "api_id": settings_config.get("telegram", {}).get("api_id", ""),
+            "api_hash": settings_config.get("telegram", {}).get("api_hash", ""),
+            "realistic_timing": realistic_timing,
+            "account_type": self.account_type_combo.currentText(),
+            "enable_voice": self.enable_voice_checkbox.isChecked(),
+            "voice_config": (
+                {
+                    "voice": self.voice_select_combo.currentText(),
+                    "trigger_mode": self.voice_trigger_combo.currentText(),
+                    "random_chance": self.voice_random_spin.value(),
+                    "nth_message": self.voice_nth_spin.value(),
+                    "keywords": self.voice_keywords_edit.text().strip(),
+                }
+                if self.enable_voice_checkbox.isChecked()
+                else None
+            ),
+            "anti_detection": settings_config.get("anti_detection", {}),
+            "proxy_pool": settings_config.get("proxy_pool", {}),
+            "brain": settings_config.get("brain", {}),
+            "account_defaults": settings_config.get("account_defaults", {}),
+            "randomize_fingerprint": factory_settings.get("randomize_fingerprint", True),
+            "vary_platform": factory_settings.get("vary_platform", True),
+            "manual_proxies": factory_settings.get("proxies", []),
         }
 
         # Disable button during creation
@@ -3337,9 +3563,9 @@ class SettingsWindow(QDialog):
 
             try:
                 # Fixed: Pass gemini_service via config for bulk creation
-                if hasattr(main_window, 'gemini_service') and main_window.gemini_service:
-                    config['_gemini_service'] = main_window.gemini_service
-                
+                if hasattr(main_window, "gemini_service") and main_window.gemini_service:
+                    config["_gemini_service"] = main_window.gemini_service
+
                 # Run the bulk creation
                 results = loop.run_until_complete(
                     main_window.account_creator.start_bulk_creation(count, config)
@@ -3376,7 +3602,7 @@ class SettingsWindow(QDialog):
         """Stop bulk account creation."""
         # Get parent main window
         main_window = self.parent()
-        if main_window and hasattr(main_window, 'account_creator') and main_window.account_creator:
+        if main_window and hasattr(main_window, "account_creator") and main_window.account_creator:
             main_window.account_creator.stop_creation()
 
         self.stop_creation_button.setEnabled(False)
@@ -3393,8 +3619,10 @@ class SettingsWindow(QDialog):
         try:
             # Try to get balance
             cached = self._get_cached_balance(provider, api_key)
-            balance = float(cached['balance']) if cached and cached.get('balance') is not None else None
-            error = cached.get('error') if cached else None
+            balance = (
+                float(cached["balance"]) if cached and cached.get("balance") is not None else None
+            )
+            error = cached.get("error") if cached else None
 
             if balance is None:
                 fetched_balance, fetch_error = self._fetch_provider_balance(provider, api_key)
@@ -3406,10 +3634,13 @@ class SettingsWindow(QDialog):
             if balance is not None:
                 # Check if balance is sufficient (with some buffer)
                 if balance < count * 1.2:  # Require 20% buffer
-                    ErrorHandler.safe_warning(self, "Insufficient Balance",
+                    ErrorHandler.safe_warning(
+                        self,
+                        "Insufficient Balance",
                         f"Your {provider} balance is {balance:.2f}, but you need approximately {count * 1.2:.1f} "
                         f"to create {count} accounts (with safety buffer).\n\n"
-                        "Please top up your account or reduce the number of accounts.")
+                        "Please top up your account or reduce the number of accounts.",
+                    )
                     return False
                 else:
                     logger.info(f"Balance validation passed: {balance:.2f} >= {count * 1.2:.1f}")
@@ -3419,10 +3650,13 @@ class SettingsWindow(QDialog):
                 if error:
                     logger.warning(f"Could not validate balance: {error}")
 
-                if not ErrorHandler.safe_question(self, "Balance Check Failed",
+                if not ErrorHandler.safe_question(
+                    self,
+                    "Balance Check Failed",
                     f"Could not verify your {provider} account balance.\n\n"
                     f"This could be due to network issues or invalid API key.\n\n"
-                    f"Continue anyway? (You may run out of credits during creation)"):
+                    f"Continue anyway? (You may run out of credits during creation)",
+                ):
                     return False
 
                 return True
@@ -3435,14 +3669,16 @@ class SettingsWindow(QDialog):
     def _validate_country_support(self, provider: str, country: str, account_creator) -> bool:
         """Ensure selected country is supported by the provider and current catalog."""
         try:
-            provider_map = getattr(getattr(account_creator, 'phone_provider', None), 'providers', {}) or {}
+            provider_map = (
+                getattr(getattr(account_creator, "phone_provider", None), "providers", {}) or {}
+            )
             provider_config = provider_map.get(provider, {})
-            supported = provider_config.get('countries', [])
+            supported = provider_config.get("countries", [])
             if supported and country not in supported:
                 ErrorHandler.safe_warning(
                     self,
                     "Unsupported Country",
-                    f"{provider} does not support {country}. Supported countries: {', '.join(supported)}"
+                    f"{provider} does not support {country}. Supported countries: {', '.join(supported)}",
                 )
                 return False
         except Exception as exc:
@@ -3457,7 +3693,9 @@ class SettingsWindow(QDialog):
         # Update progress bar
         if total > 0:
             self.creation_progress.setValue(current)
-            self.creation_progress.setFormat(f"Creating: {current}/{total} ({(current/total*100):.0f}%)")
+            self.creation_progress.setFormat(
+                f"Creating: {current}/{total} ({(current/total*100):.0f}%)"
+            )
 
         # Update status
         self.creation_status.setText(message)
@@ -3470,7 +3708,7 @@ class SettingsWindow(QDialog):
         self.creation_progress.setVisible(False)
 
         # Calculate statistics
-        successful = sum(1 for r in results if r.get('success', False))
+        successful = sum(1 for r in results if r.get("success", False))
         failed = len(results) - successful
 
         # Update summary
@@ -3492,19 +3730,22 @@ class SettingsWindow(QDialog):
             # List successful accounts
             success_msg += "Created accounts:\n"
             for result in results:
-                if result.get('success'):
-                    phone = result.get('phone_number', 'Unknown')
+                if result.get("success"):
+                    phone = result.get("phone_number", "Unknown")
                     success_msg += f"• {phone}\n"
 
             ErrorHandler.safe_information(self, "Creation Complete", success_msg)
         else:
-            ErrorHandler.safe_warning(self, "Creation Failed",
+            ErrorHandler.safe_warning(
+                self,
+                "Creation Failed",
                 f"All {len(results)} account creation attempts failed.\n\n"
-                "Check your SMS provider API key and balance.")
+                "Check your SMS provider API key and balance.",
+            )
 
         # Refresh account list in main window
         main_window = self.parent()
-        if main_window and hasattr(main_window, 'update_account_list'):
+        if main_window and hasattr(main_window, "update_account_list"):
             QTimer.singleShot(1000, main_window.update_account_list)
 
     def _handle_creation_error(self, error: str):
@@ -3518,39 +3759,49 @@ class SettingsWindow(QDialog):
         self.creation_summary.setText(f"Error: {error}")
         self.creation_summary.setVisible(True)
 
-        ErrorHandler.safe_critical(self, "Creation Failed",
+        ErrorHandler.safe_critical(
+            self,
+            "Creation Failed",
             f"Bulk account creation failed:\n\n{error}\n\n"
-            "Check your configuration and try again.")
+            "Check your configuration and try again.",
+        )
 
     def clone_account(self):
         """Clone an account profile."""
         # Get list of accounts to clone from
         main_window = self.parent()
-        if not main_window or not hasattr(main_window, 'account_manager'):
+        if not main_window or not hasattr(main_window, "account_manager"):
             ErrorHandler.safe_warning(self, "Error", "Cannot access account manager.")
             return
-        
+
         if not main_window.account_manager:
             ErrorHandler.safe_warning(self, "No Accounts", "No accounts available to clone.")
             return
-        
+
         # Get available accounts
         accounts = main_window.account_manager.get_all_accounts()
         if not accounts:
-            ErrorHandler.safe_warning(self, "No Accounts", "You need at least one account to clone from.\n\nCreate an account first in the Accounts tab.")
+            ErrorHandler.safe_warning(
+                self,
+                "No Accounts",
+                "You need at least one account to clone from.\n\nCreate an account first in the Accounts tab.",
+            )
             return
-        
+
         # Show account selector
-        account_names = [f"{acc.get('phone_number', 'Unknown')} - {acc.get('username', 'No username')}" for acc in accounts]
+        account_names = [
+            f"{acc.get('phone_number', 'Unknown')} - {acc.get('username', 'No username')}"
+            for acc in accounts
+        ]
         account_choice, ok = QInputDialog.getItem(
             self,
             "Select Account to Clone",
             "Choose the account to clone profile from:",
             account_names,
             0,
-            False
+            False,
         )
-        
+
         if ok and account_choice:
             ErrorHandler.safe_information(
                 self,
@@ -3561,31 +3812,31 @@ class SettingsWindow(QDialog):
                 f"• Username style\n\n"
                 f"Selected: {account_choice}\n\n"
                 f"This feature requires the advanced cloning system.\n"
-                f"Use the main window's cloning interface for full functionality."
+                f"Use the main window's cloning interface for full functionality.",
             )
 
     def scrape_channel_members(self):
         """Scrape members from a channel - actually perform the scraping inline."""
         channel_url = self.channel_url_edit.text().strip()
-        
+
         if not channel_url:
             ErrorHandler.safe_warning(
                 self,
                 "Missing Channel",
-                "Please enter a channel URL or username.\n\nExamples:\n• https://t.me/channelname\n• @channelname\n• channelname"
+                "Please enter a channel URL or username.\n\nExamples:\n• https://t.me/channelname\n• @channelname\n• channelname",
             )
             return
-        
+
         # Get parent main window to access scraper client
         main_window = self.parent()
-        if not main_window or not hasattr(main_window, '_get_scraper_client'):
+        if not main_window or not hasattr(main_window, "_get_scraper_client"):
             ErrorHandler.safe_warning(
                 self,
                 "Cannot Scrape",
-                "Settings dialog must be opened from the main window.\n\nAlternatively, use the Members tab in the main window."
+                "Settings dialog must be opened from the main window.\n\nAlternatively, use the Members tab in the main window.",
             )
             return
-        
+
         # Get a valid Pyrogram client
         scraper_client = main_window._get_scraper_client()
         if not scraper_client:
@@ -3593,10 +3844,10 @@ class SettingsWindow(QDialog):
                 self,
                 "No Active Account",
                 "Please start at least one Telegram account before scraping members.\n\n"
-                "Go to Accounts tab → Add/Start an account → Then return here to scrape."
+                "Go to Accounts tab → Add/Start an account → Then return here to scrape.",
             )
             return
-        
+
         # Disable UI during scraping
         self.scrape_button.setEnabled(False)
         self.stop_scrape_button.setEnabled(True)
@@ -3604,76 +3855,90 @@ class SettingsWindow(QDialog):
         self.scrape_progress.setMaximum(0)  # Indeterminate progress
         self.scraper_results_text.clear()
         self.scraper_results_text.append(f"Starting scrape of: {channel_url}\n")
-        
+
         # Import and initialize scraper
         try:
-            from member_scraper import MemberScraper, EliteAntiDetectionSystem, ComprehensiveDataExtractor
-            
-            if not hasattr(main_window, 'member_db') or not main_window.member_db:
+            from member_scraper import (
+                MemberScraper,
+                EliteAntiDetectionSystem,
+                ComprehensiveDataExtractor,
+            )
+
+            if not hasattr(main_window, "member_db") or not main_window.member_db:
                 raise Exception("Member database not initialized")
-            
+
             # Create scraper
             anti_detection = EliteAntiDetectionSystem()
             scraper = MemberScraper(
-                client=scraper_client,
-                db=main_window.member_db,
-                anti_detection=anti_detection
+                client=scraper_client, db=main_window.member_db, anti_detection=anti_detection
             )
-            
+
             # Start async scraping
             import asyncio
-            
+
             async def perform_scrape():
                 try:
                     self.scraper_results_text.append("Initializing scraper...\n")
-                    
+
                     def progress_update(count):
                         self.scrape_progress.setValue(count)
                         self.scrape_progress.setFormat(f"Found {count} members")
-                    
+
                     result = await scraper.scrape_channel_members(
                         channel_url,
                         progress_callback=progress_update,
                         analyze_messages=True,
-                        use_elite_scraping=False  # Start with basic scraping
+                        use_elite_scraping=False,  # Start with basic scraping
                     )
-                    
+
                     # Update UI with results
-                    if result.get('success'):
+                    if result.get("success"):
                         self.scraper_results_text.append(f"\nScraping complete!\n")
-                        self.scraper_results_text.append(f"Channel: {result.get('channel_title', 'Unknown')}\n")
-                        self.scraper_results_text.append(f"Members found: {result.get('members_scraped', 0)}\n")
-                        self.scraper_results_text.append(f"Safe targets: {result.get('safe_targets', 0)}\n")
-                        self.scraper_results_text.append(f"Threats filtered: {result.get('threats_filtered', 0)}\n")
-                        
+                        self.scraper_results_text.append(
+                            f"Channel: {result.get('channel_title', 'Unknown')}\n"
+                        )
+                        self.scraper_results_text.append(
+                            f"Members found: {result.get('members_scraped', 0)}\n"
+                        )
+                        self.scraper_results_text.append(
+                            f"Safe targets: {result.get('safe_targets', 0)}\n"
+                        )
+                        self.scraper_results_text.append(
+                            f"Threats filtered: {result.get('threats_filtered', 0)}\n"
+                        )
+
                         # Update stats
                         self.stats_total.setText(f"Total: {result.get('members_scraped', 0)}")
                         self.stats_active.setText(f"Safe: {result.get('safe_targets', 0)}")
-                        self.stats_inactive.setText(f"Filtered: {result.get('threats_filtered', 0)}")
-                        
+                        self.stats_inactive.setText(
+                            f"Filtered: {result.get('threats_filtered', 0)}"
+                        )
+
                         ErrorHandler.safe_information(
                             self,
                             "Scraping Complete",
-                            f"Successfully scraped {result.get('members_scraped', 0)} members!"
+                            f"Successfully scraped {result.get('members_scraped', 0)} members!",
                         )
                     else:
-                        error_msg = result.get('error', 'Unknown error')
+                        error_msg = result.get("error", "Unknown error")
                         self.scraper_results_text.append(f"\nError: {error_msg}\n")
-                        ErrorHandler.safe_warning(self, "Scraping Failed", f"Failed to scrape members:\n\n{error_msg}")
-                
+                        ErrorHandler.safe_warning(
+                            self, "Scraping Failed", f"Failed to scrape members:\n\n{error_msg}"
+                        )
+
                 except Exception as e:
                     logger.error(f"Scraping error: {e}")
                     self.scraper_results_text.append(f"\nError: {str(e)}\n")
                     ErrorHandler.safe_critical(self, "Error", f"Scraping failed:\n\n{str(e)}")
-                
+
                 finally:
                     # Re-enable UI
                     self.scrape_button.setEnabled(True)
                     self.stop_scrape_button.setEnabled(False)
                     self.scrape_progress.setVisible(False)
-            
+
             # Run the async scraping operation
-            if hasattr(main_window, '_run_async_task'):
+            if hasattr(main_window, "_run_async_task"):
                 main_window._run_async_task(perform_scrape())
             else:
                 # Fallback: run in new event loop
@@ -3696,7 +3961,7 @@ class SettingsWindow(QDialog):
                     finally:
                         loop.close()
                         asyncio.set_event_loop(None)
-        
+
         except Exception as e:
             logger.error(f"Failed to start scraping: {e}")
             self.scraper_results_text.append(f"\nFailed to initialize scraper: {str(e)}\n")
@@ -3713,42 +3978,51 @@ class SettingsWindow(QDialog):
         self.scrape_button.setEnabled(True)
         self.scrape_progress.setVisible(False)
         self.scraper_results_text.append("\nScraping stopped by user\n")
-        
+
         ErrorHandler.safe_information(self, "Stopped", "Scraping operation stopped.")
 
     def refresh_members(self):
         """Refresh member list from database."""
         try:
             main_window = self.parent()
-            if not main_window or not hasattr(main_window, 'member_db'):
+            if not main_window or not hasattr(main_window, "member_db"):
                 ErrorHandler.safe_warning(self, "Error", "Cannot access member database")
                 return
-            
+
             # Get all channels
             channels = main_window.member_db.get_all_channels()
-            
+
             # Update channel selector
             self.channel_select.clear()
             self.channel_select.addItem("Select Channel...")
             for channel in channels:
-                self.channel_select.addItem(f"{channel.get('title', 'Unknown')} ({channel.get('member_count', 0)} members)")
-            
+                self.channel_select.addItem(
+                    f"{channel.get('title', 'Unknown')} ({channel.get('member_count', 0)} members)"
+                )
+
             # Update member list for first channel
             if channels:
-                first_channel_id = channels[0].get('channel_id')
-                members = main_window.member_db.get_all_members(first_channel_id)[:50]  # Limit to 50
-                
+                first_channel_id = channels[0].get("channel_id")
+                members = main_window.member_db.get_all_members(first_channel_id)[
+                    :50
+                ]  # Limit to 50
+
                 self.members_list.clear()
                 for member in members:
-                    name = f"{member.get('first_name', '')} {member.get('last_name', '')}".strip() or 'Unknown'
-                    username = member.get('username', '')
+                    name = (
+                        f"{member.get('first_name', '')} {member.get('last_name', '')}".strip()
+                        or "Unknown"
+                    )
+                    username = member.get("username", "")
                     display = f"{name} (@{username})" if username else name
                     self.members_list.addItem(display)
-                
-                self.scraper_results_text.append(f"\nRefreshed: Showing {len(members)} members from {channels[0].get('title')}\n")
+
+                self.scraper_results_text.append(
+                    f"\nRefreshed: Showing {len(members)} members from {channels[0].get('title')}\n"
+                )
             else:
                 self.scraper_results_text.append("\nNo channels scraped yet.\n")
-        
+
         except Exception as e:
             logger.error(f"Error refreshing members: {e}")
             ErrorHandler.safe_critical(self, "Error", f"Failed to refresh members:\n\n{str(e)}")
@@ -3757,40 +4031,36 @@ class SettingsWindow(QDialog):
         """Message selected member."""
         selected_items = self.members_list.selectedItems()
         if not selected_items:
-            ErrorHandler.safe_warning(self, "No Selection", "Please select a member from the list first.")
+            ErrorHandler.safe_warning(
+                self, "No Selection", "Please select a member from the list first."
+            )
             return
-        
+
         # Get the selected member
         member_text = selected_items[0].text()
-        
+
         # Show message composer
         message, ok = QInputDialog.getText(
             self,
             "Send Message",
             f"Enter message to send to {member_text}:",
-            QLineEdit.EchoMode.Normal
+            QLineEdit.EchoMode.Normal,
         )
-        
+
         if ok and message.strip():
             ErrorHandler.safe_information(
                 self,
                 "Feature Available in Campaigns",
                 f"💡 Direct messaging is available through the Campaigns tab for proper rate limiting.\n\n"
-                f"Your message: \"{message[:50]}...\"\n\n"
-                f"Go to Campaigns → Create Campaign → Select members → Send safely"
+                f'Your message: "{message[:50]}..."\n\n'
+                f"Go to Campaigns → Create Campaign → Select members → Send safely",
             )
 
     def load_settings(self) -> Dict[str, Any]:
         """Load settings from the configuration file."""
         default_settings = {
-            "telegram": {
-                "api_id": "",
-                "api_hash": "",
-                "phone_number": ""
-            },
-            "gemini": {
-                "api_key": ""
-            },
+            "telegram": {"api_id": "", "api_hash": "", "phone_number": ""},
+            "gemini": {"api_key": ""},
             "sms_providers": {
                 "provider": "sms-activate",
                 "api_key": "",
@@ -3810,13 +4080,13 @@ class SettingsWindow(QDialog):
                 "prompt": "",
                 "auto_reply_enabled": True,
                 "typing_delay": 2,
-                "max_history": 50
+                "max_history": 50,
             },
             "advanced": {
                 "max_reply_length": 1024,
                 "enable_logging": True,
                 "realistic_typing": True,
-                "random_delays": True
+                "random_delays": True,
             },
             "anti_detection": {
                 "min_delay": 2,
@@ -3825,7 +4095,7 @@ class SettingsWindow(QDialog):
                 "burst_limit": 3,
                 "online_simulation": True,
                 "random_skip": True,
-                "enabled": True
+                "enabled": True,
             },
             "performance": {
                 "low_power": False,
@@ -3835,14 +4105,14 @@ class SettingsWindow(QDialog):
                 "dashboard_interval_ms": 5000,
                 "background_services_enabled": True,
                 "warmup_autostart": True,
-                "campaign_autostart": True
-            }
+                "campaign_autostart": True,
+            },
         }
 
         try:
             config_path = Path("config.json")
             if config_path.exists():
-                with open(config_path, 'r', encoding='utf-8') as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     loaded_settings = json.load(f)
                     # Merge with defaults
                     self._merge_settings(default_settings, loaded_settings)
@@ -3876,93 +4146,106 @@ class SettingsWindow(QDialog):
         # Note: Brain and anti-detection settings are now handled by their respective widgets
         # Only load settings for UI elements that still exist in the main window
         brain = self.settings_data.get("brain", {})
-        
+
         # Account defaults settings
         account_defaults = self.settings_data.get("account_defaults", {})
-        if hasattr(self, 'account_type_combo'):
+        if hasattr(self, "account_type_combo"):
             account_type = account_defaults.get("account_type", "reactive")
             index = 0 if account_type == "reactive" else 1
             self.account_type_combo.setCurrentIndex(index)
-        
-        if hasattr(self, 'use_shared_brain_checkbox'):
-            self.use_shared_brain_checkbox.setChecked(account_defaults.get("use_shared_brain", True))
+
+        if hasattr(self, "use_shared_brain_checkbox"):
+            self.use_shared_brain_checkbox.setChecked(
+                account_defaults.get("use_shared_brain", True)
+            )
             # Update visibility
             self._toggle_custom_brain(self.use_shared_brain_checkbox.checkState().value)
-        
-        if hasattr(self, 'custom_brain_edit'):
+
+        if hasattr(self, "custom_brain_edit"):
             self.custom_brain_edit.setPlainText(account_defaults.get("custom_brain_prompt", ""))
-        
+
         # Voice settings
         voice = self.settings_data.get("voice", {})
-        if hasattr(self, 'enable_voice_checkbox'):
+        if hasattr(self, "enable_voice_checkbox"):
             self.enable_voice_checkbox.setChecked(voice.get("enabled", False))
             # Update visibility
             self._toggle_voice_settings(self.enable_voice_checkbox.checkState().value)
-        
-        if hasattr(self, 'voice_select_combo'):
+
+        if hasattr(self, "voice_select_combo"):
             voice_id = voice.get("voice_id", "rachel")
             voice_index_map = {"rachel": 0, "elli": 1, "bella": 2, "charlotte": 3, "sarah": 4}
             self.voice_select_combo.setCurrentIndex(voice_index_map.get(voice_id, 0))
-        
-        if hasattr(self, 'voice_trigger_combo'):
+
+        if hasattr(self, "voice_trigger_combo"):
             trigger_mode = voice.get("trigger_mode", "random")
-            trigger_index_map = {"random": 0, "every_nth": 1, "keyword": 2, "smart": 3, "always": 4, "never": 5}
+            trigger_index_map = {
+                "random": 0,
+                "every_nth": 1,
+                "keyword": 2,
+                "smart": 3,
+                "always": 4,
+                "never": 5,
+            }
             self.voice_trigger_combo.setCurrentIndex(trigger_index_map.get(trigger_mode, 0))
             # Update trigger options visibility
             self._update_voice_trigger_options(self.voice_trigger_combo.currentIndex())
-        
-        if hasattr(self, 'voice_random_spin'):
+
+        if hasattr(self, "voice_random_spin"):
             self.voice_random_spin.setValue(voice.get("random_chance", 30))
-        
-        if hasattr(self, 'voice_nth_spin'):
+
+        if hasattr(self, "voice_nth_spin"):
             self.voice_nth_spin.setValue(voice.get("nth_message", 3))
-        
-        if hasattr(self, 'voice_keywords_edit'):
+
+        if hasattr(self, "voice_keywords_edit"):
             keywords = voice.get("keywords", ["hey", "hi", "hello", "interested", "price"])
             self.voice_keywords_edit.setText(", ".join(keywords))
-        
-        if hasattr(self, 'voice_time_boost_checkbox'):
+
+        if hasattr(self, "voice_time_boost_checkbox"):
             self.voice_time_boost_checkbox.setChecked(voice.get("time_boost_enabled", True))
-        
-        if hasattr(self, 'voice_rapport_boost_checkbox'):
+
+        if hasattr(self, "voice_rapport_boost_checkbox"):
             self.voice_rapport_boost_checkbox.setChecked(voice.get("rapport_boost_enabled", True))
 
         # Anti-detection and advanced settings are now handled by their respective widgets
         # Only load settings for UI elements that still exist in the main window
         advanced = self.settings_data.get("advanced", {})
-        if hasattr(self, 'enable_logging_checkbox'):
+        if hasattr(self, "enable_logging_checkbox"):
             self.enable_logging_checkbox.setChecked(advanced.get("enable_logging", True))
-        if hasattr(self, 'realistic_typing_checkbox'):
+        if hasattr(self, "realistic_typing_checkbox"):
             self.realistic_typing_checkbox.setChecked(advanced.get("realistic_typing", True))
-        if hasattr(self, 'random_delays_checkbox'):
+        if hasattr(self, "random_delays_checkbox"):
             self.random_delays_checkbox.setChecked(advanced.get("random_delays", True))
 
         # Account factory settings
         factory_settings = self.settings_data.get("account_factory", {})
-        if hasattr(self, 'account_count_spin'):
+        if hasattr(self, "account_count_spin"):
             self.account_count_spin.setValue(factory_settings.get("account_count", 10))
-        if hasattr(self, 'country_combo'):
+        if hasattr(self, "country_combo"):
             stored_country = factory_settings.get("country", "US")
             for i in range(self.country_combo.count()):
                 if self.country_combo.itemText(i).startswith(f"{stored_country} "):
                     self.country_combo.setCurrentIndex(i)
                     break
-        if hasattr(self, 'phone_provider_combo'):
+        if hasattr(self, "phone_provider_combo"):
             provider = factory_settings.get("phone_provider", "sms-activate")
             index = self.phone_provider_combo.findText(provider)
             if index != -1:
                 self.phone_provider_combo.setCurrentIndex(index)
-        if hasattr(self, 'provider_api_edit'):
+        if hasattr(self, "provider_api_edit"):
             self.provider_api_edit.setText(factory_settings.get("provider_api_key", ""))
-        if hasattr(self, 'use_proxy_checkbox'):
+        if hasattr(self, "use_proxy_checkbox"):
             self.use_proxy_checkbox.setChecked(factory_settings.get("use_proxy", True))
-        if hasattr(self, 'randomize_fingerprint_checkbox'):
-            self.randomize_fingerprint_checkbox.setChecked(factory_settings.get("randomize_fingerprint", True))
-        if hasattr(self, 'realistic_timing_checkbox'):
-            self.realistic_timing_checkbox.setChecked(factory_settings.get("realistic_timing", True))
-        if hasattr(self, 'vary_platform_checkbox'):
+        if hasattr(self, "randomize_fingerprint_checkbox"):
+            self.randomize_fingerprint_checkbox.setChecked(
+                factory_settings.get("randomize_fingerprint", True)
+            )
+        if hasattr(self, "realistic_timing_checkbox"):
+            self.realistic_timing_checkbox.setChecked(
+                factory_settings.get("realistic_timing", True)
+            )
+        if hasattr(self, "vary_platform_checkbox"):
             self.vary_platform_checkbox.setChecked(factory_settings.get("vary_platform", True))
-        if hasattr(self, 'proxy_list_edit'):
+        if hasattr(self, "proxy_list_edit"):
             proxies = factory_settings.get("proxies", [])
             proxy_text = "\n".join(proxies) if isinstance(proxies, list) else str(proxies)
             self.proxy_list_edit.setPlainText(proxy_text)
@@ -3970,13 +4253,13 @@ class SettingsWindow(QDialog):
 
         # Performance settings
         perf = self.settings_data.get("performance", {})
-        if hasattr(self, 'low_power_checkbox'):
+        if hasattr(self, "low_power_checkbox"):
             self.low_power_checkbox.setChecked(perf.get("low_power", False))
-        if hasattr(self, 'enable_sampling_checkbox'):
+        if hasattr(self, "enable_sampling_checkbox"):
             self.enable_sampling_checkbox.setChecked(perf.get("enable_sampling", False))
-        if hasattr(self, 'stats_interval_spin'):
+        if hasattr(self, "stats_interval_spin"):
             self.stats_interval_spin.setValue(perf.get("stats_interval_ms", 30000))
-        if hasattr(self, 'dashboard_interval_spin'):
+        if hasattr(self, "dashboard_interval_spin"):
             self.dashboard_interval_spin.setValue(perf.get("dashboard_interval_ms", 5000))
 
     def collect_ui_settings(self) -> Dict[str, Any]:
@@ -3987,30 +4270,44 @@ class SettingsWindow(QDialog):
             "Keyword Triggered": "keyword",
             "Smart (AI-Decides)": "smart",
             "Always": "always",
-            "Never": "never"
+            "Never": "never",
         }
         voice_id_map = {
             "Rachel (Young American, 18-25)": "rachel",
             "Elli (Energetic, 18-22)": "elli",
             "Bella (Soft & Gentle, 20-28)": "bella",
             "Charlotte (Sweet & Youthful, 18-25)": "charlotte",
-            "Sarah (Confident, 20-25)": "sarah"
+            "Sarah (Confident, 20-25)": "sarah",
         }
         account_type_map = {
             "Reactive (Wait for DMs)": "reactive",
-            "Outreach (Message First)": "outreach"
+            "Outreach (Message First)": "outreach",
         }
 
-        voice_trigger_text = getattr(self, 'voice_trigger_combo', None) and self.voice_trigger_combo.currentText() or "Random Chance"
+        voice_trigger_text = (
+            getattr(self, "voice_trigger_combo", None)
+            and self.voice_trigger_combo.currentText()
+            or "Random Chance"
+        )
         voice_trigger = voice_trigger_map.get(voice_trigger_text, "random")
 
-        voice_id_text = getattr(self, 'voice_select_combo', None) and self.voice_select_combo.currentText() or ""
+        voice_id_text = (
+            getattr(self, "voice_select_combo", None)
+            and self.voice_select_combo.currentText()
+            or ""
+        )
         voice_id = voice_id_map.get(voice_id_text, "rachel")
 
-        account_type_text = getattr(self, 'account_type_combo', None) and self.account_type_combo.currentText() or ""
+        account_type_text = (
+            getattr(self, "account_type_combo", None)
+            and self.account_type_combo.currentText()
+            or ""
+        )
         account_type = account_type_map.get(account_type_text, "reactive")
 
-        keywords_text = getattr(self, 'voice_keywords_edit', None) and self.voice_keywords_edit.text() or ""
+        keywords_text = (
+            getattr(self, "voice_keywords_edit", None) and self.voice_keywords_edit.text() or ""
+        )
         keywords = [k.strip() for k in keywords_text.split(",") if k.strip()]
 
         settings: Dict[str, Any] = {}
@@ -4022,7 +4319,7 @@ class SettingsWindow(QDialog):
         self.sms_provider_widget.save_settings(settings)
 
         # Also collect SMS provider from Account Factory tab if it exists (for backward compatibility)
-        if hasattr(self, 'phone_provider_combo') and hasattr(self, 'provider_api_edit'):
+        if hasattr(self, "phone_provider_combo") and hasattr(self, "provider_api_edit"):
             sms_provider = self.phone_provider_combo.currentText()
             sms_key = self.provider_api_edit.text()
             if sms_provider or sms_key:
@@ -4034,24 +4331,50 @@ class SettingsWindow(QDialog):
 
         # Account defaults
         settings.setdefault("account_defaults", {})
-        settings["account_defaults"].update({
-            "account_type": account_type,
-            "use_shared_brain": self.use_shared_brain_checkbox.isChecked() if hasattr(self, 'use_shared_brain_checkbox') else True,
-            "custom_brain_prompt": getattr(self, 'custom_brain_edit', None) and self.custom_brain_edit.toPlainText() or ""
-        })
+        settings["account_defaults"].update(
+            {
+                "account_type": account_type,
+                "use_shared_brain": (
+                    self.use_shared_brain_checkbox.isChecked()
+                    if hasattr(self, "use_shared_brain_checkbox")
+                    else True
+                ),
+                "custom_brain_prompt": getattr(self, "custom_brain_edit", None)
+                and self.custom_brain_edit.toPlainText()
+                or "",
+            }
+        )
 
         # Voice configuration
         voice_settings = settings.setdefault("voice", {})
-        voice_settings.update({
-            "enabled": self.enable_voice_checkbox.isChecked() if hasattr(self, 'enable_voice_checkbox') else False,
-            "voice_id": voice_id,
-            "trigger_mode": voice_trigger,
-            "random_chance": self.voice_random_spin.value() if hasattr(self, 'voice_random_spin') else 30,
-            "nth_message": self.voice_nth_spin.value() if hasattr(self, 'voice_nth_spin') else 3,
-            "keywords": keywords if keywords else ["hey", "hi", "hello", "interested", "price"],
-            "time_boost_enabled": self.voice_time_boost_checkbox.isChecked() if hasattr(self, 'voice_time_boost_checkbox') else True,
-            "rapport_boost_enabled": self.voice_rapport_boost_checkbox.isChecked() if hasattr(self, 'voice_rapport_boost_checkbox') else True
-        })
+        voice_settings.update(
+            {
+                "enabled": (
+                    self.enable_voice_checkbox.isChecked()
+                    if hasattr(self, "enable_voice_checkbox")
+                    else False
+                ),
+                "voice_id": voice_id,
+                "trigger_mode": voice_trigger,
+                "random_chance": (
+                    self.voice_random_spin.value() if hasattr(self, "voice_random_spin") else 30
+                ),
+                "nth_message": (
+                    self.voice_nth_spin.value() if hasattr(self, "voice_nth_spin") else 3
+                ),
+                "keywords": keywords if keywords else ["hey", "hi", "hello", "interested", "price"],
+                "time_boost_enabled": (
+                    self.voice_time_boost_checkbox.isChecked()
+                    if hasattr(self, "voice_time_boost_checkbox")
+                    else True
+                ),
+                "rapport_boost_enabled": (
+                    self.voice_rapport_boost_checkbox.isChecked()
+                    if hasattr(self, "voice_rapport_boost_checkbox")
+                    else True
+                ),
+            }
+        )
 
         # Campaign/account level metadata
         settings.setdefault("account", {})
@@ -4059,52 +4382,161 @@ class SettingsWindow(QDialog):
 
         # Optional proxy/scalability controls (if present)
         settings.setdefault("proxy_pool", {})
-        settings["proxy_pool"].update({
-            "enabled": self.proxy_pool_enabled_checkbox.isChecked() if hasattr(self, 'proxy_pool_enabled_checkbox') else True,
-            "min_score": self.proxy_min_score_spin.value() if hasattr(self, 'proxy_min_score_spin') else 30,
-            "health_check_interval": self.proxy_health_interval_spin.value() if hasattr(self, 'proxy_health_interval_spin') else 60,
-            "auto_reassign": self.proxy_auto_reassign_checkbox.isChecked() if hasattr(self, 'proxy_auto_reassign_checkbox') else True,
-            "prefer_us_proxies": self.prefer_us_proxies_checkbox.isChecked() if hasattr(self, 'prefer_us_proxies_checkbox') else True
-        })
+        settings["proxy_pool"].update(
+            {
+                "enabled": (
+                    self.proxy_pool_enabled_checkbox.isChecked()
+                    if hasattr(self, "proxy_pool_enabled_checkbox")
+                    else True
+                ),
+                "min_score": (
+                    self.proxy_min_score_spin.value()
+                    if hasattr(self, "proxy_min_score_spin")
+                    else 30
+                ),
+                "health_check_interval": (
+                    self.proxy_health_interval_spin.value()
+                    if hasattr(self, "proxy_health_interval_spin")
+                    else 60
+                ),
+                "auto_reassign": (
+                    self.proxy_auto_reassign_checkbox.isChecked()
+                    if hasattr(self, "proxy_auto_reassign_checkbox")
+                    else True
+                ),
+                "prefer_us_proxies": (
+                    self.prefer_us_proxies_checkbox.isChecked()
+                    if hasattr(self, "prefer_us_proxies_checkbox")
+                    else True
+                ),
+            }
+        )
 
         settings.setdefault("scalability", {})
-        settings["scalability"].update({
-            "max_concurrent_accounts": self.max_concurrent_accounts_spin.value() if hasattr(self, 'max_concurrent_accounts_spin') else 50,
-            "max_per_shard": self.max_per_shard_spin.value() if hasattr(self, 'max_per_shard_spin') else 10,
-            "idle_timeout": self.idle_timeout_spin.value() if hasattr(self, 'idle_timeout_spin') else 300,
-            "batch_update_interval": self.batch_update_interval_spin.value() if hasattr(self, 'batch_update_interval_spin') else 5
-        })
+        settings["scalability"].update(
+            {
+                "max_concurrent_accounts": (
+                    self.max_concurrent_accounts_spin.value()
+                    if hasattr(self, "max_concurrent_accounts_spin")
+                    else 50
+                ),
+                "max_per_shard": (
+                    self.max_per_shard_spin.value() if hasattr(self, "max_per_shard_spin") else 10
+                ),
+                "idle_timeout": (
+                    self.idle_timeout_spin.value() if hasattr(self, "idle_timeout_spin") else 300
+                ),
+                "batch_update_interval": (
+                    self.batch_update_interval_spin.value()
+                    if hasattr(self, "batch_update_interval_spin")
+                    else 5
+                ),
+            }
+        )
 
         settings.setdefault("advanced", {})
-        settings["advanced"].update({
-            "max_reply_length": self.max_reply_length_spin.value() if hasattr(self, 'max_reply_length_spin') else 1024,
-            "enable_logging": self.enable_logging_checkbox.isChecked() if hasattr(self, 'enable_logging_checkbox') else True,
-            "realistic_typing": self.realistic_typing_checkbox.isChecked() if hasattr(self, 'realistic_typing_checkbox') else True,
-            "random_delays": self.random_delays_checkbox.isChecked() if hasattr(self, 'random_delays_checkbox') else True
-        })
+        settings["advanced"].update(
+            {
+                "max_reply_length": (
+                    self.max_reply_length_spin.value()
+                    if hasattr(self, "max_reply_length_spin")
+                    else 1024
+                ),
+                "enable_logging": (
+                    self.enable_logging_checkbox.isChecked()
+                    if hasattr(self, "enable_logging_checkbox")
+                    else True
+                ),
+                "realistic_typing": (
+                    self.realistic_typing_checkbox.isChecked()
+                    if hasattr(self, "realistic_typing_checkbox")
+                    else True
+                ),
+                "random_delays": (
+                    self.random_delays_checkbox.isChecked()
+                    if hasattr(self, "random_delays_checkbox")
+                    else True
+                ),
+            }
+        )
 
         # Performance settings
         settings.setdefault("performance", {})
-        settings["performance"].update({
-            "low_power": self.low_power_checkbox.isChecked() if hasattr(self, 'low_power_checkbox') else False,
-            "enable_sampling": self.enable_sampling_checkbox.isChecked() if hasattr(self, 'enable_sampling_checkbox') else False,
-            "sampling_interval_seconds": getattr(self, "sampling_interval_seconds", 30),
-            "stats_interval_ms": self.stats_interval_spin.value() if hasattr(self, 'stats_interval_spin') else 30000,
-            "dashboard_interval_ms": self.dashboard_interval_spin.value() if hasattr(self, 'dashboard_interval_spin') else 5000,
-        })
+        settings["performance"].update(
+            {
+                "low_power": (
+                    self.low_power_checkbox.isChecked()
+                    if hasattr(self, "low_power_checkbox")
+                    else False
+                ),
+                "enable_sampling": (
+                    self.enable_sampling_checkbox.isChecked()
+                    if hasattr(self, "enable_sampling_checkbox")
+                    else False
+                ),
+                "sampling_interval_seconds": getattr(self, "sampling_interval_seconds", 30),
+                "stats_interval_ms": (
+                    self.stats_interval_spin.value()
+                    if hasattr(self, "stats_interval_spin")
+                    else 30000
+                ),
+                "dashboard_interval_ms": (
+                    self.dashboard_interval_spin.value()
+                    if hasattr(self, "dashboard_interval_spin")
+                    else 5000
+                ),
+            }
+        )
 
         # Account factory settings
         settings["account_factory"] = {
-            "account_count": self.account_count_spin.value() if hasattr(self, 'account_count_spin') else 10,
-            "country": self.country_combo.currentText().split(" - ")[0] if hasattr(self, 'country_combo') else "US",
-            "phone_provider": self.phone_provider_combo.currentText() if hasattr(self, 'phone_provider_combo') else "sms-activate",
-            "provider_api_key": self.provider_api_edit.text().strip() if hasattr(self, 'provider_api_edit') else "",
-            "use_proxy": self.use_proxy_checkbox.isChecked() if hasattr(self, 'use_proxy_checkbox') else False,
-            "randomize_fingerprint": self.randomize_fingerprint_checkbox.isChecked() if hasattr(self, 'randomize_fingerprint_checkbox') else False,
-            "realistic_timing": self.realistic_timing_checkbox.isChecked() if hasattr(self, 'realistic_timing_checkbox') else False,
-            "vary_platform": self.vary_platform_checkbox.isChecked() if hasattr(self, 'vary_platform_checkbox') else False,
-            "proxies": [line.strip() for line in getattr(self, 'proxy_list_edit', QTextEdit())
-                         .toPlainText().split('\n') if line.strip()] if hasattr(self, 'proxy_list_edit') else [],
+            "account_count": (
+                self.account_count_spin.value() if hasattr(self, "account_count_spin") else 10
+            ),
+            "country": (
+                self.country_combo.currentText().split(" - ")[0]
+                if hasattr(self, "country_combo")
+                else "US"
+            ),
+            "phone_provider": (
+                self.phone_provider_combo.currentText()
+                if hasattr(self, "phone_provider_combo")
+                else "sms-activate"
+            ),
+            "provider_api_key": (
+                self.provider_api_edit.text().strip() if hasattr(self, "provider_api_edit") else ""
+            ),
+            "use_proxy": (
+                self.use_proxy_checkbox.isChecked()
+                if hasattr(self, "use_proxy_checkbox")
+                else False
+            ),
+            "randomize_fingerprint": (
+                self.randomize_fingerprint_checkbox.isChecked()
+                if hasattr(self, "randomize_fingerprint_checkbox")
+                else False
+            ),
+            "realistic_timing": (
+                self.realistic_timing_checkbox.isChecked()
+                if hasattr(self, "realistic_timing_checkbox")
+                else False
+            ),
+            "vary_platform": (
+                self.vary_platform_checkbox.isChecked()
+                if hasattr(self, "vary_platform_checkbox")
+                else False
+            ),
+            "proxies": (
+                [
+                    line.strip()
+                    for line in getattr(self, "proxy_list_edit", QTextEdit())
+                    .toPlainText()
+                    .split("\n")
+                    if line.strip()
+                ]
+                if hasattr(self, "proxy_list_edit")
+                else []
+            ),
         }
 
         return settings
@@ -4117,24 +4549,24 @@ class SettingsWindow(QDialog):
         """
         try:
             self.settings_data = self.collect_ui_settings()
-            
+
             # Validate configuration
             errors = ValidationHelper.validate_config(self.settings_data)
-            
+
             # Show warnings but allow saving (flexible validation)
             if errors and not self.wizard_mode:
                 error_msg = "Configuration warnings:\n\n" + "\n".join(f"• {err}" for err in errors)
                 error_msg += "\n\nNote: These settings may prevent certain features from working."
                 error_msg += "\n\nDo you want to save anyway?"
-                
+
                 reply = QMessageBox.question(
                     self,
                     "Configuration Warnings",
                     error_msg,
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No
+                    QMessageBox.StandardButton.No,
                 )
-                
+
                 if reply == QMessageBox.StandardButton.No:
                     return
 
@@ -4143,7 +4575,11 @@ class SettingsWindow(QDialog):
                 self._validate_telegram_credentials(self.settings_data.get("telegram", {}))
             )
             if not tg_ok:
-                ErrorHandler.safe_warning(self, "Telegram Validation Failed", tg_err or "Telegram credentials could not be validated.")
+                ErrorHandler.safe_warning(
+                    self,
+                    "Telegram Validation Failed",
+                    tg_err or "Telegram credentials could not be validated.",
+                )
                 return
 
             now_ts = datetime.datetime.now().isoformat()
@@ -4157,31 +4593,38 @@ class SettingsWindow(QDialog):
 
             gemini_key = self.settings_data.get("gemini", {}).get("api_key", "")
             if gemini_key:
-                gem_ok, gem_err = self._run_async_validation(
-                    self._validate_gemini_key(gemini_key)
-                )
+                gem_ok, gem_err = self._run_async_validation(self._validate_gemini_key(gemini_key))
                 if not gem_ok:
-                    ErrorHandler.safe_warning(self, "Gemini Validation Failed", gem_err or "Gemini API key could not be validated.")
+                    ErrorHandler.safe_warning(
+                        self,
+                        "Gemini Validation Failed",
+                        gem_err or "Gemini API key could not be validated.",
+                    )
                     return
                 self.settings_data.setdefault("gemini", {})
                 self.settings_data["gemini"]["validated"] = True
                 self.settings_data["gemini"]["validated_at"] = now_ts
 
             config_path = Path("config.json")
-            
+
             # Backup existing config
             if config_path.exists():
                 backup_path = Path("config.json.backup")
                 import shutil
+
                 shutil.copy(config_path, backup_path)
-            
-            with open(config_path, 'w', encoding='utf-8') as f:
+
+            with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(self.settings_data, f, indent=2)
 
             self.settings_updated.emit(self.settings_data)
-            
+
             if not self.wizard_mode:
-                ErrorHandler.safe_information(self, "Success", "Settings saved successfully!\n\nYou may need to restart for some changes to take effect.")
+                ErrorHandler.safe_information(
+                    self,
+                    "Success",
+                    "Settings saved successfully!\n\nYou may need to restart for some changes to take effect.",
+                )
 
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
@@ -4218,7 +4661,9 @@ class SettingsWindow(QDialog):
             logger.error(f"Gemini validation error: {exc}")
             return False, str(exc)
 
-    async def _validate_telegram_credentials(self, telegram_cfg: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], str]:
+    async def _validate_telegram_credentials(
+        self, telegram_cfg: Dict[str, Any]
+    ) -> Tuple[bool, Dict[str, Any], str]:
         """Validate Telegram credentials with sign-in and profile fetch."""
         api_id = telegram_cfg.get("api_id")
         api_hash = telegram_cfg.get("api_hash")
@@ -4234,7 +4679,7 @@ class SettingsWindow(QDialog):
             phone_number=phone,
             workdir=str(session_dir),
             in_memory=True,
-            no_updates=True
+            no_updates=True,
         )
 
         profile: Dict[str, Any] = {}
@@ -4252,7 +4697,9 @@ class SettingsWindow(QDialog):
         try:
             if not await client.is_authorized():
                 sent = await client.send_code(phone)
-                code, ok = self._prompt_input("Telegram Login", "Enter the login code sent to Telegram:")
+                code, ok = self._prompt_input(
+                    "Telegram Login", "Enter the login code sent to Telegram:"
+                )
                 if not ok or not code.strip():
                     await client.disconnect()
                     return False, profile, "Login code was not provided."
@@ -4260,10 +4707,14 @@ class SettingsWindow(QDialog):
                     await client.sign_in(
                         phone_number=phone,
                         phone_code_hash=sent.phone_code_hash,
-                        phone_code=code.strip()
+                        phone_code=code.strip(),
                     )
                 except SessionPasswordNeeded:
-                    password, ok_pwd = self._prompt_input("Two-Factor Password", "Enter your Telegram 2FA password:", password_mode=True)
+                    password, ok_pwd = self._prompt_input(
+                        "Two-Factor Password",
+                        "Enter your Telegram 2FA password:",
+                        password_mode=True,
+                    )
                     if not ok_pwd or not password:
                         await client.disconnect()
                         return False, profile, "Two-factor password required to finish sign-in."
@@ -4271,9 +4722,15 @@ class SettingsWindow(QDialog):
 
             me = await client.get_me()
             if not me:
-                return False, profile, "Could not retrieve profile. Please ensure the account is fully signed in."
+                return (
+                    False,
+                    profile,
+                    "Could not retrieve profile. Please ensure the account is fully signed in.",
+                )
 
-            display_name = f"{(me.first_name or '').strip()} {(me.last_name or '').strip()}".strip() or phone
+            display_name = (
+                f"{(me.first_name or '').strip()} {(me.last_name or '').strip()}".strip() or phone
+            )
             profile = {
                 "user_id": getattr(me, "id", None),
                 "username": getattr(me, "username", "") or "",
@@ -4281,7 +4738,7 @@ class SettingsWindow(QDialog):
                 "last_name": getattr(me, "last_name", "") or "",
                 "display_name": display_name,
                 "phone_number": phone,
-                "photo_path": ""
+                "photo_path": "",
             }
 
             if getattr(me, "photo", None):
@@ -4289,8 +4746,7 @@ class SettingsWindow(QDialog):
                 photo_dir.mkdir(exist_ok=True)
                 try:
                     photo_path = await client.download_media(
-                        me.photo,
-                        file_name=str(photo_dir / f"{me.id}.jpg")
+                        me.photo, file_name=str(photo_dir / f"{me.id}.jpg")
                     )
                     if photo_path:
                         profile["photo_path"] = str(photo_path)
@@ -4312,7 +4768,9 @@ class SettingsWindow(QDialog):
 
         return True, profile, ""
 
-    def _prompt_input(self, title: str, label: str, password_mode: bool = False) -> Tuple[str, bool]:
+    def _prompt_input(
+        self, title: str, label: str, password_mode: bool = False
+    ) -> Tuple[str, bool]:
         """Prompt the user for input without blocking the UI."""
         echo = QLineEdit.EchoMode.Password if password_mode else QLineEdit.EchoMode.Normal
         text, ok = QInputDialog.getText(self, title, label, echo)
@@ -4321,36 +4779,37 @@ class SettingsWindow(QDialog):
     def test_configuration(self):
         """Test the current configuration with detailed validation."""
         config = self.collect_ui_settings()
-        
+
         # Validate configuration
         errors = ValidationHelper.validate_config(config)
-        
+
         if errors:
             error_msg = "Configuration Issues Found:\n\n" + "\n".join(f"• {err}" for err in errors)
             error_msg += "\n\n💡 Fix these issues and test again."
             ErrorHandler.safe_warning(self, "Configuration Test Failed", error_msg)
             return
-        
+
         # Test actual connections
         test_results = []
-        
+
         # Test Telegram API (just validate format, actual test requires connection)
         test_results.append("Telegram API credentials format is valid")
-        
+
         # Test Gemini API if provided
         if config.get("gemini", {}).get("api_key"):
             test_results.append("Gemini API key format is valid")
-        
+
         # Check proxy format if provided
-        if hasattr(self, 'proxy_list') and self.proxy_list.count() > 0:
+        if hasattr(self, "proxy_list") and self.proxy_list.count() > 0:
             test_results.append(f"{self.proxy_list.count()} proxy(ies) configured")
-        
+
         success_msg = "Configuration Test Passed!\n\n" + "\n".join(test_results)
         success_msg += "\n\nNote: This validates format only. Actual connectivity will be tested when you connect."
-        
+
         ErrorHandler.safe_information(self, "Configuration Test Passed", success_msg)
-    
+
     def _open_url(self, url: str):
         """Open URL in default browser."""
         import webbrowser
+
         webbrowser.open(url)
