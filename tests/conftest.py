@@ -37,7 +37,7 @@ except Exception:
 
 def _safe_process_events(app, max_events=5):
     """Safely process Qt events with a limit to prevent blocking.
-    
+
     In headless/CI environments, processEvents() can block indefinitely.
     This function processes a limited number of events to avoid hangs.
     """
@@ -49,7 +49,7 @@ def _safe_process_events(app, max_events=5):
         # Only process if there are actually pending events
         if not app.hasPendingEvents():
             return
-        
+
         # Process only a very limited number of events to prevent blocking
         # Use AllEvents flag - in PyQt6, processEvents() without timeout
         # can block, so we limit iterations strictly
