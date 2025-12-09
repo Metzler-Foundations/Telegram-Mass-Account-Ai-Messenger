@@ -10,7 +10,7 @@ class MockGenerativeModel:
     
     def __init__(
         self,
-        model_name: str = "gemini-1.5-flash",
+        model_name: str = "gemini-1.5-flash-latest",
         generation_config: Optional[Dict] = None,
         **kwargs
     ):

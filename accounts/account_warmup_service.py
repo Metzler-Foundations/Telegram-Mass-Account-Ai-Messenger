@@ -196,10 +196,13 @@ class WarmupConfig:
 class AccountWarmupService:
     """Advanced service for warming up Telegram accounts with AI-powered intelligence."""
 
-    def __init__(self, account_manager: AccountManager, gemini_service: Optional[GeminiService] = None):
+    def __init__(self, account_manager: AccountManager, gemini_service: Optional[GeminiService] = None,
+                 performance_profile: Optional[Dict[str, Any]] = None):
         self.account_manager = account_manager
         self.gemini_service = gemini_service
         # Store reference for status updates
+        self.performance_profile = performance_profile or {}
+        self.low_power = bool(self.performance_profile.get("low_power", False))
 
         # Queue management
         self.job_queue: List[WarmupJob] = []
@@ -214,6 +217,13 @@ class AccountWarmupService:
 
         # Configuration
         self.config = WarmupConfig()
+        if self.low_power:
+            self.config.daily_activity_limit = min(self.config.daily_activity_limit, 10)
+            self.config.session_max_duration = min(self.config.session_max_duration, 20)
+            self.config.min_delay_between_actions = max(self.config.min_delay_between_actions, 45)
+            self.config.max_delay_between_actions = max(self.config.max_delay_between_actions, 360)
+            self.config.use_gemini_for_responses = False
+            self.config.use_gemini_for_decisions = False
 
         # Persistence
         self.jobs_file = Path("warmup_jobs.json")
@@ -245,7 +255,7 @@ class AccountWarmupService:
         # Also update account manager if available
         if hasattr(self, 'account_manager') and self.account_manager:
             try:
-                from account_manager import AccountStatus
+                from accounts.account_manager import AccountStatus
                 # Update account status based on warmup stage
                 if job.stage == WarmupStage.COMPLETED:
                     self.account_manager.update_account_status(

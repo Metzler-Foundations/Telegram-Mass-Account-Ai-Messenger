@@ -31,9 +31,23 @@ class IntelligentScheduler:
         """Initialize intelligent scheduler."""
         self.db_path = db_path
         self.status_db = status_db
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except Exception as exc:
+            logger.debug(f"Connection pool unavailable for scheduler: {exc}")
         self._init_database()
         self.cleanup_stale_records()
         self.blackout_windows: List[Tuple[int, int]] = [(0, 6)]
+    
+    def _get_connection(self):
+        """Return a DB connection from pool or direct sqlite."""
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
     
     def _init_database(self):
         """Initialize scheduler database."""

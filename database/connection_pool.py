@@ -14,13 +14,15 @@ import sqlite3
 import threading
 import time
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Literal
 from pathlib import Path
 from queue import Queue, Empty, Full
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+ConnectionType = Literal['read', 'write']
 
 
 class PooledConnection:
@@ -98,7 +100,14 @@ class PooledConnection:
     
     def cursor(self):
         """Get cursor."""
-        return self.connection.cursor()
+        try:
+            self.last_used = datetime.now()
+            self.use_count += 1
+            return self.connection.cursor()
+        except sqlite3.Error as e:
+            logger.error(f"Cursor error: {e}")
+            self.is_healthy = False
+            raise
     
     def close(self):
         """Close connection."""
@@ -106,6 +115,29 @@ class PooledConnection:
             self.connection.close()
         except Exception as e:
             logger.warning(f"Error closing connection: {e}")
+
+
+class ManagedConnection:
+    """Wrapper that returns to pool on close/exit."""
+
+    def __init__(self, pool: "ConnectionPool", conn: PooledConnection):
+        self._pool = pool
+        self._conn = conn
+        self._released = False
+
+    def __enter__(self):
+        return self._conn
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+
+    def __getattr__(self, item):
+        return getattr(self._conn, item)
+
+    def close(self):
+        if not self._released:
+            self._released = True
+            self._pool._release_connection(self._conn)
 
 
 class ConnectionPool:
@@ -137,6 +169,13 @@ class ConnectionPool:
         self.max_idle_time = max_idle_time
         self.max_lifetime = max_lifetime
         self.timeout = timeout
+
+        # Read/write connection pools (SQLite doesn't have true read replicas,
+        # but we can logically separate read and write operations)
+        self.pools = {
+            'read': Queue(maxsize=max_connections),
+            'write': Queue(maxsize=max_connections // 2)  # Fewer write connections
+        }
         
         # Connection queue
         self._pool: Queue = Queue(maxsize=max_connections)
@@ -187,6 +226,10 @@ class ConnectionPool:
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA busy_timeout=60000")  # 60 seconds for better lock tolerance
             conn.execute("PRAGMA wal_autocheckpoint=1000")  # Checkpoint every 1000 pages
+            conn.execute("PRAGMA temp_store=MEMORY")  # Store temp tables in memory
+            conn.execute("PRAGMA mmap_size=268435456")  # 256MB memory map for better performance
+            conn.execute("PRAGMA cache_size=-64000")  # 64MB cache (negative = KB)
+            conn.execute("PRAGMA optimize")  # Run optimize pragma for better query planning
             conn.execute("PRAGMA cache_size=-64000")  # 64MB cache
             
             # Row factory for dict-like access
@@ -218,63 +261,70 @@ class ConnectionPool:
                 logger.warning(f"Could not initialize all connections: {e}")
                 break
     
-    @contextmanager
-    def get_connection(self):
+    def get_connection(self, connection_type: ConnectionType = 'read'):
         """
-        Get a connection from the pool (context manager).
-        
-        Yields:
-            PooledConnection instance
-            
-        Example:
-            with pool.get_connection() as conn:
-                conn.execute("SELECT * FROM table")
+        Get a connection from the appropriate pool based on operation type.
+
+        Args:
+            connection_type: 'read' for read operations, 'write' for write operations
+
+        Returns:
+            ManagedConnection that can be used with a context manager
         """
+        pool = self.pools[connection_type]
         conn = None
+
+        # Try to get from appropriate pool
         try:
-            # Try to get from pool
             try:
-                conn = self._pool.get(timeout=self.timeout)
+                conn = pool.get(timeout=self.timeout)
             except Empty:
                 # Pool empty, try to create new connection if under max
+                pool_max = self.max_connections if connection_type == 'read' else self.max_connections // 2
                 with self._lock:
-                    if len(self._all_connections) < self.max_connections:
+                    pool_size = len([c for c in self._all_connections if getattr(c, 'connection_type', 'read') == connection_type])
+                    if pool_size < pool_max:
                         conn = self._create_connection()
+                        conn.connection_type = connection_type  # Mark connection type
                     else:
-                        # Wait for connection to become available
                         self.stats['total_timeouts'] += 1
                         raise TimeoutError(
-                            f"Could not get connection within {self.timeout}s "
-                            f"(pool size: {len(self._all_connections)})"
+                            f"Could not get {connection_type} connection within {self.timeout}s "
+                            f"(pool exhausted, {pool_size}/{pool_max} connections)"
                         )
-            
+
             # Check connection health
             if not self._is_connection_healthy(conn):
                 logger.warning("Recycling unhealthy connection")
                 self._recycle_connection(conn)
                 conn = self._create_connection()
-            
-            yield conn
-            
-        finally:
-            # Return connection to pool
+
+            return ManagedConnection(self, conn)
+        except Exception:
+            # If we failed after getting a conn, recycle it
             if conn:
+                self._recycle_connection(conn)
+            raise
+
+    def _release_connection(self, conn: PooledConnection):
+        """Return connection to pool or recycle if unhealthy."""
+        if not conn:
+            return
+
+        connection_type = getattr(conn, 'connection_type', 'read')
+        pool = self.pools[connection_type]
+
+        try:
+            if conn.is_healthy:
                 try:
-                    # Rollback any uncommitted transactions
-                    if conn.is_healthy:
-                        try:
-                            conn.rollback()
-                        except Exception:
-                            pass
-                        
-                        # Return to pool
-                        self._pool.put(conn, block=False)
-                    else:
-                        # Recycle unhealthy connection
-                        self._recycle_connection(conn)
-                except Full:
-                    # Pool full, close connection
-                    self._recycle_connection(conn)
+                    conn.rollback()
+                except Exception:
+                    pass
+                pool.put(conn, block=False)
+            else:
+                self._recycle_connection(conn)
+        except Full:
+            self._recycle_connection(conn)
     
     def _is_connection_healthy(self, conn: PooledConnection) -> bool:
         """

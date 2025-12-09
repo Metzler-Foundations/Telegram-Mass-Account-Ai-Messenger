@@ -25,10 +25,23 @@ class ConfigurationManager:
         "telegram": {
             "api_id": "",
             "api_hash": "",
-            "phone_number": ""
+            "phone_number": "",
+            "profile": {
+                "username": "",
+                "first_name": "",
+                "last_name": "",
+                "phone_number": "",
+                "photo_path": "",
+                "validated": False,
+                "validated_at": ""
+            },
+            "validated": False,
+            "validated_at": ""
         },
         "gemini": {
-            "api_key": ""
+            "api_key": "",
+            "validated": False,
+            "validated_at": ""
         },
         "brain": {
             "prompt": "",
@@ -52,6 +65,36 @@ class ConfigurationManager:
             "time_based_delays": True,
             "error_backoff": True,
             "session_recovery": True
+        },
+        "performance": {
+            "low_power": False,
+            "enable_sampling": False,
+            "sampling_interval_seconds": 30,
+            "stats_interval_ms": 30000,
+            "dashboard_interval_ms": 5000,
+            "background_services_enabled": True,
+            "warmup_autostart": True,
+            "campaign_autostart": True,
+            "resource_limits": {
+                "max_concurrent_operations": 10,
+                "memory_limit_mb": 512,
+                "cpu_limit_percent": 80,
+                "resource_check_interval": 30
+            },
+            "accounts": {
+                "max_concurrent_connections": 50,
+                "max_per_shard": 10,
+                "health_check_interval": 30,
+                "batch_update_interval": 5.0
+            },
+            "scraping": {
+                "max_workers": 5,
+                "queue_poll_interval": 0.1
+            },
+            "ai": {
+                "max_tokens": 1024,
+                "max_history": 50
+            }
         }
     }
 
@@ -65,9 +108,61 @@ class ConfigurationManager:
             try:
                 with open(self.config_path, "r", encoding="utf-8") as handle:
                     data = json.load(handle)
-                    self._deep_merge(self._config, data)
+
+                # SECURITY: Migrate any credentials found in config to secrets manager
+                self._migrate_credentials_to_secrets(data)
+
+                self._deep_merge(self._config, data)
             except Exception as exc:
                 logger.error(f"Failed to load configuration: {exc}")
+
+    def _migrate_credentials_to_secrets(self, data: Dict[str, Any]) -> None:
+        """Migrate any credentials found in config to secrets manager and remove them."""
+        if not SECRETS_AVAILABLE:
+            logger.warning("Secrets manager not available, credentials remain in config (INSECURE)")
+            return
+
+        try:
+            secrets_manager = get_secrets_manager()
+            migrated = False
+
+            # Migrate Telegram credentials
+            if "telegram" in data:
+                telegram_cfg = data["telegram"]
+                if telegram_cfg.get("api_id"):
+                    secrets_manager.set_secret('telegram_api_id', telegram_cfg["api_id"])
+                    del telegram_cfg["api_id"]
+                    migrated = True
+                if telegram_cfg.get("api_hash"):
+                    secrets_manager.set_secret('telegram_api_hash', telegram_cfg["api_hash"])
+                    del telegram_cfg["api_hash"]
+                    migrated = True
+
+            # Migrate Gemini API key
+            if "gemini" in data and data["gemini"].get("api_key"):
+                secrets_manager.set_secret('gemini_api_key', data["gemini"]["api_key"])
+                del data["gemini"]["api_key"]
+                migrated = True
+
+            # Migrate SMS provider API key
+            if "sms_providers" in data and data["sms_providers"].get("api_key"):
+                secrets_manager.set_secret('sms_provider_api_key', data["sms_providers"]["api_key"])
+                del data["sms_providers"]["api_key"]
+                migrated = True
+
+            if migrated:
+                logger.info("Migrated credentials from config.json to secure secrets manager")
+                # Save the cleaned config back to disk
+                try:
+                    with open(self.config_path, "w", encoding="utf-8") as handle:
+                        json.dump(data, handle, indent=2)
+                    logger.info("Cleaned config.json saved (credentials removed)")
+                except Exception as save_exc:
+                    logger.error(f"Failed to save cleaned config: {save_exc}")
+
+        except Exception as exc:
+            logger.error(f"Failed to migrate credentials to secrets manager: {exc}")
+            logger.warning("Credentials may remain in config.json (INSECURE)")
 
     def save(self) -> None:
         try:
@@ -145,7 +240,7 @@ class ConfigurationManager:
     
     def get_gemini_api_key(self) -> Optional[str]:
         """Get Gemini API key from secrets manager."""
-        return self.get_secret('gemini_api_key', required=True)
+        return self.get_secret('gemini_api_key', required=False)
     
     def get_sms_provider_api_key(self) -> Optional[str]:
         """Get SMS provider API key from secrets manager."""

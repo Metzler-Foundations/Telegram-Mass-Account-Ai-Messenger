@@ -20,6 +20,8 @@ import base64
 import hashlib
 from cryptography.fernet import Fernet
 
+from core.security_audit import audit_credential_access, audit_credential_modification
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,7 +39,6 @@ class SecretsManager:
         self._cache: Dict[str, Any] = {}
         self._master_key = self._get_or_create_master_key()
         self._fernet = Fernet(self._master_key)
-        self._access_log = []
         
     def _get_or_create_master_key(self) -> bytes:
         """
@@ -102,86 +103,91 @@ class SecretsManager:
         Raises:
             ValueError: If required secret not found
         """
-        # Log access
-        self._access_log.append({
-            'key': key,
-            'timestamp': datetime.now().isoformat(),
-            'found': False
-        })
-        
         # Check cache first
         if key in self._cache:
-            self._access_log[-1]['found'] = True
-            self._access_log[-1]['source'] = 'cache'
+            audit_credential_access(key, 'cache', success=True)
             return self._cache[key]
-        
+
         # Check environment variable
         env_key = f"SECRET_{key.upper()}"
         env_value = os.environ.get(env_key)
         if env_value:
             logger.debug(f"Secret '{key}' loaded from environment")
             self._cache[key] = env_value
-            self._access_log[-1]['found'] = True
-            self._access_log[-1]['source'] = 'environment'
+            audit_credential_access(key, 'environment', success=True)
             return env_value
-        
+
         # Check encrypted file
         secrets = self._load_encrypted_secrets()
         if key in secrets:
             value = secrets[key]
             logger.debug(f"Secret '{key}' loaded from encrypted file")
             self._cache[key] = value
-            self._access_log[-1]['found'] = True
-            self._access_log[-1]['source'] = 'encrypted_file'
+            audit_credential_access(key, 'encrypted_file', success=True)
             return value
-        
+
         # Return default or raise error
         if required:
+            audit_credential_access(key, 'unknown', success=False)
             raise ValueError(f"Required secret '{key}' not found in environment or secrets file")
-        
+
         logger.debug(f"Secret '{key}' not found, using default")
-        self._access_log[-1]['source'] = 'default'
+        audit_credential_access(key, 'default', success=True)
         return default
     
     def set_secret(self, key: str, value: Any) -> None:
         """
         Store a secret securely in encrypted file.
-        
+
         Args:
             key: Secret key name
             value: Secret value
         """
-        secrets = self._load_encrypted_secrets()
-        secrets[key] = value
-        self._save_encrypted_secrets(secrets)
-        
-        # Update cache
-        self._cache[key] = value
-        
-        logger.info(f"Secret '{key}' stored securely")
+        try:
+            secrets = self._load_encrypted_secrets()
+            secrets[key] = value
+            self._save_encrypted_secrets(secrets)
+
+            # Update cache
+            self._cache[key] = value
+
+            audit_credential_modification(key, 'set', success=True)
+            logger.info(f"Secret '{key}' stored securely")
+        except Exception as e:
+            audit_credential_modification(key, 'set', success=False)
+            logger.error(f"Failed to store secret '{key}': {e}")
+            raise
     
     def delete_secret(self, key: str) -> bool:
         """
         Delete a secret from encrypted storage.
-        
+
         Args:
             key: Secret key name
-            
+
         Returns:
             True if deleted, False if not found
         """
-        secrets = self._load_encrypted_secrets()
-        if key in secrets:
-            del secrets[key]
-            self._save_encrypted_secrets(secrets)
-            
-            # Clear from cache
-            self._cache.pop(key, None)
-            
-            logger.info(f"Secret '{key}' deleted")
-            return True
-        
-        return False
+        try:
+            secrets = self._load_encrypted_secrets()
+            if key in secrets:
+                del secrets[key]
+                self._save_encrypted_secrets(secrets)
+
+                # Clear from cache
+                self._cache.pop(key, None)
+
+                audit_credential_modification(key, 'delete', success=True)
+                logger.info(f"Secret '{key}' deleted")
+                return True
+
+            audit_credential_modification(key, 'delete', success=False)
+            logger.warning(f"Secret '{key}' not found for deletion")
+            return False
+        except Exception as e:
+            audit_credential_modification(key, 'delete', success=False)
+            logger.error(f"Failed to delete secret '{key}': {e}")
+            raise
     
     def _load_encrypted_secrets(self) -> Dict[str, Any]:
         """
@@ -333,15 +339,6 @@ class SecretsManager:
             json.dump(config, f, indent=2)
         
         logger.info("Secrets cleared from config.json")
-    
-    def get_access_log(self) -> list:
-        """
-        Get audit log of secret accesses.
-        
-        Returns:
-            List of access log entries
-        """
-        return self._access_log.copy()
     
     def validate_secrets(self) -> Dict[str, bool]:
         """

@@ -15,6 +15,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QEasingCurv
 from PyQt6.QtGui import QColor, QIcon, QMovie, QPixmap
 
 from core.error_handler import ErrorHandler
+from ui.theme_manager import ThemeManager
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +31,20 @@ class LoadingOverlay(QWidget):
     
     def setup_ui(self):
         """Set up the loading overlay UI."""
+        c = ThemeManager.get_colors()
+        is_dark = ThemeManager.current_theme == "dark"
+        
+        # Convert hex to rgba for overlay background
+        bg_hex = c["BG_PRIMARY"].lstrip('#')
+        bg_r = int(bg_hex[0:2], 16)
+        bg_g = int(bg_hex[2:4], 16)
+        bg_b = int(bg_hex[4:6], 16)
+        
         # Make overlay cover parent
-        self.setStyleSheet("""
-            LoadingOverlay {
-                background-color: rgba(0, 0, 0, 0.7);
-            }
+        self.setStyleSheet(f"""
+            LoadingOverlay {{
+                background-color: rgba({bg_r}, {bg_g}, {bg_b}, 0.85);
+            }}
         """)
         
         layout = QVBoxLayout(self)
@@ -42,28 +52,35 @@ class LoadingOverlay(QWidget):
         
         # Container for centering
         container = QFrame()
-        container.setStyleSheet("""
-            QFrame {
-                background-color: #2b2d31;
+        container.setObjectName("hero_card")
+        container.setStyleSheet(f"""
+            QFrame#hero_card {{
+                background-color: {c["BG_SECONDARY"]};
+                border: 1px solid {c["BORDER_DEFAULT"]};
                 border-radius: 12px;
-                padding: 30px;
-            }
+                padding: 24px 32px;
+            }}
         """)
         container_layout = QVBoxLayout(container)
         container_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        container_layout.setSpacing(20)
+        container_layout.setSpacing(16)
         
-        # Spinner using animated dots
-        self.spinner_label = QLabel("⏳")
-        self.spinner_label.setStyleSheet("font-size: 48px;")
+        # Spinner using animated dots (text-based, no emoji)
+        self.spinner_label = QLabel("...")
+        self.spinner_label.setStyleSheet(f"""
+            font-size: 32px;
+            color: {c["ACCENT_PRIMARY"]};
+            font-weight: 700;
+            letter-spacing: 4px;
+        """)
         self.spinner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         container_layout.addWidget(self.spinner_label)
         
         # Message
         self.message_label = QLabel(self.message)
-        self.message_label.setStyleSheet("""
-            font-size: 16px;
-            color: #ffffff;
+        self.message_label.setStyleSheet(f"""
+            font-size: 14px;
+            color: {c["TEXT_PRIMARY"]};
             font-weight: 500;
         """)
         self.message_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -72,18 +89,10 @@ class LoadingOverlay(QWidget):
         # Progress bar (indeterminate)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)  # Indeterminate mode
-        self.progress_bar.setFixedWidth(200)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                background-color: #1e1f22;
-                border-radius: 4px;
-                height: 8px;
-            }
-            QProgressBar::chunk {
-                background-color: #5865f2;
-                border-radius: 4px;
-            }
-        """)
+        # Use relative sizing instead of fixed
+        self.progress_bar.setMinimumWidth(240)
+        self.progress_bar.setMaximumWidth(400)
+        self.progress_bar.setFixedHeight(6)
         container_layout.addWidget(self.progress_bar)
         
         layout.addWidget(container)
@@ -91,7 +100,7 @@ class LoadingOverlay(QWidget):
         # Animation timer for spinner
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self._animate_spinner)
-        self.spinner_frames = ["⏳", "⌛"]
+        self.spinner_frames = [".", "..", "...", ".."]
         self.current_frame = 0
     
     def _animate_spinner(self):
@@ -161,6 +170,10 @@ class MessageHistoryWidget(QWidget):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
+        self.table.setWordWrap(False)
+        self.table.setMinimumHeight(240)
         layout.addWidget(self.table)
         
         # Store messages data
@@ -197,13 +210,14 @@ class MessageHistoryWidget(QWidget):
             status_item = QTableWidgetItem(msg.get('status', ''))
             
             # Color code status
+            c = ThemeManager.get_colors()
             status = msg.get('status', '').lower()
             if status == 'sent':
-                status_item.setForeground(QColor('#23a559'))
+                status_item.setForeground(QColor(c['ACCENT_SUCCESS']))
             elif status == 'failed':
-                status_item.setForeground(QColor('#f23f42'))
+                status_item.setForeground(QColor(c['ACCENT_DANGER']))
             elif status == 'received':
-                status_item.setForeground(QColor('#5865f2'))
+                status_item.setForeground(QColor(c['ACCENT_PRIMARY']))
             
             self.table.setItem(row, 0, time_item)
             self.table.setItem(row, 1, account_item)
@@ -226,20 +240,25 @@ class CreateCampaignDialog(QDialog):
         self.setModal(True)
         self.resize(600, 700) # Reduced width, standard height
         self.setObjectName("settings_dialog")
+        
+        # CRITICAL: Prevent dialog from closing parent window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        
         self.setup_ui()
         
     def setup_ui(self):
+        c = ThemeManager.get_colors()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(20)
         
         # Dialog Title
         title_label = QLabel("New Campaign")
-        title_label.setStyleSheet("font-size: 20px; font-weight: 600; color: #e4e4e7;")
+        title_label.setStyleSheet(f"font-size: 20px; font-weight: 600; color: {c['TEXT_BRIGHT']};")
         layout.addWidget(title_label)
         
         subtitle_label = QLabel("Configure your DM campaign settings")
-        subtitle_label.setStyleSheet("color: #a1a1aa; margin-bottom: 12px;")
+        subtitle_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; margin-bottom: 12px;")
         layout.addWidget(subtitle_label)
         
         # Form
@@ -274,7 +293,7 @@ class CreateCampaignDialog(QDialog):
         
         # Variable help
         help_label = QLabel("Available variables: {first_name}, {last_name}, {username}, {name}")
-        help_label.setStyleSheet("color: #a1a1aa; font-size: 12px; padding: 4px;")
+        help_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px; padding: 4px;")
         form_layout.addRow("", help_label)
         
         layout.addLayout(form_layout)
@@ -286,7 +305,7 @@ class CreateCampaignDialog(QDialog):
         variant_layout.setSpacing(8)
         
         variant_subtitle = QLabel("Add multiple template variants for A/B testing")
-        variant_subtitle.setStyleSheet("color: #a1a1aa; font-size: 12px;")
+        variant_subtitle.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px;")
         variant_layout.addWidget(variant_subtitle)
         
         # Variant table
@@ -294,8 +313,9 @@ class CreateCampaignDialog(QDialog):
         self.variant_table.setColumnCount(3)
         self.variant_table.setHorizontalHeaderLabels(["Variant Name", "Template", "Weight"])
         self.variant_table.horizontalHeader().setStretchLastSection(True)
+        # Use relative sizing - minimum 150px but can grow
         self.variant_table.setMinimumHeight(150)
-        self.variant_table.setMaximumHeight(250)
+        # Remove fixed max height to allow flexibility
         self.variant_table.setToolTip(
             "Create multiple message variants for A/B testing.\n"
             "Weight determines distribution (e.g., 1.0 = equal split).\n"
@@ -333,11 +353,12 @@ class CreateCampaignDialog(QDialog):
         target_layout.setSpacing(8)
         
         target_subtitle = QLabel("Select channels to scrape members from")
-        target_subtitle.setStyleSheet("color: #a1a1aa; font-size: 12px;")
+        target_subtitle.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px;")
         target_layout.addWidget(target_subtitle)
         
         self.channel_list = QListWidget()
         self.channel_list.setMinimumHeight(120)
+        # Allow flexible sizing
         self.channel_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.channel_list.setToolTip(
             "Select one or more channels to target.\n"
@@ -363,11 +384,12 @@ class CreateCampaignDialog(QDialog):
         account_layout.setSpacing(8)
         
         account_subtitle = QLabel("Select which accounts will send messages")
-        account_subtitle.setStyleSheet("color: #a1a1aa; font-size: 12px;")
+        account_subtitle.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px;")
         account_layout.addWidget(account_subtitle)
         
         self.account_list = QListWidget()
         self.account_list.setMinimumHeight(120)
+        # Allow flexible sizing
         self.account_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.account_list.setToolTip(
             "Select accounts to send messages from.\n"
@@ -391,13 +413,13 @@ class CreateCampaignDialog(QDialog):
         buttons.addStretch()
         
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFixedWidth(100)
+        cancel_btn.setMinimumWidth(100)
         cancel_btn.clicked.connect(self.reject)
         buttons.addWidget(cancel_btn)
         
         create_btn = QPushButton("Create Campaign")
         create_btn.setObjectName("primary")
-        create_btn.setFixedWidth(140)
+        create_btn.setMinimumWidth(140)
         create_btn.clicked.connect(self.accept)
         buttons.addWidget(create_btn)
         
@@ -503,6 +525,9 @@ class MemberProfileViewer(QDialog):
         self.setWindowTitle(f"Member Profile: {member_data.get('first_name', '')} {member_data.get('last_name', '')}".strip() or member_data.get('username', 'Unknown'))
         self.resize(800, 600)
         self.setModal(True)
+        
+        # CRITICAL: Prevent dialog from closing parent window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
         self.setup_ui()
         self.load_comprehensive_data()
@@ -514,12 +539,17 @@ class MemberProfileViewer(QDialog):
         # Header with basic info
         header_layout = QHBoxLayout()
 
+        c = ThemeManager.get_colors()
         # Profile photo placeholder (replaced if actual photo is available)
         self.photo_label = QLabel("👤")
-        self.photo_label.setStyleSheet("""
+        accent_hex = c["ACCENT_PRIMARY"].lstrip('#')
+        accent_r = int(accent_hex[0:2], 16)
+        accent_g = int(accent_hex[2:4], 16)
+        accent_b = int(accent_hex[4:6], 16)
+        self.photo_label.setStyleSheet(f"""
             font-size: 48px;
             padding: 20px;
-            background: rgba(114, 137, 218, 0.1);
+            background: rgba({accent_r}, {accent_g}, {accent_b}, 0.1);
             border-radius: 8px;
         """)
         header_layout.addWidget(self.photo_label)
@@ -527,24 +557,32 @@ class MemberProfileViewer(QDialog):
         # Basic info
         info_layout = QVBoxLayout()
         name_label = QLabel(f"{self.member_data.get('first_name', '')} {self.member_data.get('last_name', '')}".strip())
-        name_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #e4e4e7;")
+        name_label.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {c['TEXT_BRIGHT']};")
         info_layout.addWidget(name_label)
 
         username = self.member_data.get('username', '')
         username_label = QLabel(f"@{username}" if username else "No username")
-        username_label.setStyleSheet("color: #a1a1aa; font-size: 14px;")
+        username_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 14px;")
         info_layout.addWidget(username_label)
 
         # Status badges
         badges_layout = QHBoxLayout()
         if self.member_data.get('is_verified'):
             verified_badge = QLabel("✓ Verified")
-            verified_badge.setStyleSheet("color: #23a559; font-size: 12px; background: rgba(35, 163, 89, 0.1); padding: 4px 8px; border-radius: 4px;")
+            success_hex = c["ACCENT_SUCCESS"].lstrip('#')
+            success_r = int(success_hex[0:2], 16)
+            success_g = int(success_hex[2:4], 16)
+            success_b = int(success_hex[4:6], 16)
+            verified_badge.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-size: 12px; background: rgba({success_r}, {success_g}, {success_b}, 0.1); padding: 4px 8px; border-radius: 4px;")
             badges_layout.addWidget(verified_badge)
 
         if self.member_data.get('is_premium'):
             premium_badge = QLabel("⭐ Premium")
-            premium_badge.setStyleSheet("color: #faa61a; font-size: 12px; background: rgba(250, 166, 26, 0.1); padding: 4px 8px; border-radius: 4px;")
+            warn_hex = c["ACCENT_WARNING"].lstrip('#')
+            warn_r = int(warn_hex[0:2], 16)
+            warn_g = int(warn_hex[2:4], 16)
+            warn_b = int(warn_hex[4:6], 16)
+            premium_badge.setStyleSheet(f"color: {c['ACCENT_WARNING']}; font-size: 12px; background: rgba({warn_r}, {warn_g}, {warn_b}, 0.1); padding: 4px 8px; border-radius: 4px;")
             badges_layout.addWidget(premium_badge)
 
         badges_layout.addStretch()
@@ -577,7 +615,9 @@ class MemberProfileViewer(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        message_btn = QPushButton("💬 Send Message")
+        message_btn = QPushButton("Send Message")
+        message_btn.setObjectName("quick_action")
+        message_btn.setMinimumHeight(32)
         message_btn.clicked.connect(self.send_message)
         button_layout.addWidget(message_btn)
 
@@ -689,7 +729,7 @@ class MemberProfileViewer(QDialog):
 
         layout.addStretch()
         scroll_area.setWidget(content)
-        self.tab_widget.addTab(scroll_area, "📊 Activity")
+        self.tab_widget.addTab(scroll_area, "Activity")
 
     def setup_network_tab(self):
         """Setup the network connections tab."""
@@ -723,7 +763,7 @@ class MemberProfileViewer(QDialog):
                 membership_layout = QVBoxLayout()
 
                 for group in memberships[:10]:  # Limit display
-                    group_label = QLabel(f"📱 {group.get('title', 'Unknown Group')} ({group.get('member_count', 0)} members)")
+                    group_label = QLabel(f"{group.get('title', 'Unknown Group')} ({group.get('member_count', 0)} members)")
                     membership_layout.addWidget(group_label)
 
                 if len(memberships) > 10:
@@ -736,7 +776,7 @@ class MemberProfileViewer(QDialog):
 
         layout.addStretch()
         scroll_area.setWidget(content)
-        self.tab_widget.addTab(scroll_area, "🌐 Network")
+        self.tab_widget.addTab(scroll_area, "Network")
 
     def setup_behavioral_tab(self):
         """Setup the behavioral insights tab."""
@@ -821,9 +861,10 @@ class MemberProfileViewer(QDialog):
                 factors_group = QGroupBox("Risk Factors")
                 factors_layout = QVBoxLayout()
 
+                c = ThemeManager.get_colors()
                 for factor in factors:
-                    factor_label = QLabel(f"⚠️ {factor}")
-                    factor_label.setStyleSheet("color: #f23f42;")
+                    factor_label = QLabel(f"{factor}")
+                    factor_label.setStyleSheet(f"color: {c['ACCENT_DANGER']};")
                     factors_layout.addWidget(factor_label)
 
                 factors_group.setLayout(factors_layout)
@@ -833,7 +874,7 @@ class MemberProfileViewer(QDialog):
 
         layout.addStretch()
         scroll_area.setWidget(content)
-        self.tab_widget.addTab(scroll_area, "⚠️ Risk Assessment")
+        self.tab_widget.addTab(scroll_area, "Risk Assessment")
 
     def load_comprehensive_data(self):
         """Load comprehensive member data."""
@@ -895,7 +936,7 @@ class CampaignManagerWidget(QWidget):
         toolbar.setSpacing(8)
         
         create_btn = QPushButton("Create Campaign")
-        create_btn.setObjectName("primary")
+        create_btn.setObjectName("quick_action")
         
         # Debounce to prevent double-clicks
         from utils.button_debouncer import protect_button
@@ -904,7 +945,7 @@ class CampaignManagerWidget(QWidget):
         toolbar.addWidget(create_btn)
         
         pause_btn = QPushButton("Pause")
-        pause_btn.setObjectName("warning")
+        pause_btn.setObjectName("secondary")
         pause_btn.clicked.connect(self.pause_selected)
         toolbar.addWidget(pause_btn)
         
@@ -928,12 +969,23 @@ class CampaignManagerWidget(QWidget):
         view_btn.clicked.connect(self.view_selected)
         toolbar.addWidget(view_btn)
         
-        export_btn = QPushButton("📤 Export")
+        export_btn = QPushButton("Export")
         export_btn.setObjectName("secondary")
+        export_btn.setMinimumHeight(32)
         export_btn.clicked.connect(self.export_campaigns)
         toolbar.addWidget(export_btn)
         
         toolbar.addStretch()
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search campaigns…")
+        self.search_input.textChanged.connect(self.refresh_campaigns)
+        toolbar.addWidget(self.search_input)
+
+        self.status_filter = QComboBox()
+        self.status_filter.addItems(["All", "Running", "Paused", "Error", "Draft", "Completed"])
+        self.status_filter.currentTextChanged.connect(self.refresh_campaigns)
+        toolbar.addWidget(self.status_filter)
         layout.addLayout(toolbar)
         
         # Campaign Table
@@ -943,61 +995,93 @@ class CampaignManagerWidget(QWidget):
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch) # Name stretches
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch) # Progress stretches
+        header.setStretchLastSection(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        c = ThemeManager.get_colors()
+        # Use theme-aware hover color
+        hover_bg = c["BG_TERTIARY"]
+        self.table.setStyleSheet(f"QTableWidget::item:hover {{ background-color: {hover_bg}; }}")
         layout.addWidget(self.table)
+
+        self.loading_overlay = LoadingOverlay(self.table, "Loading campaigns…")
         
     def refresh_campaigns(self):
         """Refresh the campaign list."""
         if not self.campaign_manager:
             return
             
-        campaigns = self.campaign_manager.get_all_campaigns()
-        self.table.setRowCount(len(campaigns))
-        
-        for row, campaign in enumerate(campaigns):
-            # ID
-            self.table.setItem(row, 0, QTableWidgetItem(str(campaign.id)))
+        try:
+            if hasattr(self, "loading_overlay") and self.loading_overlay:
+                self.loading_overlay.show_loading("Refreshing campaigns…")
+
+            campaigns = self.campaign_manager.get_all_campaigns()
+            search = self.search_input.text().lower() if hasattr(self, "search_input") else ""
+            status_filter = self.status_filter.currentText().lower() if hasattr(self, "status_filter") else "all"
+
+            filtered = []
+            for c in campaigns:
+                if search and search not in f"{c.name.lower()} {c.status.value.lower()}":
+                    continue
+                if status_filter != "all" and c.status.value.lower() != status_filter:
+                    continue
+                filtered.append(c)
+
+            self.table.setRowCount(len(filtered))
             
-            # Name
-            self.table.setItem(row, 1, QTableWidgetItem(campaign.name))
-            
-            # Status
-            status_item = QTableWidgetItem(campaign.status.value.title())
-            if campaign.status.value == "running":
-                status_item.setForeground(QColor('#23a559'))
-            elif campaign.status.value == "paused":
-                status_item.setForeground(QColor('#faa61a'))
-            elif campaign.status.value == "error":
-                status_item.setForeground(QColor('#f23f42'))
-            self.table.setItem(row, 2, status_item)
-            
-            # Progress
-            progress_widget = QProgressBar()
-            progress_widget.setStyleSheet("""
-                QProgressBar {
-                    background-color: #1e1f22;
-                    border-radius: 4px;
-                    text-align: center;
-                    color: white;
-                }
-                QProgressBar::chunk {
-                    background-color: #5865f2;
-                    border-radius: 4px;
-                }
-            """)
-            total = campaign.total_targets or 1
-            progress = ((campaign.sent_count + campaign.failed_count) / total) * 100
-            progress_widget.setValue(int(progress))
-            self.table.setCellWidget(row, 3, progress_widget)
-            
-            # Stats
-            stats = f"{campaign.sent_count}/{campaign.total_targets}"
-            self.table.setItem(row, 4, QTableWidgetItem(stats))
-            
-            # Created
-            created = campaign.created_at.strftime("%Y-%m-%d %H:%M") if campaign.created_at else ""
-            self.table.setItem(row, 5, QTableWidgetItem(created))
+            for row, campaign in enumerate(filtered):
+                # ID
+                self.table.setItem(row, 0, QTableWidgetItem(str(campaign.id)))
+                
+                # Name
+                self.table.setItem(row, 1, QTableWidgetItem(campaign.name))
+                
+                # Status pill
+                status_pill = QLabel(campaign.status.value.title())
+                status_pill.setObjectName("status_chip")
+                state = "ok" if campaign.status.value == "running" else "warn" if campaign.status.value == "paused" else "bad" if campaign.status.value == "error" else "warn"
+                status_pill.setProperty("state", state)
+                self.table.setCellWidget(row, 2, status_pill)
+                
+                # Progress
+                progress_widget = QProgressBar()
+                c = ThemeManager.get_colors()
+                progress_widget.setStyleSheet(f"""
+                    QProgressBar {{
+                        background-color: {c["BG_PRIMARY"]};
+                        border-radius: 4px;
+                        text-align: center;
+                        color: {c["TEXT_BRIGHT"]};
+                    }}
+                    QProgressBar::chunk {{
+                        background-color: {c["ACCENT_PRIMARY"]};
+                        border-radius: 4px;
+                    }}
+                """)
+                total = campaign.total_targets or 1
+                progress = ((campaign.sent_count + campaign.failed_count) / total) * 100
+                progress_widget.setValue(int(progress))
+                self.table.setCellWidget(row, 3, progress_widget)
+                
+                # Stats
+                stats = f"{campaign.sent_count}/{campaign.total_targets}"
+                self.table.setItem(row, 4, QTableWidgetItem(stats))
+                
+                # Created
+                created = campaign.created_at.strftime("%Y-%m-%d %H:%M") if campaign.created_at else ""
+                self.table.setItem(row, 5, QTableWidgetItem(created))
+
+            if not filtered:
+                self.table.setRowCount(1)
+                empty = QTableWidgetItem("No campaigns found. Create one to get started.")
+                c = ThemeManager.get_colors()
+                empty.setForeground(QColor(c['TEXT_DISABLED']))
+                self.table.setItem(0, 0, empty)
+                self.table.setSpan(0, 0, 1, self.table.columnCount())
+        finally:
+            if hasattr(self, "loading_overlay") and self.loading_overlay:
+                self.loading_overlay.hide_loading()
             
     def create_campaign(self):
         """Open dialog to create a campaign."""
@@ -1103,14 +1187,14 @@ class CampaignManagerWidget(QWidget):
     def delete_selected(self):
         cid = self.get_selected_campaign_id()
         if cid:
-            if ErrorHandler.safe_question(self, "Confirm Delete", "⚠️ Are you sure you want to delete this campaign?\n\nThis action cannot be undone."):
+            if ErrorHandler.safe_question(self, "Confirm Delete", "Are you sure you want to delete this campaign?\n\nThis action cannot be undone."):
                 # Cancel first
                 main_window = self.window()
                 if hasattr(main_window, '_run_async_task'):
                     main_window._run_async_task(self.campaign_manager.cancel_campaign(cid))
                 # Note: Actual deletion from DB might not be implemented in manager, but cancellation stops it.
                 self.refresh_campaigns()
-                ErrorHandler.safe_information(self, "Success", "✅ Campaign deleted successfully")
+                ErrorHandler.safe_information(self, "Success", "Campaign deleted successfully")
     
     def edit_selected(self):
         """Edit selected campaign."""
@@ -1167,7 +1251,7 @@ class CampaignManagerWidget(QWidget):
             
             # Build details message
             details = f"""
-<h3>📊 Campaign Details</h3>
+<h3>Campaign Details</h3>
 <br>
 <b>Name:</b> {campaign.name}<br>
 <b>Status:</b> {campaign.status.value.title()}<br>

@@ -19,7 +19,14 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
+from ui.theme_manager import ThemeManager
+
 logger = logging.getLogger(__name__)
+
+try:
+    from ui.ui_components import LoadingOverlay
+except ImportError:
+    LoadingOverlay = None
 
 # Try to import delivery analytics
 try:
@@ -33,21 +40,18 @@ except ImportError:
 class DeliveryMetricCard(QWidget):
     """Card displaying a delivery metric."""
     
-    def __init__(self, title: str, icon: str = "📊", parent=None):
+    def __init__(self, title: str, icon: str = "", parent=None):
         super().__init__(parent)
         self.setup_ui(title, icon)
     
     def setup_ui(self, title: str, icon: str):
         """Setup the UI."""
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
         
-        self.setStyleSheet("""
-            DeliveryMetricCard {
-                background-color: #2b2d31;
-                border-radius: 8px;
-                padding: 15px;
-            }
-        """)
+        ThemeManager.apply_to_widget(self, "card")
+        c = ThemeManager._get_palette()
         
         # Header
         header_layout = QHBoxLayout()
@@ -59,7 +63,7 @@ class DeliveryMetricCard(QWidget):
         header_layout.addWidget(icon_label)
         
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #b5bac1; font-size: 11px;")
+        title_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 11px;")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         
@@ -71,12 +75,12 @@ class DeliveryMetricCard(QWidget):
         value_font.setPointSize(20)
         value_font.setBold(True)
         self.value_label.setFont(value_font)
-        self.value_label.setStyleSheet("color: #ffffff;")
+        self.value_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']};")
         layout.addWidget(self.value_label)
         
         # Subtext
         self.subtext_label = QLabel("")
-        self.subtext_label.setStyleSheet("color: #949ba4; font-size: 10px;")
+        self.subtext_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 10px;")
         layout.addWidget(self.subtext_label)
     
     def set_value(self, value: str, subtext: str = ""):
@@ -120,48 +124,56 @@ class DeliveryAnalyticsWidget(QWidget):
         
         header_layout.addStretch()
         
-        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setObjectName("secondary")
         refresh_btn.clicked.connect(self.refresh_data)
         header_layout.addWidget(refresh_btn)
         
-        export_btn = QPushButton("📥 Export")
+        export_btn = QPushButton("Export")
+        export_btn.setObjectName("secondary")
         export_btn.clicked.connect(self.export_data)
         header_layout.addWidget(export_btn)
+
+        self.data_freshness_chip = QLabel("Not updated")
+        self.data_freshness_chip.setObjectName("status_chip")
+        self.data_freshness_chip.setProperty("state", "warn")
+        header_layout.addWidget(self.data_freshness_chip)
         
         layout.addLayout(header_layout)
         
         # Overall metrics
-        overall_group = QGroupBox("📊 Overall Performance (Last 7 Days)")
+        overall_group = QGroupBox("Overall Performance (Last 7 Days)")
+        # Global theme handles QGroupBox styling
         overall_layout = QGridLayout(overall_group)
         
-        self.overall_sent_card = DeliveryMetricCard("Messages Sent", "📤")
+        self.overall_sent_card = DeliveryMetricCard("Messages Sent", "")
         overall_layout.addWidget(self.overall_sent_card, 0, 0)
         
-        self.overall_delivered_card = DeliveryMetricCard("Delivered", "✅")
+        self.overall_delivered_card = DeliveryMetricCard("Delivered", "")
         overall_layout.addWidget(self.overall_delivered_card, 0, 1)
         
-        self.overall_read_card = DeliveryMetricCard("Read", "👁")
+        self.overall_read_card = DeliveryMetricCard("Read", "")
         overall_layout.addWidget(self.overall_read_card, 0, 2)
         
-        self.overall_replied_card = DeliveryMetricCard("Replied", "💬")
+        self.overall_replied_card = DeliveryMetricCard("Replied", "")
         overall_layout.addWidget(self.overall_replied_card, 0, 3)
         
-        self.delivery_rate_card = DeliveryMetricCard("Delivery Rate", "📈")
+        self.delivery_rate_card = DeliveryMetricCard("Delivery Rate", "")
         overall_layout.addWidget(self.delivery_rate_card, 1, 0)
         
-        self.read_rate_card = DeliveryMetricCard("Read Rate", "📖")
+        self.read_rate_card = DeliveryMetricCard("Read Rate", "")
         overall_layout.addWidget(self.read_rate_card, 1, 1)
         
-        self.response_rate_card = DeliveryMetricCard("Response Rate", "💯")
+        self.response_rate_card = DeliveryMetricCard("Response Rate", "")
         overall_layout.addWidget(self.response_rate_card, 1, 2)
         
-        self.avg_response_time_card = DeliveryMetricCard("Avg Response Time", "⏱")
+        self.avg_response_time_card = DeliveryMetricCard("Avg Response Time", "")
         overall_layout.addWidget(self.avg_response_time_card, 1, 3)
         
         layout.addWidget(overall_group)
         
         # Campaign selector
-        campaign_group = QGroupBox("🎯 Campaign-Specific Analytics")
+        campaign_group = QGroupBox("Campaign-Specific Analytics")
         campaign_layout = QVBoxLayout(campaign_group)
         
         selector_layout = QHBoxLayout()
@@ -177,35 +189,45 @@ class DeliveryAnalyticsWidget(QWidget):
         # Campaign metrics
         campaign_metrics_layout = QGridLayout()
         
-        self.campaign_sent_card = DeliveryMetricCard("Sent", "📤")
+        self.campaign_sent_card = DeliveryMetricCard("Sent", "")
         campaign_metrics_layout.addWidget(self.campaign_sent_card, 0, 0)
         
-        self.campaign_delivered_card = DeliveryMetricCard("Delivered", "✅")
+        self.campaign_delivered_card = DeliveryMetricCard("Delivered", "")
         campaign_metrics_layout.addWidget(self.campaign_delivered_card, 0, 1)
         
-        self.campaign_read_card = DeliveryMetricCard("Read", "👁")
+        self.campaign_read_card = DeliveryMetricCard("Read", "")
         campaign_metrics_layout.addWidget(self.campaign_read_card, 0, 2)
         
-        self.campaign_replied_card = DeliveryMetricCard("Replied", "💬")
+        self.campaign_replied_card = DeliveryMetricCard("Replied", "")
         campaign_metrics_layout.addWidget(self.campaign_replied_card, 0, 3)
         
         campaign_layout.addLayout(campaign_metrics_layout)
         layout.addWidget(campaign_group)
         
         # Status
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #949ba4; font-size: 11px; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px; padding: 5px;")
         layout.addWidget(self.status_label)
         
         layout.addStretch()
+
+        # Loading overlay
+        self.loading_overlay = LoadingOverlay(self, "Refreshing delivery analytics…") if LoadingOverlay else None
     
     def refresh_data(self):
         """Refresh analytics data."""
         if not self.analytics:
             self.status_label.setText("Delivery analytics not available")
+            if hasattr(self, "data_freshness_chip"):
+                self.data_freshness_chip.setText("Unavailable")
+                self.data_freshness_chip.setProperty("state", "bad")
             return
         
         try:
+            if self.loading_overlay:
+                self.loading_overlay.show_loading("Refreshing delivery analytics…")
             # Get overall stats
             overall = self.analytics.get_overall_delivery_stats(days=7)
             
@@ -264,10 +286,17 @@ class DeliveryAnalyticsWidget(QWidget):
                 self._refresh_campaign_stats(self.selected_campaign_id)
             
             self.status_label.setText(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
+            if hasattr(self, "data_freshness_chip"):
+                self._set_chip_state(self.data_freshness_chip, "ok", f"Updated {datetime.now().strftime('%H:%M:%S')}")
             
         except Exception as e:
             logger.error(f"Failed to refresh delivery analytics: {e}")
             self.status_label.setText(f"Error: {str(e)[:50]}")
+            if hasattr(self, "data_freshness_chip"):
+                self._set_chip_state(self.data_freshness_chip, "bad", "Refresh failed")
+        finally:
+            if self.loading_overlay:
+                self.loading_overlay.hide_loading()
     
     def _update_campaign_selector(self):
         """Update campaign selector with active campaigns."""
@@ -310,7 +339,13 @@ class DeliveryAnalyticsWidget(QWidget):
         self.selected_campaign_id = campaign_id
         
         if campaign_id:
-            self._refresh_campaign_stats(campaign_id)
+            try:
+                if self.loading_overlay:
+                    self.loading_overlay.show_loading("Loading campaign…")
+                self._refresh_campaign_stats(campaign_id)
+            finally:
+                if self.loading_overlay:
+                    self.loading_overlay.hide_loading()
     
     def _refresh_campaign_stats(self, campaign_id: int):
         """Refresh campaign-specific statistics."""
@@ -393,6 +428,17 @@ class DeliveryAnalyticsWidget(QWidget):
                 self, "Export Error",
                 f"Failed to export data:\n{str(e)}"
             )
+
+    @staticmethod
+    def _set_chip_state(label: QLabel, state: str, text: str):
+        """Update status chip text/state safely."""
+        if not label:
+            return
+        label.setText(text)
+        label.setProperty("state", state)
+        label.style().unpolish(label)
+        label.style().polish(label)
+        label.update()
 
 
 

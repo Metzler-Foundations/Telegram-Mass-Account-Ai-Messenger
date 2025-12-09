@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict, field
 from enum import Enum
 from collections import defaultdict
+from contextlib import contextmanager
 
 from pyrogram import Client, filters
 from pyrogram.types import Message, Chat
@@ -110,6 +111,15 @@ class EngagementAutomation:
         """
         self.db_path = db_path
         self.intelligence_db = intelligence_db
+        
+        # Initialize connection pool
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(db_path)
+        except:
+            pass
+        
         self._init_database()
 
         # Retention controls
@@ -122,12 +132,46 @@ class EngagementAutomation:
         # Active rules
         self._rules: Dict[str, EngagementRule] = {}
         self._load_rules()
+    
+    def _get_connection(self):
+        """Get a real SQLite connection (or pooled) for callers that need cursor()."""
+        import sqlite3
+        if self._connection_pool:
+            # Use the connection pool as a context manager
+            return self._connection_pool.get_connection()
+        else:
+            # Fallback to direct connection
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+    @contextmanager
+    def _connection_context(self):
+        """Context manager for database operations."""
+        conn_manager = self._get_connection()
+        if hasattr(conn_manager, '__enter__'):
+            # Using connection pool (already a context manager)
+            with conn_manager as conn:
+                yield conn
+        else:
+            # Direct connection
+            try:
+                yield conn_manager
+            finally:
+                try:
+                    conn_manager.close()
+                except Exception:
+                    pass
         
     def _init_database(self):
         """Initialize engagement database."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+            self._create_tables(cursor)
+            conn.commit()
+    
+    def _create_tables(self, cursor):
+        """Create database tables."""
         # Engagement rules
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS engagement_rules (
@@ -192,76 +236,76 @@ class EngagementAutomation:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_group ON engagement_log(group_id, timestamp)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_stats_user ON engagement_stats(user_id)")
         
-        conn.commit()
-        conn.close()
-        logger.info("Engagement database initialized")
+        logger.info("Engagement database tables created")
     
     def _load_rules(self):
         """Load engagement rules from database."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM engagement_rules WHERE enabled = 1")
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM engagement_rules WHERE enabled = 1")
 
-        for row in cursor.fetchall():
-            rule = EngagementRule(
-                rule_id=row[0],
-                name=row[1],
-                enabled=bool(row[2]),
-                target_groups=json.loads(row[3]) if row[3] else [],
-                target_users=json.loads(row[4]) if row[4] else [],
-                keywords=json.loads(row[5]) if row[5] else [],
-                min_user_value_score=row[6] or 0.0,
-                reaction_emojis=json.loads(row[7]) if row[7] else [],
-                reaction_probability=row[8] or 0.3,
-                min_delay_seconds=row[9] or 5,
-                max_delay_seconds=row[10] or 120,
-                max_reactions_per_hour=row[11] or 20,
-                max_reactions_per_group_per_hour=row[12] or 10,
-                exclude_keywords=json.loads(row[13]) if row[13] else [],
-                only_reply_to_messages=bool(row[14]),
-                min_message_length=row[15] or 10,
-                created_at=datetime.fromisoformat(row[16]) if row[16] else datetime.now(),
-                updated_at=datetime.fromisoformat(row[17]) if row[17] else datetime.now(),
-                disabled_groups=json.loads(row[18]) if len(row) > 18 and row[18] else []
-            )
-            self._rules[rule.rule_id] = rule
-        
-        conn.close()
-        logger.info(f"Loaded {len(self._rules)} engagement rules")
+            for row in cursor.fetchall():
+                rule = EngagementRule(
+                    rule_id=row[0],
+                    name=row[1],
+                    enabled=bool(row[2]),
+                    target_groups=json.loads(row[3]) if row[3] else [],
+                    target_users=json.loads(row[4]) if row[4] else [],
+                    keywords=json.loads(row[5]) if row[5] else [],
+                    min_user_value_score=row[6] or 0.0,
+                    reaction_emojis=json.loads(row[7]) if row[7] else [],
+                    reaction_probability=row[8] or 0.3,
+                    min_delay_seconds=row[9] or 5,
+                    max_delay_seconds=row[10] or 120,
+                    max_reactions_per_hour=row[11] or 20,
+                    max_reactions_per_group_per_hour=row[12] or 10,
+                    exclude_keywords=json.loads(row[13]) if row[13] else [],
+                    only_reply_to_messages=bool(row[14]),
+                    min_message_length=row[15] or 10,
+                    created_at=datetime.fromisoformat(row[16]) if row[16] else datetime.now(),
+                    updated_at=datetime.fromisoformat(row[17]) if row[17] else datetime.now(),
+                    disabled_groups=json.loads(row[18]) if len(row) > 18 and row[18] else []
+                )
+                self._rules[rule.rule_id] = rule
+
+            logger.info(f"Loaded {len(self._rules)} engagement rules")
+
+    def get_all_rules(self) -> List[EngagementRule]:
+        """Return all engagement rules (enabled only, as loaded)."""
+        return list(self._rules.values())
     
     def add_rule(self, rule: EngagementRule):
         """Add or update an engagement rule."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        rule.updated_at = datetime.now()
-        
-        cursor.execute("""
-            INSERT OR REPLACE INTO engagement_rules VALUES (
-                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            )
-        """, (
-            rule.rule_id, rule.name, int(rule.enabled),
-            json.dumps(rule.target_groups),
-            json.dumps(rule.target_users),
-            json.dumps(rule.keywords),
-            rule.min_user_value_score,
-            json.dumps(rule.reaction_emojis),
-            rule.reaction_probability,
-            rule.min_delay_seconds,
-            rule.max_delay_seconds,
-            rule.max_reactions_per_hour,
-            rule.max_reactions_per_group_per_hour,
-            json.dumps(rule.exclude_keywords),
-            int(rule.only_reply_to_messages),
-            rule.min_message_length,
-            rule.created_at.isoformat(),
-            rule.updated_at.isoformat(),
-            json.dumps(rule.disabled_groups)
-        ))
-        
-        conn.commit()
-        conn.close()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+
+            rule.updated_at = datetime.now()
+
+            cursor.execute("""
+                INSERT OR REPLACE INTO engagement_rules VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                )
+            """, (
+                rule.rule_id, rule.name, int(rule.enabled),
+                json.dumps(rule.target_groups),
+                json.dumps(rule.target_users),
+                json.dumps(rule.keywords),
+                rule.min_user_value_score,
+                json.dumps(rule.reaction_emojis),
+                rule.reaction_probability,
+                rule.min_delay_seconds,
+                rule.max_delay_seconds,
+                rule.max_reactions_per_hour,
+                rule.max_reactions_per_group_per_hour,
+                json.dumps(rule.exclude_keywords),
+                int(rule.only_reply_to_messages),
+                rule.min_message_length,
+                rule.created_at.isoformat(),
+                rule.updated_at.isoformat(),
+                json.dumps(rule.disabled_groups)
+            ))
+
+            conn.commit()
 
         self._rules[rule.rule_id] = rule
         logger.info(f"Added/updated engagement rule: {rule.name}")
@@ -500,17 +544,16 @@ class EngagementAutomation:
     def _log_engagement(self, rule_id: str, group_id: int, message_id: int,
                        user_id: int, reaction: str, success: bool, error: str = None):
         """Log an engagement action."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            INSERT INTO engagement_log (
-                rule_id, group_id, message_id, user_id, reaction_emoji,
-                timestamp, success, error_message
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (rule_id, group_id, message_id, user_id, reaction,
-              datetime.now(), int(success), error))
-        conn.commit()
-        conn.close()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO engagement_log (
+                    rule_id, group_id, message_id, user_id, reaction_emoji,
+                    timestamp, success, error_message
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (rule_id, group_id, message_id, user_id, reaction,
+                  datetime.now(), int(success), error))
+            conn.commit()
 
     def _prune_engagement_stats(self, conn):
         """Delete stale engagement stats to prevent unbounded growth."""
@@ -539,14 +582,13 @@ class EngagementAutomation:
     def _already_engaged(self, rule_id: str, message_id: int) -> bool:
         """Check if we've already reacted to this message for the given rule."""
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT 1 FROM engagement_log WHERE rule_id = ? AND message_id = ? LIMIT 1",
-                (rule_id, message_id)
-            )
-            exists = cursor.fetchone() is not None
-            conn.close()
+            with self._connection_context() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT 1 FROM engagement_log WHERE rule_id = ? AND message_id = ? LIMIT 1",
+                    (rule_id, message_id)
+                )
+                exists = cursor.fetchone() is not None
             return exists
         except Exception as exc:
             logger.debug(f"Duplicate engagement check failed: {exc}")
@@ -555,78 +597,75 @@ class EngagementAutomation:
     def _update_engagement_stats(self, user_id: int, group_id: int,
                                  gave_reaction: bool = False, received_reaction: bool = False):
         """Update engagement statistics."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        if gave_reaction:
-            cursor.execute("""
-                INSERT INTO engagement_stats (user_id, group_id, reactions_given, last_engagement)
-                VALUES (?, ?, 1, ?)
-                ON CONFLICT(user_id, group_id) DO UPDATE SET
-                    reactions_given = reactions_given + 1,
-                    last_engagement = excluded.last_engagement
-            """, (user_id, group_id, datetime.now()))
-        
-        if received_reaction:
-            cursor.execute("""
-                INSERT INTO engagement_stats (user_id, group_id, reactions_received, last_engagement)
-                VALUES (?, ?, 1, ?)
-                ON CONFLICT(user_id, group_id) DO UPDATE SET
-                    reactions_received = reactions_received + 1,
-                    last_engagement = excluded.last_engagement
-            """, (user_id, group_id, datetime.now()))
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
 
-        conn.commit()
-        self._prune_engagement_stats(conn)
-        conn.close()
+            if gave_reaction:
+                cursor.execute("""
+                    INSERT INTO engagement_stats (user_id, group_id, reactions_given, last_engagement)
+                    VALUES (?, ?, 1, ?)
+                    ON CONFLICT(user_id, group_id) DO UPDATE SET
+                        reactions_given = reactions_given + 1,
+                        last_engagement = excluded.last_engagement
+                """, (user_id, group_id, datetime.now()))
+
+            if received_reaction:
+                cursor.execute("""
+                    INSERT INTO engagement_stats (user_id, group_id, reactions_received, last_engagement)
+                    VALUES (?, ?, 1, ?)
+                    ON CONFLICT(user_id, group_id) DO UPDATE SET
+                        reactions_received = reactions_received + 1,
+                        last_engagement = excluded.last_engagement
+                """, (user_id, group_id, datetime.now()))
+
+            conn.commit()
+            self._prune_engagement_stats(conn)
     
     def get_engagement_stats(self, period_hours: int = 24) -> Dict:
         """Get engagement statistics for a period.
-        
+
         Args:
             period_hours: Time period in hours
-            
+
         Returns:
             Dictionary with statistics
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        since = datetime.now() - timedelta(hours=period_hours)
-        
-        # Total reactions
-        cursor.execute("""
-            SELECT COUNT(*) FROM engagement_log 
-            WHERE timestamp > ? AND success = 1
-        """, (since,))
-        total_reactions = cursor.fetchone()[0]
-        
-        # By rule
-        cursor.execute("""
-            SELECT rule_id, COUNT(*) FROM engagement_log
-            WHERE timestamp > ? AND success = 1
-            GROUP BY rule_id
-        """, (since,))
-        by_rule = dict(cursor.fetchall())
-        
-        # By group
-        cursor.execute("""
-            SELECT group_id, COUNT(*) FROM engagement_log
-            WHERE timestamp > ? AND success = 1
-            GROUP BY group_id
-        """, (since,))
-        by_group = dict(cursor.fetchall())
-        
-        # Success rate
-        cursor.execute("""
-            SELECT 
-                SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate
-            FROM engagement_log
-            WHERE timestamp > ?
-        """, (since,))
-        success_rate = cursor.fetchone()[0] or 0.0
-        
-        conn.close()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+
+            since = datetime.now() - timedelta(hours=period_hours)
+
+            # Total reactions
+            cursor.execute("""
+                SELECT COUNT(*) FROM engagement_log
+                WHERE timestamp > ? AND success = 1
+            """, (since,))
+            total_reactions = cursor.fetchone()[0]
+
+            # By rule
+            cursor.execute("""
+                SELECT rule_id, COUNT(*) FROM engagement_log
+                WHERE timestamp > ? AND success = 1
+                GROUP BY rule_id
+            """, (since,))
+            by_rule = dict(cursor.fetchall())
+
+            # By group
+            cursor.execute("""
+                SELECT group_id, COUNT(*) FROM engagement_log
+                WHERE timestamp > ? AND success = 1
+                GROUP BY group_id
+            """, (since,))
+            by_group = dict(cursor.fetchall())
+
+            # Success rate
+            cursor.execute("""
+                SELECT
+                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*) as success_rate
+                FROM engagement_log
+                WHERE timestamp > ?
+            """, (since,))
+            success_rate = cursor.fetchone()[0] or 0.0
         
         return {
             'total_reactions': total_reactions,
@@ -715,18 +754,17 @@ class EngagementAutomation:
     
     def cleanup_old_logs(self, days: int = 30):
         """Clean up old engagement logs.
-        
+
         Args:
             days: Keep logs newer than this many days
         """
         cutoff = datetime.now() - timedelta(days=days)
-        
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM engagement_log WHERE timestamp < ?", (cutoff,))
-        deleted = cursor.rowcount
-        conn.commit()
-        conn.close()
-        
+
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM engagement_log WHERE timestamp < ?", (cutoff,))
+            deleted = cursor.rowcount
+            conn.commit()
+
         logger.info(f"Cleaned up {deleted} old engagement logs")
 

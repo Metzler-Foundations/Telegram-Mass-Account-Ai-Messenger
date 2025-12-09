@@ -33,7 +33,7 @@ from pyrogram import Client
 from pyrogram.errors import FloodWait, UserPrivacyRestricted, UserBlocked, PeerIdInvalid
 from telegram.telegram_client import TelegramClient
 from accounts.account_creator import AccountCreator
-from scraping.member_scraper import MemberDatabase
+from scraping.database import MemberDatabase
 from telegram.persistent_connection_manager import PersistentConnectionManager
 
 logger = logging.getLogger(__name__)
@@ -397,13 +397,52 @@ class AccountManager:
     MAX_MEMORY_PERCENT = 80.0
     BATCH_UPDATE_INTERVAL = 5.0
     
-    def __init__(self, db: MemberDatabase, warmup_service=None):
+    def __init__(self, db: MemberDatabase, warmup_service=None, performance_profile: Optional[Dict[str, Any]] = None):
         """Initialize the account manager.
 
         Args:
             db: Member database instance
             warmup_service: Optional warmup service instance for auto-queueing
         """
+        self.performance_profile = performance_profile or {}
+        self.low_power = bool(self.performance_profile.get("low_power", False))
+
+        # Apply performance tuning overrides before constructing pools/timers
+        account_perf = self.performance_profile.get("accounts", {}) if isinstance(self.performance_profile, dict) else {}
+        if self.low_power:
+            self.MAX_CONCURRENT_CONNECTIONS = min(
+                self.MAX_CONCURRENT_CONNECTIONS,
+                account_perf.get("max_concurrent_connections_low_power", 10)
+            )
+            self.MAX_CONNECTIONS_PER_SHARD = min(
+                self.MAX_CONNECTIONS_PER_SHARD,
+                account_perf.get("max_per_shard_low_power", 3)
+            )
+            self.HEALTH_CHECK_INTERVAL = max(
+                self.HEALTH_CHECK_INTERVAL,
+                account_perf.get("health_check_interval_low_power", 60)
+            )
+            self.BATCH_UPDATE_INTERVAL = max(
+                self.BATCH_UPDATE_INTERVAL,
+                float(account_perf.get("batch_update_interval_low_power", 10.0))
+            )
+        else:
+            self.MAX_CONCURRENT_CONNECTIONS = account_perf.get(
+                "max_concurrent_connections",
+                self.MAX_CONCURRENT_CONNECTIONS
+            )
+            self.MAX_CONNECTIONS_PER_SHARD = account_perf.get(
+                "max_per_shard",
+                self.MAX_CONNECTIONS_PER_SHARD
+            )
+            self.HEALTH_CHECK_INTERVAL = account_perf.get(
+                "health_check_interval",
+                self.HEALTH_CHECK_INTERVAL
+            )
+            self.BATCH_UPDATE_INTERVAL = float(account_perf.get(
+                "batch_update_interval",
+                self.BATCH_UPDATE_INTERVAL
+            ))
         self.db = db
         self.warmup_service = warmup_service
         
@@ -514,6 +553,12 @@ class AccountManager:
             
             conn.execute('CREATE INDEX IF NOT EXISTS idx_account_shard ON accounts(shard_id)')
             conn.commit()
+
+    def _get_connection(self):
+        """Return a thread-safe SQLite connection for account data."""
+        conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
     
     def _init_shards(self):
         """Initialize account shards based on proxy regions."""

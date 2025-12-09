@@ -17,6 +17,7 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from collections import defaultdict
+from contextlib import contextmanager
 import statistics
 
 logger = logging.getLogger(__name__)
@@ -64,8 +65,29 @@ class ConversationAnalyzer:
     def _get_connection(self):
         if self._connection_pool:
             return self._connection_pool.get_connection()
-        return self._get_connection()
-        self.flow_retention_days = 90
+        else:
+            import sqlite3
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+    @contextmanager
+    def _connection_context(self):
+        """Context manager for database operations."""
+        conn_manager = self._get_connection()
+        if hasattr(conn_manager, '__enter__'):
+            # Using connection pool (already a context manager)
+            with conn_manager as conn:
+                yield conn
+        else:
+            # Direct connection
+            try:
+                yield conn_manager
+            finally:
+                try:
+                    conn_manager.close()
+                except Exception:
+                    pass
         self.max_sentiment_records_per_user = 500
         self._stage_has_user_id = False
         self._ensure_stage_schema()
@@ -75,70 +97,69 @@ class ConversationAnalyzer:
     
     def _init_database(self):
         """Initialize analytics database."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        # Conversation flows
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS conversation_flows (
-                flow_id TEXT PRIMARY KEY,
-                user_id INTEGER,
-                messages TEXT,
-                user_responses TEXT,
-                outcome TEXT,
-                conversion_value REAL,
-                duration_minutes REAL,
-                started_at TIMESTAMP,
-                ended_at TIMESTAMP
-            )
-        """)
-        
-        # Message patterns
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS message_patterns (
-                pattern_id TEXT PRIMARY KEY,
-                message_template TEXT,
-                keywords TEXT,
-                avg_response_time REAL,
-                response_rate REAL,
-                conversion_rate REAL,
-                times_used INTEGER DEFAULT 0,
-                success_count INTEGER DEFAULT 0,
-                created_at TIMESTAMP,
-                last_used TIMESTAMP
-            )
-        """)
-        
-        # Conversation stages
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS conversation_stages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                flow_id TEXT,
-                stage_number INTEGER,
-                our_message TEXT,
-                user_response TEXT,
-                response_time REAL,
-                sentiment_score REAL,
-                timestamp TIMESTAMP
-            )
-        """)
-        
-        # Successful conversions
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS conversions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                flow_id TEXT,
-                user_id INTEGER,
-                conversion_type TEXT,
-                value REAL,
-                messages_to_convert INTEGER,
-                time_to_convert REAL,
-                timestamp TIMESTAMP
-            )
-        """)
-        
-        conn.commit()
-        conn.close()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+
+            # Conversation flows
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS conversation_flows (
+                    flow_id TEXT PRIMARY KEY,
+                    user_id INTEGER,
+                    messages TEXT,
+                    user_responses TEXT,
+                    outcome TEXT,
+                    conversion_value REAL,
+                    duration_minutes REAL,
+                    started_at TIMESTAMP,
+                    ended_at TIMESTAMP
+                )
+            """)
+
+            # Message patterns
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS message_patterns (
+                    pattern_id TEXT PRIMARY KEY,
+                    message_template TEXT,
+                    keywords TEXT,
+                    avg_response_time REAL,
+                    response_rate REAL,
+                    conversion_rate REAL,
+                    times_used INTEGER DEFAULT 0,
+                    success_count INTEGER DEFAULT 0,
+                    created_at TIMESTAMP,
+                    last_used TIMESTAMP
+                )
+            """)
+
+            # Conversation stages
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS conversation_stages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    flow_id TEXT,
+                    stage_number INTEGER,
+                    our_message TEXT,
+                    user_response TEXT,
+                    response_time REAL,
+                    sentiment_score REAL,
+                    timestamp TIMESTAMP
+                )
+            """)
+
+            # Successful conversions
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS conversions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    flow_id TEXT,
+                    user_id INTEGER,
+                    conversion_type TEXT,
+                    value REAL,
+                    messages_to_convert INTEGER,
+                    time_to_convert REAL,
+                    timestamp TIMESTAMP
+                )
+            """)
+
+            conn.commit()
         logger.info("Conversation analytics database initialized")
 
     def _ensure_stage_schema(self):

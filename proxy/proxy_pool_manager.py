@@ -18,6 +18,8 @@ import aiohttp
 import logging
 import json
 import re
+from utils.http_connection_pool import get_http_connection_pool
+from utils.rate_limiter import get_rate_limit_manager
 import socket
 import time
 import hashlib
@@ -70,8 +72,17 @@ class ProxyCredentialManager:
     def _get_or_create_encryption_key(self) -> bytes:
         """Get or create encryption key for proxy credentials."""
         try:
-            # Try OS keyring first
+            # Try OS keyring first, only if a backend is available
             import keyring
+            from keyring.errors import NoKeyringError
+
+            try:
+                backend = keyring.get_keyring()
+                if getattr(backend, "priority", 0) <= 0:
+                    raise NoKeyringError("No usable keyring backend")
+            except NoKeyringError:
+                raise ImportError("No keyring backend available")
+
             keyring_service = "telegram_bot_proxy_credentials"
             stored_key = keyring.get_password(keyring_service, "encryption_key")
 
@@ -85,9 +96,9 @@ class ProxyCredentialManager:
             return key
 
         except ImportError:
-            logger.warning("keyring not available for proxy credentials")
+            logger.debug("Keyring unavailable; falling back to filesystem key storage")
         except Exception as e:
-            logger.warning(f"Failed to use keyring for proxy credentials: {e}")
+            logger.debug(f"Keyring unusable for proxy credentials: {e}")
 
         # Fallback to secure directory
         try:
@@ -1110,13 +1121,19 @@ class ProxyPoolManager:
         """Fetch proxies from a single endpoint."""
         try:
             async with self._fetch_semaphore:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-                    async with session.get(endpoint.url) as response:
-                        if response.status != 200:
-                            endpoint.failure_count += 1
-                            logger.warning(f"Failed to fetch {endpoint.name}: HTTP {response.status}")
+                # Use HTTP connection pool with rate limiting
+                http_pool = get_http_connection_pool()
+                rate_limiter = get_rate_limit_manager()
+
+                # Apply rate limiting for proxy endpoint
+                await rate_limiter.wait_for_domain(endpoint.url)
+
+                async with http_pool.request('GET', endpoint.url) as response:
+                    if response.status != 200:
+                        endpoint.failure_count += 1
+                        logger.warning(f"Failed to fetch {endpoint.name}: HTTP {response.status}")
                         return 0
-                    
+
                     content = await response.text()
                     
                     # Parse based on parser type

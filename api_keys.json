@@ -11,12 +11,12 @@
     "last_error": "Unknown service: test"
   },
   "gemini": {
-    "key": "gAAAAABpMSFVz07LOyy0yW3qskGF9ClNmvRIiYq-idzdl88KjOY5axIz3tZCLNDBgkF3yvE0PC8Ea7tI-TP3T483Rsog8YxPO5pMim79ZWu2kXgK5nRmCK_JZyw5w_bHPtgIgVCd9eHf",
-    "added_at": "2025-12-03T22:51:17.603036",
+    "key": "gAAAAABpNXKjgPlkf3OPGNL_Sjxire3RlbG0QXj3lqMa57OkTRMSZfVUGVZZsFZWFe2LQWZtWiLgjqUJN_SIuDPY15waZzQCROG9MV3A7jq9WltDeNahG9dPyhVE3_tPkLjYasBT8xJy",
+    "added_at": "2025-12-07T05:27:15.229782",
     "last_validated": null,
     "is_valid": false,
     "validation_attempts": 0,
-    "last_used": "2025-12-03T22:51:17.635364",
+    "last_used": "2025-12-07T05:27:15.233582",
     "usage_count": 1,
     "metadata": {}
   }

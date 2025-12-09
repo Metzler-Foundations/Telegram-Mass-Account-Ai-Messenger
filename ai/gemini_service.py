@@ -1,10 +1,21 @@
 import asyncio
+import os
 import logging
 import random
 import time
 from typing import Dict, List, Optional, Any
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+
+try:
+    import google.generativeai as genai
+    from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    GEMINI_AVAILABLE = True
+except Exception as exc:  # noqa: BLE001
+    GEMINI_AVAILABLE = False
+    _GEMINI_IMPORT_ERROR = exc
+    genai = None
+    HarmCategory = None  # type: ignore
+    HarmBlockThreshold = None  # type: ignore
+
 import psutil
 
 logger = logging.getLogger(__name__)
@@ -20,7 +31,7 @@ class GeminiService:
     Supports both shared brain configuration and per-account custom prompts.
     """
 
-    def __init__(self, api_key: str, brain_config: Dict[str, Any] = None):
+    def __init__(self, api_key: str, brain_config: Dict[str, Any] = None, performance: Optional[Dict[str, Any]] = None):
         """Initialize the Gemini service.
 
         Args:
@@ -37,7 +48,14 @@ class GeminiService:
         self.model = None
         self.conversation_history: Dict[int, List[Dict[str, str]]] = {}
         self.brain_prompt = ""
-        self.max_history_length = 50  # Maximum messages to keep in history per chat
+        self.performance = performance or {}
+        self.low_power = bool(self.performance.get("low_power", False))
+
+        ai_cfg = self.performance.get("ai", {}) if isinstance(self.performance, dict) else {}
+        history_cap = ai_cfg.get("max_history", 50)
+        if self.low_power:
+            history_cap = min(history_cap, 20)
+        self.max_history_length = history_cap  # Maximum messages to keep in history per chat
         
         # Per-account brain configuration
         self.brain_config = brain_config or {}
@@ -52,6 +70,9 @@ class GeminiService:
         # Resilience management
         self.resilience_manager = get_resilience_manager()
         self._setup_resilience_strategies()
+
+        # Offline stub flag: if no API key or SDK, run in degraded mode
+        self.offline_mode = not GEMINI_AVAILABLE or not self.api_key
 
     def _setup_resilience_strategies(self):
         """Set up circuit breakers and fallback strategies for Gemini AI operations."""
@@ -68,6 +89,8 @@ class GeminiService:
 
         # Primary: Full Gemini generation with history
         async def primary_generation(prompt, chat_id, **kwargs):
+            if self.offline_mode or not self.model:
+                return await fallback_template(prompt, chat_id, **kwargs)
             return await self._generate_with_gemini(prompt, chat_id, **kwargs)
 
         # Fallback 1: Gemini generation without history
@@ -96,23 +119,38 @@ class GeminiService:
         generation_fallback.add_fallback(fallback_template, "Template-based fallback")
 
     def _initialize_model(self) -> None:
-        """Initialize the Gemini model."""
+        """Initialize the Gemini model; tolerate missing SDK."""
+        if not GEMINI_AVAILABLE:
+            logger.warning(f"Gemini SDK unavailable: {_GEMINI_IMPORT_ERROR}")
+            self.model = None
+            return
+
         try:
+            if not self.api_key:
+                raise ValueError("Gemini API key missing")
+
             genai.configure(api_key=self.api_key)
             
             # Use custom generation config if set, otherwise use defaults
+            perf_ai = self.performance.get("ai", {}) if isinstance(self.performance, dict) else {}
+            max_tokens = perf_ai.get("max_tokens", 1024)
+            if self.low_power:
+                max_tokens = min(max_tokens, 768)
             default_config = {
-                'temperature': 0.7,
-                'top_p': 0.8,
-                'top_k': 40,
-                'max_output_tokens': 1024,
+                'temperature': perf_ai.get('temperature', 0.7),
+                'top_p': perf_ai.get('top_p', 0.8),
+                'top_k': perf_ai.get('top_k', 40),
+                'max_output_tokens': max_tokens,
             }
             
             gen_config = self.custom_generation_config or default_config
             
+            # Resolve model name with optional override
+            model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
+
             # Use BLOCK_NONE for content generation (required for adult content scenarios)
             self.model = genai.GenerativeModel(
-                model_name='gemini-1.5-flash',
+                model_name=model_name,
                 generation_config=gen_config,
                 safety_settings={
                     HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
@@ -125,6 +163,7 @@ class GeminiService:
         except Exception as e:
             logger.error(f"Failed to initialize Gemini model: {e}")
             self.model = None
+            self.offline_mode = True
     
     def _apply_brain_config(self, brain_config: Dict[str, Any]) -> None:
         """Apply per-account brain configuration.
@@ -580,7 +619,7 @@ def create_gemini_service_for_account(api_key: str, account_data: Dict[str, Any]
         # But if not, try to get default based on account type
         if not service.brain_prompt:
             account_type = account_data.get('account_type', 'reactive')
-            from account_manager import DEFAULT_BRAIN_PROMPTS, AccountType
+            from accounts.account_manager import DEFAULT_BRAIN_PROMPTS, AccountType
             try:
                 default_prompt = DEFAULT_BRAIN_PROMPTS.get(AccountType(account_type), "")
                 if default_prompt:

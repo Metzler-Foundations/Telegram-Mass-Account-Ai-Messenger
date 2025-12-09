@@ -21,6 +21,9 @@ def __getattr__(name):
     elif name == 'ProgressTracker':
         from .progress_tracker import ProgressTracker
         return ProgressTracker
+    elif name == 'InputValidator':
+        from .input_validation import InputValidator
+        return InputValidator
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
@@ -32,5 +35,6 @@ __all__ = [
     'BatchOptimizer',
     'MemoryOptimizer',
     'ProgressTracker',
+    'InputValidator',
 ]
 

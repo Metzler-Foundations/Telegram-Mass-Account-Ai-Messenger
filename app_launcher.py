@@ -86,6 +86,20 @@ def launch_application():
         app.setApplicationName("Telegram Auto-Reply Bot")
         app.setOrganizationName("TelegramBot")
         
+        # Apply Aurora theme immediately so the welcome wizard is themed
+        try:
+            from ui.theme_manager import ThemeManager
+            ThemeManager.apply_to_application(app)
+            logger.info("Applied Aurora theme via ThemeManager (pre-wizard)")
+        except Exception as theme_exc:
+            logger.warning(f"Theme application fallback before wizard: {theme_exc}")
+            try:
+                from ui.ui_redesign import HIGH_CONTRAST_THEME
+                app.setStyleSheet(HIGH_CONTRAST_THEME)
+                logger.info("Applied Aurora stylesheet fallback (pre-wizard)")
+            except Exception:
+                logger.warning("Could not import theme before wizard - using default Qt styling")
+        
         # Check if this is first run
         is_first_run = check_first_run()
         
@@ -115,13 +129,19 @@ def launch_application():
         logger.info("Creating main window")
         main_window = MainWindow()
         
-        # Apply theme
+        # Re-apply theme after main window creation (keeps current selection)
         try:
-            from ui.ui_redesign import DISCORD_THEME
-            app.setStyleSheet(DISCORD_THEME)
-            logger.info("Applied Discord theme")
-        except ImportError:
-            logger.warning("Could not import Discord theme")
+            from ui.theme_manager import ThemeManager
+            ThemeManager.apply_to_application(app)
+            logger.info("Re-applied Aurora theme post-main window")
+        except Exception as theme_exc:
+            logger.warning(f"Theme application fallback post-main window: {theme_exc}")
+            try:
+                from ui.ui_redesign import HIGH_CONTRAST_THEME
+                app.setStyleSheet(HIGH_CONTRAST_THEME)
+                logger.info("Applied Aurora stylesheet fallback post-main window")
+            except Exception:
+                logger.warning("Could not import theme post-main window - using default Qt styling")
         
         # Show main window
         main_window.show()
@@ -136,7 +156,22 @@ def launch_application():
         # Run event loop
         logger.info("Entering main event loop")
         exit_code = app.exec()
-        
+
+        # Memory cleanup before exit
+        try:
+            import gc
+            logger.info("Performing final memory cleanup...")
+
+            # Force garbage collection
+            collected = gc.collect()
+            logger.info(f"Final garbage collection: {collected} objects collected")
+
+            # Clear any cached references
+            gc.collect(2)  # Full collection
+
+        except Exception as cleanup_error:
+            logger.warning(f"Memory cleanup failed: {cleanup_error}")
+
         logger.info(f"Application exited with code {exit_code}")
         return exit_code
         

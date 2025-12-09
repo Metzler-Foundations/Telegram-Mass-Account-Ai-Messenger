@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTime, pyqtSignal
 from PyQt6.QtGui import QFont
 
+from ui.theme_manager import ThemeManager
+
 logger = logging.getLogger(__name__)
 
 # Try to import warmup service
@@ -50,7 +52,7 @@ class WarmupConfigWidget(QWidget):
         # Header
         header_layout = QHBoxLayout()
         
-        title = QLabel("⚙️ Warmup Configuration")
+        title = QLabel("Warmup Configuration")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -60,7 +62,7 @@ class WarmupConfigWidget(QWidget):
         header_layout.addStretch()
         
         # Save button
-        save_btn = QPushButton("💾 Save Configuration")
+        save_btn = QPushButton("Save Configuration")
         
         # Debounce to prevent double-saves
         from utils.button_debouncer import protect_button
@@ -69,21 +71,22 @@ class WarmupConfigWidget(QWidget):
         header_layout.addWidget(save_btn)
         
         # Reset button
-        reset_btn = QPushButton("🔄 Reset to Defaults")
+        reset_btn = QPushButton("Reset to Defaults")
         reset_btn.clicked.connect(self.reset_to_defaults)
         header_layout.addWidget(reset_btn)
         
         layout.addLayout(header_layout)
         
         # Blackout Windows
-        blackout_group = QGroupBox("🌙 Blackout Windows")
+        blackout_group = QGroupBox("Blackout Windows")
         blackout_layout = QVBoxLayout(blackout_group)
         
         blackout_info = QLabel(
             "Configure time windows when warmup activities should NOT run.\n"
             "Useful for avoiding detection patterns or matching timezone behavior."
         )
-        blackout_info.setStyleSheet("color: #949ba4; font-size: 11px;")
+        c = ThemeManager.get_colors()
+        blackout_info.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px;")
         blackout_info.setWordWrap(True)
         blackout_layout.addWidget(blackout_info)
         
@@ -130,14 +133,15 @@ class WarmupConfigWidget(QWidget):
         layout.addWidget(blackout_group)
         
         # Stage Weights and Priorities
-        stages_group = QGroupBox("📊 Stage Weights & Priorities")
+        stages_group = QGroupBox("Stage Weights & Priorities")
         stages_layout = QVBoxLayout(stages_group)
         
         stages_info = QLabel(
             "Configure priority and weight for each warmup stage.\n"
             "Higher weights = more time spent on that stage."
         )
-        stages_info.setStyleSheet("color: #949ba4; font-size: 11px;")
+        c = ThemeManager.get_colors()
+        stages_info.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px;")
         stages_info.setWordWrap(True)
         stages_layout.addWidget(stages_info)
         
@@ -246,7 +250,8 @@ class WarmupConfigWidget(QWidget):
         
         # Status label
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #949ba4; font-size: 11px; padding: 5px;")
+        c = ThemeManager.get_colors()
+        self.status_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px; padding: 5px;")
         layout.addWidget(self.status_label)
         
         layout.addStretch()

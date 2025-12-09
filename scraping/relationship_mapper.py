@@ -68,7 +68,21 @@ class RelationshipMapper:
         self.graph = None
         if NETWORKX_AVAILABLE:
             self.graph = nx.Graph()
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(self.db_path)
+        except Exception as exc:
+            logger.debug(f"Connection pool unavailable for relationship mapper: {exc}")
         self._init_database()
+    
+    def _get_connection(self):
+        """Return a DB connection from pool or direct sqlite."""
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
     
     def _init_database(self):
         """Initialize relationship tables."""

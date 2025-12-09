@@ -23,8 +23,17 @@ async def test_account_creation_complete_flow():
     """Test complete account creation flow with all integrations."""
     
     # Setup test database
-    test_db = ':memory:'
-    
+    from scraping.member_scraper import MemberDatabase
+    test_db = MemberDatabase(':memory:')
+
+    # Mock Gemini service
+    mock_gemini_service = Mock()
+    mock_gemini_service.generate_response = AsyncMock(return_value="Test response")
+ 
+    # Mock account manager
+    mock_account_manager = Mock()
+    mock_account_manager.add_account = AsyncMock(return_value=True)
+
     # Mock SMS provider
     mock_sms_provider = Mock()
     mock_sms_provider.get_phone_number = AsyncMock(return_value={
@@ -33,7 +42,7 @@ async def test_account_creation_complete_flow():
         'order_id': 'test_order_123'
     })
     mock_sms_provider.get_verification_code = AsyncMock(return_value='12345')
-    
+
     # Mock proxy pool
     mock_proxy_pool = Mock()
     mock_proxy_pool.assign_proxy_to_account = AsyncMock(return_value={
@@ -41,16 +50,16 @@ async def test_account_creation_complete_flow():
         'port': 8080,
         'protocol': 'http'
     })
-    
+
     # Mock Telegram client (already have MockTelegramClient)
     with patch('accounts.account_creator.Client', MockTelegramClient):
         # Import after patching
         from accounts.account_creator import AccountCreator
-        
+
         creator = AccountCreator(
-            api_id='12345678',
-            api_hash='a' * 32,
-            sms_provider='test_provider'
+            db=test_db,
+            gemini_service=mock_gemini_service,
+            account_manager=mock_account_manager
         )
         
         # Configure mocks
@@ -88,20 +97,32 @@ async def test_account_creation_complete_flow():
 async def test_account_creation_failure_handling():
     """Test account creation handles failures gracefully."""
     
+    # Setup test database
+    from scraping.member_scraper import MemberDatabase
+    test_db = MemberDatabase(':memory:')
+
+    # Mock Gemini service
+    mock_gemini_service = Mock()
+    mock_gemini_service.generate_response = AsyncMock(return_value="Test response")
+
+    # Mock account manager
+    mock_account_manager = Mock()
+    mock_account_manager.add_account = AsyncMock(return_value=True)
+
     # Mock SMS provider that fails
     mock_sms_provider = Mock()
     mock_sms_provider.get_phone_number = AsyncMock(return_value={
         'success': False,
         'error': 'No numbers available'
     })
-    
+
     with patch('accounts.account_creator.Client', MockTelegramClient):
         from accounts.account_creator import AccountCreator
-        
+
         creator = AccountCreator(
-            api_id='12345678',
-            api_hash='a' * 32,
-            sms_provider='test_provider'
+            db=test_db,
+            gemini_service=mock_gemini_service,
+            account_manager=mock_account_manager
         )
         creator.phone_provider = mock_sms_provider
         

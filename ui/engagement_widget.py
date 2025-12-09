@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 
+from ui.theme_manager import ThemeManager
+
 logger = logging.getLogger(__name__)
 
 # Try to import EngagementAutomation
@@ -40,6 +42,10 @@ class EngagementRuleDialog(QDialog):
         self.rule = rule
         self.setWindowTitle("Engagement Rule" if not rule else f"Edit Rule: {rule.name}")
         self.setMinimumWidth(500)
+        
+        # CRITICAL: Prevent dialog from closing parent window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        
         self.setup_ui()
         
         if rule:
@@ -160,11 +166,13 @@ class EngagementWidget(QWidget):
     def setup_ui(self):
         """Setup the UI."""
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
         
         # Header
         header_layout = QHBoxLayout()
         
-        title = QLabel("🎯 Engagement Automation")
+        title = QLabel("Engagement Automation")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -174,12 +182,12 @@ class EngagementWidget(QWidget):
         header_layout.addStretch()
         
         # Refresh button
-        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self.refresh_data)
         header_layout.addWidget(refresh_btn)
         
         # Add rule button
-        add_btn = QPushButton("➕ Add Rule")
+        add_btn = QPushButton("Add Rule")
         add_btn.clicked.connect(self.add_rule)
         header_layout.addWidget(add_btn)
         
@@ -187,7 +195,21 @@ class EngagementWidget(QWidget):
         
         # Rules table
         rules_group = QGroupBox("Engagement Rules")
+        rules_group.setStyleSheet(
+            """
+            QGroupBox {
+                border: 1px solid palette(mid);
+                border-radius: 10px;
+                padding-top: 12px;
+                margin-top: 8px;
+                font-weight: 700;
+            }
+            QGroupBox::title { left: 12px; padding: 0 6px; }
+            """
+        )
         rules_layout = QVBoxLayout(rules_group)
+        rules_layout.setContentsMargins(10, 10, 10, 10)
+        rules_layout.setSpacing(8)
         
         self.rules_table = QTableWidget()
         self.rules_table.setColumnCount(7)
@@ -210,32 +232,37 @@ class EngagementWidget(QWidget):
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Fixed)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         
+        self.rules_table.setAlternatingRowColors(True)
+        self.rules_table.setShowGrid(False)
+        self.rules_table.verticalHeader().setVisible(False)
+        self.rules_table.setWordWrap(False)
         self.rules_table.setColumnWidth(1, 80)
         self.rules_table.setColumnWidth(2, 100)
         self.rules_table.setColumnWidth(3, 80)
         self.rules_table.setColumnWidth(5, 120)
         self.rules_table.setColumnWidth(6, 80)
         
-        self.rules_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                gridline-color: #2b2d31;
+        c = ThemeManager.get_colors()
+        self.rules_table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {c['BG_PRIMARY']};
+                color: {c['TEXT_SECONDARY']};
+                gridline-color: {c['BORDER_DEFAULT']};
                 border: none;
-            }
-            QTableWidget::item {
+            }}
+            QTableWidget::item {{
                 padding: 8px;
-            }
-            QTableWidget::item:selected {
-                background-color: #404249;
-            }
-            QHeaderView::section {
-                background-color: #2b2d31;
-                color: #b5bac1;
+            }}
+            QTableWidget::item:selected {{
+                background-color: {c['BG_SECONDARY']};
+            }}
+            QHeaderView::section {{
+                background-color: {c['BG_TERTIARY']};
+                color: {c['TEXT_SECONDARY']};
                 padding: 8px;
                 border: none;
-                border-bottom: 2px solid #5865f2;
-            }
+                border-bottom: 2px solid {c['ACCENT_PRIMARY']};
+            }}
         """)
         
         rules_layout.addWidget(self.rules_table)
@@ -259,7 +286,8 @@ class EngagementWidget(QWidget):
         
         # Status
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #949ba4; font-size: 11px; padding: 5px;")
+        c = ThemeManager.get_colors()
+        self.status_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px; padding: 5px;")
         layout.addWidget(self.status_label)
     
     def refresh_data(self):

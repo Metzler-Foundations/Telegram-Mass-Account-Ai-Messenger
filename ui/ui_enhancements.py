@@ -16,6 +16,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont, QColor, QPalette
 
+from ui.theme_manager import ThemeManager
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +28,9 @@ class HelpDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(f"Help: {title}")
         self.resize(600, 400)
+        
+        # CRITICAL: Prevent dialog from closing parent window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         
         layout = QVBoxLayout(self)
         
@@ -73,13 +78,16 @@ class QuickStartDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("🚀 Quick Start Guide")
+        self.setWindowTitle("Quick Start Guide")
         self.resize(700, 500)
+        
+        # CRITICAL: Prevent dialog from closing parent window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         
         layout = QVBoxLayout(self)
         
         # Title
-        title = QLabel("🚀 Quick Start Guide")
+        title = QLabel("Quick Start Guide")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -92,7 +100,7 @@ class QuickStartDialog(QDialog):
             "<br>"
             "<h4>Step 1: Configure API Credentials</h4>"
             "<ol>"
-            "<li>Click <b>Settings</b> (⚙️ icon or menu)</li>"
+            "<li>Click <b>Settings</b> (gear icon or menu)</li>"
             "<li>Go to <b>API & Auth</b> tab</li>"
             "<li>Get your <b>Telegram API credentials</b> from <a href='https://my.telegram.org/apps'>my.telegram.org/apps</a></li>"
             "<li>Get your <b>Gemini API key</b> from <a href='https://makersuite.google.com/app/apikey'>Google AI Studio</a></li>"
@@ -132,7 +140,7 @@ class QuickStartDialog(QDialog):
             "<li>Hover over any option for helpful tooltips</li>"
             "</ul>"
             "<br>"
-            "<p style='color: #f0b132;'><b>⚠️ Remember:</b> This is a powerful tool. Use it responsibly and ethically!</p>"
+            f"<p style='color: {ThemeManager.get_color('ACCENT_WARNING')};'><b>Remember:</b> This is a powerful tool. Use it responsibly and ethically!</p>"
         )
         content.setWordWrap(True)
         content.setTextFormat(Qt.TextFormat.RichText)
@@ -176,12 +184,12 @@ class ProgressDialogWithRetry(QProgressDialog):
         self.error_occurred = True
         self.error_message = error_msg
         
-        self.setLabelText(f"❌ Error: {error_msg}")
+        self.setLabelText(f"Error: {error_msg}")
         self.setValue(self.maximum())
         
         if allow_retry and not self.retry_btn:
             # Add retry button
-            self.retry_btn = QPushButton("🔄 Retry")
+            self.retry_btn = QPushButton("Retry")
             self.retry_btn.clicked.connect(self._on_retry)
             self.setCancelButtonText("Close")
     
@@ -245,26 +253,26 @@ class StatusPanel(QFrame):
     def _animate_dots(self):
         """Animate working dots."""
         self.dot_count = (self.dot_count + 1) % 4
-        self.progress_label.setText("⏳ Working" + "." * self.dot_count)
+        self.progress_label.setText("Working" + "." * self.dot_count)
     
     def set_success(self, message: str):
         """Show success status."""
         self.animation_timer.stop()
-        self.status_label.setText("✅ Success")
+        self.status_label.setText("Success")
         self.details_label.setText(message)
         self.progress_label.setText("")
     
     def set_error(self, message: str):
         """Show error status."""
         self.animation_timer.stop()
-        self.status_label.setText("❌ Error")
+        self.status_label.setText("Error")
         self.details_label.setText(message)
         self.progress_label.setText("")
     
     def set_warning(self, message: str):
         """Show warning status."""
         self.animation_timer.stop()
-        self.status_label.setText("⚠️ Warning")
+        self.status_label.setText("Warning")
         self.details_label.setText(message)
         self.progress_label.setText("")
 
@@ -277,7 +285,16 @@ class ConfirmationDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(title)
         
+        # Apply dialog styling
+        self.setStyleSheet(ThemeManager.get_dialog_style())
+        
+        # CRITICAL: Prevent dialog from closing parent window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        
+        c = ThemeManager.get_colors()
         layout = QVBoxLayout(self)
+        layout.setSpacing(16)
+        layout.setContentsMargins(24, 24, 24, 24)
         
         # Main message
         msg_label = QLabel(message)
@@ -285,35 +302,42 @@ class ConfirmationDialog(QDialog):
         msg_font = QFont()
         msg_font.setPointSize(11)
         msg_label.setFont(msg_font)
+        msg_label.setStyleSheet(f"color: {c['TEXT_PRIMARY']};")
         layout.addWidget(msg_label)
         
         # Details
         if details:
-            layout.addSpacing(10)
             details_label = QLabel("<ul>" + "".join(f"<li>{d}</li>" for d in details) + "</ul>")
             details_label.setWordWrap(True)
+            details_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
             layout.addWidget(details_label)
         
         # Warning
         if warning:
-            layout.addSpacing(10)
             warning_frame = QFrame()
-            warning_frame.setStyleSheet("background-color: #ffa50033; border: 2px solid #ffa500; border-radius: 4px; padding: 8px;")
+            warn_hex = c["ACCENT_WARNING"].lstrip('#')
+            warn_r = int(warn_hex[0:2], 16)
+            warn_g = int(warn_hex[2:4], 16)
+            warn_b = int(warn_hex[4:6], 16)
+            warning_frame.setStyleSheet(f"background-color: rgba({warn_r}, {warn_g}, {warn_b}, 0.15); border: 2px solid {c['ACCENT_WARNING']}; border-radius: 4px; padding: 12px;")
             warning_layout = QVBoxLayout(warning_frame)
-            warning_label = QLabel(f"⚠️ {warning}")
+            warning_label = QLabel(f"{warning}")
             warning_label.setWordWrap(True)
+            warning_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
             warning_layout.addWidget(warning_label)
             layout.addWidget(warning_frame)
         
         # Buttons
-        layout.addSpacing(10)
         button_layout = QHBoxLayout()
+        button_layout.addStretch()
         
         self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn.setStyleSheet(ThemeManager.get_button_style("default"))
         self.cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_btn)
         
         self.confirm_btn = QPushButton("Confirm")
+        self.confirm_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
         self.confirm_btn.clicked.connect(self.accept)
         self.confirm_btn.setDefault(True)
         button_layout.addWidget(self.confirm_btn)
@@ -333,8 +357,9 @@ class TutorialOverlay(QWidget):
         
         self.message_label = QLabel()
         self.message_label.setWordWrap(True)
+        c = ThemeManager.get_colors()
         self.message_label.setStyleSheet(
-            "background-color: #5865f2; color: white; padding: 15px; "
+            f"background-color: {c['ACCENT_PRIMARY']}; color: {c['TEXT_BRIGHT']}; padding: 15px; "
             "border-radius: 8px; font-size: 14px;"
         )
         layout.addWidget(self.message_label)
@@ -391,9 +416,10 @@ class FeatureCard(QFrame):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        c = ThemeManager.get_colors()
         self.setStyleSheet(
-            "FeatureCard { background-color: #2b2d31; border-radius: 8px; padding: 15px; } "
-            "FeatureCard:hover { background-color: #35373c; }"
+            f"FeatureCard {{ background-color: {c['BG_TERTIARY']}; border-radius: 8px; padding: 15px; }} "
+            f"FeatureCard:hover {{ background-color: {c['BG_SECONDARY']}; }}"
         )
         
         layout = QVBoxLayout(self)
@@ -419,7 +445,8 @@ class FeatureCard(QFrame):
         # Description
         desc_label = QLabel(description)
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("color: #b5bac1;")
+        c = ThemeManager.get_colors()
+        desc_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         layout.addWidget(desc_label)
     
     def mousePressEvent(self, event):
@@ -439,12 +466,13 @@ class SettingsValidator(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        self.status_label = QLabel("⏳ Validating...")
+        self.status_label = QLabel("Validating...")
         layout.addWidget(self.status_label)
         
         self.issues_label = QLabel("")
         self.issues_label.setWordWrap(True)
-        self.issues_label.setStyleSheet("color: #ed4245;")
+        c = ThemeManager.get_colors()
+        self.issues_label.setStyleSheet(f"color: {c['ACCENT_DANGER']};")
         layout.addWidget(self.issues_label)
         
         self.is_valid = False
@@ -454,10 +482,10 @@ class SettingsValidator(QWidget):
         self.is_valid = is_valid
         
         if is_valid:
-            self.status_label.setText("✅ Configuration Valid")
+            self.status_label.setText("Configuration Valid")
             self.issues_label.setText("")
         else:
-            self.status_label.setText(f"❌ {len(errors)} Issue(s) Found")
+            self.status_label.setText(f"{len(errors)} Issue(s) Found")
             self.issues_label.setText("\n".join(f"• {err}" for err in errors[:5]))  # Show first 5
             
             if len(errors) > 5:

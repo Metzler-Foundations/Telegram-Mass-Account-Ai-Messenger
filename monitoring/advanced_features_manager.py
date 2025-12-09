@@ -64,19 +64,78 @@ class AdvancedFeaturesManager:
         
         logger.info(f"Initializing Advanced Features Manager with: {self.enabled_features}")
         
-        # Initialize systems
-        self.intelligence = IntelligenceEngine() if 'intelligence' in self.enabled_features else None
-        self.engagement = EngagementAutomation() if 'engagement' in self.enabled_features else None
-        self.group_discovery = GroupDiscoveryEngine() if 'discovery' in self.enabled_features else None
-        self.status_tracker = StatusIntelligence() if 'status' in self.enabled_features else None
-        self.shadowban = ShadowBanDetector() if 'shadowban' in self.enabled_features else None
-        self.recovery = RecoveryProtocol() if 'recovery' in self.enabled_features or 'shadowban' in self.enabled_features else None
-        self.network = NetworkAnalytics() if 'network' in self.enabled_features else None
-        self.competitor = CompetitorIntelligence() if 'competitor' in self.enabled_features else None
-        self.media = MediaIntelligence() if 'media' in self.enabled_features else None
-        self.scheduler = IntelligentScheduler() if 'scheduler' in self.enabled_features else None
-        self.conversation = ConversationAnalyzer()
-        self.relationships = RelationshipMapper()
+        # Initialize systems with error handling
+        try:
+            self.intelligence = IntelligenceEngine() if 'intelligence' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize IntelligenceEngine: {e}")
+            self.intelligence = None
+
+        try:
+            self.engagement = EngagementAutomation() if 'engagement' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize EngagementAutomation: {e}")
+            self.engagement = None
+
+        try:
+            self.group_discovery = GroupDiscoveryEngine() if 'discovery' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize GroupDiscoveryEngine: {e}")
+            self.group_discovery = None
+
+        try:
+            self.status_tracker = StatusIntelligence() if 'status' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize StatusIntelligence: {e}")
+            self.status_tracker = None
+
+        try:
+            self.shadowban = ShadowBanDetector() if 'shadowban' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize ShadowBanDetector: {e}")
+            self.shadowban = None
+
+        try:
+            self.recovery = RecoveryProtocol() if 'recovery' in self.enabled_features or 'shadowban' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize RecoveryProtocol: {e}")
+            self.recovery = None
+
+        try:
+            self.network = NetworkAnalytics() if 'network' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize NetworkAnalytics: {e}")
+            self.network = None
+
+        try:
+            self.competitor = CompetitorIntelligence() if 'competitor' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize CompetitorIntelligence: {e}")
+            self.competitor = None
+
+        try:
+            self.media = MediaIntelligence() if 'media' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize MediaIntelligence: {e}")
+            self.media = None
+
+        try:
+            self.scheduler = IntelligentScheduler() if 'scheduler' in self.enabled_features else None
+        except Exception as e:
+            logger.warning(f"Failed to initialize IntelligentScheduler: {e}")
+            self.scheduler = None
+
+        try:
+            self.conversation = ConversationAnalyzer()
+        except Exception as e:
+            logger.warning(f"Failed to initialize ConversationAnalyzer: {e}")
+            self.conversation = None
+
+        try:
+            self.relationships = RelationshipMapper()
+        except Exception as e:
+            logger.warning(f"Failed to initialize RelationshipMapper: {e}")
+            self.relationships = None
         
         logger.info("Advanced Features Manager initialized successfully")
     

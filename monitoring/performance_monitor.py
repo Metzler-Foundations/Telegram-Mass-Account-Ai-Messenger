@@ -47,6 +47,16 @@ class ResourceManager:
         self.resource_check_interval = 30  # seconds
         self._resource_monitor_task = None
 
+    def apply_config(self, config: Optional[Dict[str, Any]] = None):
+        """Apply performance/resource configuration."""
+        if not config:
+            return
+        with self._lock:
+            self.max_concurrent_operations = config.get("max_concurrent_operations", self.max_concurrent_operations)
+            self.memory_limit_mb = config.get("memory_limit_mb", self.memory_limit_mb)
+            self.cpu_limit_percent = config.get("cpu_limit_percent", self.cpu_limit_percent)
+            self.resource_check_interval = config.get("resource_check_interval", self.resource_check_interval)
+
     async def start(self):
         """Start the resource manager."""
         logger.info("Starting ResourceManager")
@@ -538,7 +548,7 @@ class StructuredLogger:
 class PerformanceMonitor:
     """Monitor application performance metrics."""
 
-    def __init__(self):
+    def __init__(self, sampling_enabled: bool = False, sample_interval_seconds: float = 30.0):
         self.metrics = {
             'api_calls': 0,
             'api_errors': 0,
@@ -549,6 +559,10 @@ class PerformanceMonitor:
             'start_time': time.time()
         }
         self._last_memory_check = 0
+        self.sampling_enabled = sampling_enabled
+        self.sample_interval_seconds = max(5.0, float(sample_interval_seconds or 30.0))
+        self._last_sample_ts = 0.0
+        self._last_summary: Optional[str] = None
 
     def record_api_call(self, response_time: float = None, error: bool = False):
         """Record an API call."""
@@ -586,6 +600,9 @@ class PerformanceMonitor:
             self.metrics['memory_usage'] = self.metrics['memory_usage'][-100:]
         # Update last check time
         self._last_memory_check = current_time
+        if self.metrics['memory_usage']:
+            return self.metrics['memory_usage'][-1][1]
+        return 0
 
     def cleanup_old_data(self):
         """Clean up old data to prevent memory leaks."""
@@ -613,6 +630,27 @@ class PerformanceMonitor:
         if len(self.metrics['memory_usage']) > 100:
             self.metrics['memory_usage'] = self.metrics['memory_usage'][-100:]
 
+    def _sample_process_resources(self) -> Optional[str]:
+        """Lightweight sampling of current CPU and memory for UI/status display."""
+        if not self.sampling_enabled or not psutil:
+            return self._last_summary
+
+        now = time.time()
+        if now - self._last_sample_ts < self.sample_interval_seconds:
+            return self._last_summary
+
+        try:
+            process = psutil.Process()
+            cpu_percent = process.cpu_percent(interval=0.0)
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            summary = f"CPU {cpu_percent:.0f}% | RAM {memory_mb:.0f}MB"
+            self._last_summary = summary
+            self._last_sample_ts = now
+            return summary
+        except Exception as exc:
+            logger.debug(f"Perf sample failed: {exc}")
+            return self._last_summary
+
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get current performance statistics."""
         # Periodic cleanup to prevent memory leaks
@@ -624,7 +662,7 @@ class PerformanceMonitor:
         response_times = self.metrics['response_times']
         avg_response_time = sum(response_times) / len(response_times) if response_times else 0
 
-        return {
+        stats = {
             'uptime_seconds': uptime,
             'api_calls_total': self.metrics['api_calls'],
             'api_error_rate': (self.metrics['api_errors'] / max(self.metrics['api_calls'], 1)) * 100,
@@ -634,6 +672,11 @@ class PerformanceMonitor:
             'current_memory_mb': memory_mb,
             'memory_trend': [m[1] for m in self.metrics['memory_usage'][-10:]]  # Last 10 readings
         }
+
+        summary = self._sample_process_resources()
+        if summary:
+            stats['summary'] = summary
+        return stats
 
 
 class RateLimiter:
@@ -804,6 +847,18 @@ class NetworkRecoveryManager:
         info = self._state[channel]
         delay = self.base_delay * max(1, info["attempts"])
         return min(delay, 60.0)
+
+
+# Global instance
+_performance_monitor: Optional[PerformanceMonitor] = None
+
+
+def get_performance_monitor() -> PerformanceMonitor:
+    """Get global performance monitor instance."""
+    global _performance_monitor
+    if _performance_monitor is None:
+        _performance_monitor = PerformanceMonitor()
+    return _performance_monitor
 
 
 

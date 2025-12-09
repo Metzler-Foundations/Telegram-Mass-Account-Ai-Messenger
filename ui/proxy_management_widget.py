@@ -21,14 +21,21 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QGroupBox,
     QProgressBar, QComboBox, QSpinBox, QCheckBox, QTabWidget,
-    QFrame, QGridLayout, QMessageBox, QSplitter, QTextEdit
+    QFrame, QGridLayout, QMessageBox, QSplitter, QTextEdit, QLineEdit,
+    QScrollArea, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt6.QtGui import QColor, QFont
 
 from core.error_handler import ErrorHandler
+from ui.theme_manager import ThemeManager
 
 logger = logging.getLogger(__name__)
+
+try:
+    from ui.ui_components import LoadingOverlay
+except ImportError:
+    LoadingOverlay = None
 
 # Try to import ProxyPoolManager
 try:
@@ -53,73 +60,65 @@ class ProxyStatsWidget(QWidget):
         layout = QGridLayout(self)
         layout.setSpacing(15)
         
-        # Style for stat cards
-        card_style = """
-            QFrame {
-                background-color: #2b2d31;
-                border-radius: 10px;
-                padding: 15px;
-            }
-            QLabel {
-                color: #b5bac1;
-            }
-        """
+        # Colors from palette
+        c = ThemeManager._get_palette()
         
         # Total Proxies Card
-        self.total_card = self._create_stat_card("Total Proxies", "0", "#5865f2")
+        self.total_card = self._create_stat_card("Total Proxies", "0", c["ACCENT_PRIMARY"])
         layout.addWidget(self.total_card, 0, 0)
         
         # Active Proxies Card
-        self.active_card = self._create_stat_card("Active", "0", "#23a559")
+        self.active_card = self._create_stat_card("Active", "0", c["ACCENT_SUCCESS"])
         layout.addWidget(self.active_card, 0, 1)
         
         # Available Proxies Card
-        self.available_card = self._create_stat_card("Available", "0", "#f0b232")
+        self.available_card = self._create_stat_card("Available", "0", c["ACCENT_WARNING"])
         layout.addWidget(self.available_card, 0, 2)
         
         # Assigned Proxies Card
-        self.assigned_card = self._create_stat_card("Assigned", "0", "#5865f2")
+        self.assigned_card = self._create_stat_card("Assigned", "0", c["ACCENT_PRIMARY"])
         layout.addWidget(self.assigned_card, 0, 3)
         
         # Average Latency Card
-        self.latency_card = self._create_stat_card("Avg Latency", "0 ms", "#eb459e")
+        self.latency_card = self._create_stat_card("Avg Latency", "0 ms", c["ACCENT_DANGER"])
         layout.addWidget(self.latency_card, 1, 0)
         
         # Average Score Card
-        self.score_card = self._create_stat_card("Avg Score", "0", "#57f287")
+        self.score_card = self._create_stat_card("Avg Score", "0", c["ACCENT_SUCCESS"])
         layout.addWidget(self.score_card, 1, 1)
         
         # Endpoints Card
-        self.endpoints_card = self._create_stat_card("Endpoints", "15", "#ed4245")
+        self.endpoints_card = self._create_stat_card("Endpoints", "15", c["ACCENT_DANGER"])
         layout.addWidget(self.endpoints_card, 1, 2)
         
         # Last Poll Card
-        self.poll_card = self._create_stat_card("Last Poll", "Never", "#9b59b6")
+        self.poll_card = self._create_stat_card("Last Poll", "Never", c["ACCENT_PRIMARY"])
         layout.addWidget(self.poll_card, 1, 3)
     
     def _create_stat_card(self, title: str, value: str, color: str) -> QFrame:
         """Create a statistics card widget."""
         frame = QFrame()
-        frame.setStyleSheet(f"""
+        ThemeManager.apply_to_widget(frame, "card")
+        # Override border for accent
+        c = ThemeManager._get_palette()
+        frame.setStyleSheet(frame.styleSheet() + f"""
             QFrame {{
-                background-color: #2b2d31;
-                border-radius: 10px;
                 border-left: 4px solid {color};
             }}
         """)
         
         layout = QVBoxLayout(frame)
-        layout.setContentsMargins(15, 10, 15, 10)
+        layout.setContentsMargins(15, 15, 15, 15)
         
         # Title
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #b5bac1; font-size: 12px;")
+        title_label.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {c['TEXT_SECONDARY']}; text-transform: uppercase;")
         layout.addWidget(title_label)
         
         # Value
         value_label = QLabel(value)
         value_label.setObjectName(f"{title.lower().replace(' ', '_')}_value")
-        value_label.setStyleSheet(f"color: {color}; font-size: 24px; font-weight: bold;")
+        value_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-size: 24px; font-weight: 800;")
         layout.addWidget(value_label)
         
         return frame
@@ -191,11 +190,13 @@ class ProxyTableWidget(QWidget):
         
         # Toolbar
         toolbar = QHBoxLayout()
+        toolbar.setSpacing(8)
         
         # Filter by tier
         toolbar.addWidget(QLabel("Filter by Tier:"))
         self.tier_filter = QComboBox()
         self.tier_filter.addItems(["All", "Premium", "Standard", "Economy", "Low"])
+        self.tier_filter.setAccessibleName("Proxy tier filter")
         self.tier_filter.currentTextChanged.connect(self.apply_filter)
         toolbar.addWidget(self.tier_filter)
         
@@ -203,6 +204,7 @@ class ProxyTableWidget(QWidget):
         toolbar.addWidget(QLabel("Status:"))
         self.status_filter = QComboBox()
         self.status_filter.addItems(["All", "Active", "Testing", "Cooldown", "Failed"])
+        self.status_filter.setAccessibleName("Proxy status filter")
         self.status_filter.currentTextChanged.connect(self.on_filter_changed)
         toolbar.addWidget(self.status_filter)
         
@@ -211,8 +213,15 @@ class ProxyTableWidget(QWidget):
         self.display_mode = QComboBox()
         self.display_mode.addItems(["Active Only", "Assigned Only", "All"])
         self.display_mode.setCurrentText("Active Only")  # Default to Active Only
+        self.display_mode.setAccessibleName("Proxy display mode")
         self.display_mode.currentTextChanged.connect(self.on_filter_changed)
         toolbar.addWidget(self.display_mode)
+
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search host or assignee…")
+        self.search_input.setAccessibleName("Proxy search")
+        self.search_input.textChanged.connect(self.apply_filter)
+        toolbar.addWidget(self.search_input)
         
         toolbar.addStretch()
         
@@ -234,29 +243,11 @@ class ProxyTableWidget(QWidget):
         self.table.setHorizontalHeaderLabels([
             "IP:Port", "Status", "Tier", "Latency", "Score", "Uptime %", "Assigned To", "Source", "Last Tested"
         ])
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)  # Cleaner look
         
-        # Style table
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #2b2d31;
-                border: none;
-                gridline-color: #3f4147;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                color: #dbdee1;
-            }
-            QTableWidget::item:selected {
-                background-color: #5865f2;
-            }
-            QHeaderView::section {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-            }
-        """)
+        # Style table - handled by global theme, but ensure specific overrides if needed
+        # We rely on ThemeManager application logic or global stylesheet
         
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -273,7 +264,9 @@ class ProxyTableWidget(QWidget):
         pagination_layout = QHBoxLayout()
         
         self.page_info_label = QLabel("Showing 0-0 of 0")
-        self.page_info_label.setStyleSheet("color: #b5bac1;")
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        self.page_info_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         pagination_layout.addWidget(self.page_info_label)
         
         pagination_layout.addStretch()
@@ -287,7 +280,9 @@ class ProxyTableWidget(QWidget):
         pagination_layout.addWidget(self.prev_page_btn)
         
         self.page_label = QLabel("Page 1")
-        self.page_label.setStyleSheet("color: #ffffff; font-weight: bold; margin: 0 10px;")
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        self.page_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-weight: bold; margin: 0 10px;")
         pagination_layout.addWidget(self.page_label)
         
         self.next_page_btn = QPushButton("Next")
@@ -307,6 +302,8 @@ class ProxyTableWidget(QWidget):
         pagination_layout.addWidget(self.page_size_spin)
         
         layout.addLayout(pagination_layout)
+
+        self.loading_overlay = LoadingOverlay(self.table, "Refreshing proxies…") if LoadingOverlay else None
     
     def set_proxy_pool_manager(self, manager):
         """Set the proxy pool manager for database queries."""
@@ -329,6 +326,7 @@ class ProxyTableWidget(QWidget):
         tier_filter = self.tier_filter.currentText().lower()
         status_filter = self.status_filter.currentText().lower()
         display_mode = self.display_mode.currentText()
+        search = self.search_input.text().lower() if hasattr(self, "search_input") else ""
         
         # Map display mode to filters
         active_only = display_mode == "Active Only"
@@ -340,6 +338,8 @@ class ProxyTableWidget(QWidget):
         
         # Query database with pagination
         try:
+            if self.loading_overlay:
+                self.loading_overlay.show_loading("Refreshing proxies…")
             proxies, total_count = self.proxy_pool_manager.get_proxies_paginated(
                 page=self.current_page,
                 page_size=self.page_size,
@@ -349,6 +349,8 @@ class ProxyTableWidget(QWidget):
                 active_only=active_only
             )
             
+            if search:
+                proxies = [p for p in proxies if search in f"{p.get('ip','')}:{p.get('port','')}".lower() or search in str(p.get('assigned_account','')).lower()]
             self.total_count = total_count
             self.proxies = {p.get('proxy_key', f"{p.get('ip')}:{p.get('port')}"): p for p in proxies}
             self.render_table(proxies)
@@ -356,12 +358,16 @@ class ProxyTableWidget(QWidget):
             
         except Exception as e:
             logger.error(f"Failed to load page: {e}")
+        finally:
+            if self.loading_overlay:
+                self.loading_overlay.hide_loading()
     
     def apply_filter(self):
         """Apply current filters to table (in-memory filtering for backwards compatibility)."""
         tier_filter = self.tier_filter.currentText().lower()
         status_filter = self.status_filter.currentText().lower()
         display_mode = self.display_mode.currentText()
+        search = self.search_input.text().lower() if hasattr(self, "search_input") else ""
         
         filtered = []
         for key, proxy in self.proxies.items():
@@ -378,6 +384,8 @@ class ProxyTableWidget(QWidget):
                 continue
             if display_mode == "Assigned Only" and not proxy.get('assigned_account'):
                 continue
+            if search and search not in f"{proxy.get('ip','')}:{proxy.get('port','')}".lower() and search not in str(proxy.get('assigned_account','')).lower():
+                continue
             
             filtered.append(proxy)
         
@@ -390,7 +398,19 @@ class ProxyTableWidget(QWidget):
         self.table.setUpdatesEnabled(False)
         self.table.setSortingEnabled(False)
         
+        c = ThemeManager._get_palette()
+        
         # Update table
+        if not proxies:
+            self.table.setRowCount(1)
+            empty = QTableWidgetItem("No proxies match the filters.")
+            empty.setForeground(QColor(c["TEXT_DISABLED"]))
+            self.table.setItem(0, 0, empty)
+            self.table.setSpan(0, 0, 1, self.table.columnCount())
+            self.table.setUpdatesEnabled(True)
+            self.table.setSortingEnabled(True)
+            return
+
         self.table.setRowCount(len(proxies))
         
         for row, proxy in enumerate(proxies):
@@ -400,49 +420,51 @@ class ProxyTableWidget(QWidget):
             
             # Status with color
             status = proxy.get('status', 'unknown')
-            status_item = QTableWidgetItem(status.capitalize())
-            status_colors = {
-                'active': '#23a559',
-                'testing': '#f0b232',
-                'cooldown': '#eb459e',
-                'failed': '#ed4245',
-                'blacklisted': '#ed4245'
-            }
-            status_item.setForeground(QColor(status_colors.get(status, '#b5bac1')))
-            self.table.setItem(row, 1, status_item)
+            status_chip = QLabel(status.capitalize())
+            status_chip.setObjectName("status_chip")
+            status_chip.setProperty("state", {
+                'active': 'ok',
+                'testing': 'warn',
+                'cooldown': 'warn',
+                'failed': 'bad',
+                'blacklisted': 'bad'
+            }.get(status, 'info'))
+            status_chip.setStyleSheet("padding: 4px 10px;")
+            self.table.setCellWidget(row, 1, status_chip)
             
             # Tier with color
             tier = proxy.get('tier', 'standard')
-            tier_item = QTableWidgetItem(tier.capitalize())
-            tier_colors = {
-                'premium': '#faa61a',
-                'standard': '#5865f2',
-                'economy': '#57f287',
-                'low': '#b5bac1'
-            }
-            tier_item.setForeground(QColor(tier_colors.get(tier, '#b5bac1')))
-            self.table.setItem(row, 2, tier_item)
+            tier_chip = QLabel(tier.capitalize())
+            tier_chip.setObjectName("status_chip")
+            tier_chip.setProperty("state", {
+                'premium': 'ok',
+                'standard': 'info',
+                'economy': 'warn',
+                'low': 'warn'
+            }.get(tier, 'info'))
+            tier_chip.setStyleSheet("padding: 4px 10px;")
+            self.table.setCellWidget(row, 2, tier_chip)
             
             # Latency
             latency = proxy.get('latency_ms', 0)
             latency_item = QTableWidgetItem(f"{latency:.0f} ms")
             if latency < 200:
-                latency_item.setForeground(QColor('#23a559'))
+                latency_item.setForeground(QColor(c["ACCENT_SUCCESS"]))
             elif latency < 500:
-                latency_item.setForeground(QColor('#f0b232'))
+                latency_item.setForeground(QColor(c["ACCENT_WARNING"]))
             else:
-                latency_item.setForeground(QColor('#ed4245'))
+                latency_item.setForeground(QColor(c["ACCENT_DANGER"]))
             self.table.setItem(row, 3, latency_item)
             
             # Score
             score = proxy.get('score', 0)
             score_item = QTableWidgetItem(f"{score:.1f}")
             if score >= 80:
-                score_item.setForeground(QColor('#23a559'))
+                score_item.setForeground(QColor(c["ACCENT_SUCCESS"]))
             elif score >= 50:
-                score_item.setForeground(QColor('#f0b232'))
+                score_item.setForeground(QColor(c["ACCENT_WARNING"]))
             else:
-                score_item.setForeground(QColor('#ed4245'))
+                score_item.setForeground(QColor(c["ACCENT_DANGER"]))
             self.table.setItem(row, 4, score_item)
             
             # Uptime %
@@ -569,24 +591,7 @@ class EndpointStatusWidget(QWidget):
             "Endpoint", "Type", "Interval", "Last Poll", "Success", "Proxies Found"
         ])
         
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #2b2d31;
-                border: none;
-                gridline-color: #3f4147;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                color: #dbdee1;
-            }
-            QHeaderView::section {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-            }
-        """)
+        # Style table - handled by global theme
         
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -594,34 +599,52 @@ class EndpointStatusWidget(QWidget):
             header.setSectionResizeMode(i, QHeaderView.ResizeMode.ResizeToContents)
         
         layout.addWidget(self.table)
+        self.loading_overlay = LoadingOverlay(self.table, "Refreshing endpoints…") if LoadingOverlay else None
     
     def update_endpoints(self, endpoints: List[Dict]):
         """Update endpoint table."""
-        self.table.setRowCount(len(endpoints))
-        
-        for row, endpoint in enumerate(endpoints):
-            self.table.setItem(row, 0, QTableWidgetItem(endpoint.get('name', 'Unknown')))
+        try:
+            if self.loading_overlay:
+                self.loading_overlay.show_loading("Refreshing endpoints…")
             
-            feed_type = endpoint.get('feed_type', 'unknown')
-            type_item = QTableWidgetItem(feed_type.capitalize())
-            type_colors = {
-                'primary': '#23a559',
-                'secondary': '#5865f2',
-                'obscure': '#eb459e'
-            }
-            type_item.setForeground(QColor(type_colors.get(feed_type, '#b5bac1')))
-            self.table.setItem(row, 1, type_item)
+            c = ThemeManager._get_palette()
             
-            interval = endpoint.get('poll_interval', 0)
-            self.table.setItem(row, 2, QTableWidgetItem(f"{interval // 60}m"))
+            if not endpoints:
+                self.table.setRowCount(1)
+                empty = QTableWidgetItem("No endpoints found.")
+                empty.setForeground(QColor(c["TEXT_DISABLED"]))
+                self.table.setItem(0, 0, empty)
+                self.table.setSpan(0, 0, 1, self.table.columnCount())
+                return
+
+            self.table.setRowCount(len(endpoints))
             
-            last_poll = endpoint.get('last_poll', 'Never')
-            self.table.setItem(row, 3, QTableWidgetItem(str(last_poll)[:19] if last_poll else 'Never'))
-            
-            success = endpoint.get('success_count', 0)
-            self.table.setItem(row, 4, QTableWidgetItem(str(success)))
-            
-            self.table.setItem(row, 5, QTableWidgetItem(str(endpoint.get('proxies_found', 0))))
+            for row, endpoint in enumerate(endpoints):
+                self.table.setItem(row, 0, QTableWidgetItem(endpoint.get('name', 'Unknown')))
+                
+                feed_type = endpoint.get('feed_type', 'unknown')
+                type_item = QTableWidgetItem(feed_type.capitalize())
+                type_colors = {
+                    'primary': c['ACCENT_SUCCESS'],
+                    'secondary': c['ACCENT_PRIMARY'],
+                    'obscure': c['ACCENT_WARNING']
+                }
+                type_item.setForeground(QColor(type_colors.get(feed_type, c['TEXT_SECONDARY'])))
+                self.table.setItem(row, 1, type_item)
+                
+                interval = endpoint.get('poll_interval', 0)
+                self.table.setItem(row, 2, QTableWidgetItem(f"{interval // 60}m"))
+                
+                last_poll = endpoint.get('last_poll', 'Never')
+                self.table.setItem(row, 3, QTableWidgetItem(str(last_poll)[:19] if last_poll else 'Never'))
+                
+                success = endpoint.get('success_count', 0)
+                self.table.setItem(row, 4, QTableWidgetItem(str(success)))
+                
+                self.table.setItem(row, 5, QTableWidgetItem(str(endpoint.get('proxies_found', 0))))
+        finally:
+            if self.loading_overlay:
+                self.loading_overlay.hide_loading()
 
 
 class ProxyManagementWidget(QWidget):
@@ -639,6 +662,9 @@ class ProxyManagementWidget(QWidget):
             try:
                 self.proxy_pool_manager = get_proxy_pool_manager()
                 self.manual_mode = self.proxy_pool_manager is None
+                if self.proxy_pool_manager:
+                    # Ensure table wiring happens even though UI was built first
+                    self.proxy_table.set_proxy_pool_manager(self.proxy_pool_manager)
             except Exception as e:
                 logger.warning(f"Failed to get proxy pool manager: {e}")
                 self.manual_mode = True
@@ -649,53 +675,42 @@ class ProxyManagementWidget(QWidget):
         self._configure_mode()
     
     def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(12, 12, 12, 12)
+        outer_layout.setSpacing(10)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(14)
+
         # Title
-        title = QLabel("🌐 Proxy Pool Management")
-        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #ffffff;")
-        layout.addWidget(title)
+        title = QLabel("Proxy Pool Management")
+        title.setStyleSheet(ThemeManager.get_label_style("header"))
+        scroll_layout.addWidget(title)
         
         if not PROXY_POOL_AVAILABLE:
             error_label = QLabel(
-                "⚠️ Proxy Pool Manager not available. Falling back to manual proxy entry and testing."
+                "Proxy Pool Manager not available. Falling back to manual proxy entry and testing."
             )
-            error_label.setStyleSheet("color: #ed4245; font-size: 14px;")
-            layout.addWidget(error_label)
-
+            c = ThemeManager._get_palette()
+            error_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-size: 14px;")
+            scroll_layout.addWidget(error_label)
+        
         # Stats Section
         self.stats_widget = ProxyStatsWidget()
-        layout.addWidget(self.stats_widget)
+        self.stats_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        scroll_layout.addWidget(self.stats_widget)
         
         # Tabs for different views
         tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane {
-                border: none;
-                background-color: #2b2d31;
-                border-radius: 8px;
-            }
-            QTabBar::tab {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                padding: 10px 20px;
-                margin-right: 2px;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-            }
-            QTabBar::tab:selected {
-                background-color: #5865f2;
-                color: white;
-            }
-            QTabBar::tab:hover:!selected {
-                background-color: #3f4147;
-            }
-        """)
+        tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Proxy List Tab
         self.proxy_table = ProxyTableWidget()
-        # Set proxy pool manager reference if available
         if self.proxy_pool_manager:
             self.proxy_table.set_proxy_pool_manager(self.proxy_pool_manager)
         tabs.addTab(self.proxy_table, "📋 Proxy List")
@@ -706,22 +721,21 @@ class ProxyManagementWidget(QWidget):
         
         # Controls Tab
         controls_widget = self._create_controls_tab()
-        tabs.addTab(controls_widget, "⚙️ Controls")
+        tabs.addTab(controls_widget, "Controls")
         
-        layout.addWidget(tabs)
+        scroll_layout.addWidget(tabs)
         
         # Status bar
         status_layout = QHBoxLayout()
+        status_layout.setSpacing(8)
         
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #b5bac1;")
         status_layout.addWidget(self.status_label)
         
         status_layout.addStretch()
         
         self.auto_refresh_check = QCheckBox("Auto-refresh")
         self.auto_refresh_check.setChecked(True)
-        self.auto_refresh_check.setStyleSheet("color: #b5bac1;")
         status_layout.addWidget(self.auto_refresh_check)
         
         self.refresh_interval = QSpinBox()
@@ -731,7 +745,11 @@ class ProxyManagementWidget(QWidget):
         self.refresh_interval.valueChanged.connect(self._update_timer_interval)
         status_layout.addWidget(self.refresh_interval)
         
-        layout.addLayout(status_layout)
+        scroll_layout.addLayout(status_layout)
+
+        scroll_widget.setLayout(scroll_layout)
+        scroll.setWidget(scroll_widget)
+        outer_layout.addWidget(scroll)
     
     def _create_controls_tab(self) -> QWidget:
         """Create controls tab."""
@@ -740,36 +758,22 @@ class ProxyManagementWidget(QWidget):
         
         # Actions group
         actions_group = QGroupBox("Actions")
-        actions_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #3f4147;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-                color: #b5bac1;
-            }
-        """)
+        # Global theme handles QGroupBox styling
         actions_layout = QHBoxLayout(actions_group)
 
-        self.fetch_btn = QPushButton("🔄 Fetch All Endpoints")
+        self.fetch_btn = QPushButton("Fetch All Endpoints")
         self.fetch_btn.clicked.connect(self._fetch_all_endpoints)
         actions_layout.addWidget(self.fetch_btn)
 
-        self.test_all_btn = QPushButton("🧪 Test All Proxies")
+        self.test_all_btn = QPushButton("Test All Proxies")
         self.test_all_btn.clicked.connect(self._test_all_proxies)
         actions_layout.addWidget(self.test_all_btn)
 
-        self.cleanup_btn = QPushButton("🧹 Cleanup Failed")
+        self.cleanup_btn = QPushButton("Cleanup Failed")
         self.cleanup_btn.clicked.connect(self._cleanup_failed)
         actions_layout.addWidget(self.cleanup_btn)
 
-        self.export_btn = QPushButton("📤 Export Health")
+        self.export_btn = QPushButton("Export Health")
         self.export_btn.clicked.connect(self._export_health_results)
         actions_layout.addWidget(self.export_btn)
         
@@ -777,7 +781,6 @@ class ProxyManagementWidget(QWidget):
         
         # Configuration group
         config_group = QGroupBox("Configuration")
-        config_group.setStyleSheet(actions_group.styleSheet())
         config_layout = QGridLayout(config_group)
         
         config_layout.addWidget(QLabel("Min Score:"), 0, 0)
@@ -814,7 +817,6 @@ class ProxyManagementWidget(QWidget):
 
         # Manual fallback controls (visible when proxy pool manager is unavailable)
         self.manual_controls_group = QGroupBox("Manual Proxy Entry (Fallback Mode)")
-        self.manual_controls_group.setStyleSheet(actions_group.styleSheet())
         manual_layout = QVBoxLayout(self.manual_controls_group)
 
         manual_layout.addWidget(QLabel(
@@ -824,14 +826,7 @@ class ProxyManagementWidget(QWidget):
         self.manual_proxy_input = QTextEdit()
         self.manual_proxy_input.setPlaceholderText("socks5://1.2.3.4:1080")
         self.manual_proxy_input.setFixedHeight(120)
-        self.manual_proxy_input.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                border: 1px solid #3f4147;
-                border-radius: 6px;
-            }
-        """)
+        # Global theme handles QTextEdit
         manual_layout.addWidget(self.manual_proxy_input)
 
         timeout_row = QHBoxLayout()
@@ -848,7 +843,7 @@ class ProxyManagementWidget(QWidget):
         self.manual_add_btn.clicked.connect(self._add_manual_proxies)
         manual_buttons.addWidget(self.manual_add_btn)
 
-        self.manual_test_btn = QPushButton("🧪 Test Manually")
+        self.manual_test_btn = QPushButton("Test Manually")
         self.manual_test_btn.clicked.connect(self._test_manual_proxies)
         manual_buttons.addWidget(self.manual_test_btn)
 
@@ -859,20 +854,14 @@ class ProxyManagementWidget(QWidget):
 
         # Log output
         log_group = QGroupBox("Activity Log")
-        log_group.setStyleSheet(actions_group.styleSheet())
         log_layout = QVBoxLayout(log_group)
         
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         self.log_output.setMaximumHeight(150)
-        self.log_output.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                border: none;
-                font-family: monospace;
-            }
-        """)
+        # Apply specific font for logs but keep theme colors
+        c = ThemeManager._get_palette()
+        self.log_output.setStyleSheet(f"font-family: monospace; font-size: 12px; color: {c['TEXT_SECONDARY']};")
         log_layout.addWidget(self.log_output)
         
         layout.addWidget(log_group)
@@ -934,7 +923,7 @@ class ProxyManagementWidget(QWidget):
             # Check for backup errors and surface them
             if hasattr(self.proxy_pool_manager, '_last_backup_error') and self.proxy_pool_manager._last_backup_error:
                 error_msg = self.proxy_pool_manager._last_backup_error
-                self._log(f"⚠️ Proxy backup error: {error_msg}")
+                self._log(f"Proxy backup error: {error_msg}")
                 # Show warning banner if backup failed recently (only once per error)
                 if not hasattr(self, '_last_shown_backup_error') or self._last_shown_backup_error != error_msg:
                     self._last_shown_backup_error = error_msg

@@ -18,12 +18,17 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QGroupBox,
     QProgressBar, QComboBox, QSpinBox, QCheckBox, QTabWidget,
     QFrame, QGridLayout, QMessageBox, QSplitter, QTextEdit,
-    QScrollArea
+    QScrollArea, QLineEdit, QSizePolicy
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QBrush
 
 from core.error_handler import ErrorHandler
+from ui.theme_manager import ThemeManager
+try:
+    from ui.ui_components import LoadingOverlay
+except ImportError:
+    LoadingOverlay = None
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +42,8 @@ except ImportError:
 
 # Try to import enhanced anti-detection
 try:
-    from anti_detection_system import (
-        EnhancedAntiDetectionSystem, BanRiskLevel, AccountRiskMetrics
+    from anti_detection.anti_detection_system import (
+        EnhancedAntiDetectionSystem, BanRiskLevel, AccountRiskMetrics, QuarantineReason
     )
     ANTI_DETECTION_AVAILABLE = True
 except ImportError:
@@ -69,20 +74,22 @@ class RiskGaugeWidget(QWidget):
         x = (self.width() - size) // 2
         y = (self.height() - size) // 2
         
+        c = ThemeManager.get_colors()
         # Draw background arc
-        pen = QPen(QColor('#3f4147'), 10)
+        pen = QPen(QColor(c['BORDER_DEFAULT']), 10)
         painter.setPen(pen)
         painter.drawArc(x, y, size, size, 30 * 16, 120 * 16)
         
         # Draw risk arc
         if self.risk_value < 0.3:
-            color = QColor('#23a559')  # Green
+            color = QColor(c['ACCENT_SUCCESS'])  # Green
         elif self.risk_value < 0.5:
-            color = QColor('#f0b232')  # Yellow
+            color = QColor(c['ACCENT_WARNING'])  # Yellow
         elif self.risk_value < 0.7:
-            color = QColor('#eb459e')  # Orange/Pink
+            # Use warning for moderate-high risk
+            color = QColor(c['ACCENT_WARNING'])
         else:
-            color = QColor('#ed4245')  # Red
+            color = QColor(c['ACCENT_DANGER'])  # Red
         
         pen = QPen(color, 10)
         painter.setPen(pen)
@@ -92,7 +99,7 @@ class RiskGaugeWidget(QWidget):
         painter.drawArc(x, y, size, size, 150 * 16, -arc_angle)
         
         # Draw center text
-        painter.setPen(QColor('#ffffff'))
+        painter.setPen(QColor(c['TEXT_BRIGHT']))
         font = QFont()
         font.setPointSize(18)
         font.setBold(True)
@@ -105,7 +112,7 @@ class RiskGaugeWidget(QWidget):
         font.setPointSize(10)
         font.setBold(False)
         painter.setFont(font)
-        painter.setPen(QColor('#b5bac1'))
+        painter.setPen(QColor(c['TEXT_SECONDARY']))
         
         label_rect = self.rect().adjusted(0, 40, 0, 0)
         painter.drawText(label_rect, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, "Ban Risk")
@@ -123,18 +130,20 @@ class AccountHealthCard(QFrame):
         self.setup_ui()
     
     def setup_ui(self):
-        self.setStyleSheet("""
-            QFrame {
-                background-color: #2b2d31;
+        c = ThemeManager.get_colors()
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {c['BG_TERTIARY']};
                 border-radius: 12px;
-                border: 1px solid #3f4147;
-            }
-            QFrame:hover {
-                border: 1px solid #5865f2;
-            }
+                border: 1px solid {c['BORDER_DEFAULT']};
+            }}
+            QFrame:hover {{
+                border: 1px solid {c['ACCENT_PRIMARY']};
+            }}
         """)
-        self.setMinimumWidth(280)
-        self.setMaximumWidth(320)
+        self.setMinimumWidth(240)
+        self.setMaximumWidth(360)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         
         layout = QVBoxLayout(self)
         layout.setSpacing(10)
@@ -144,54 +153,88 @@ class AccountHealthCard(QFrame):
         header = QHBoxLayout()
         
         # Status indicator
+        c = ThemeManager.get_colors()
         status = self.account_data.get('status', 'unknown')
         status_colors = {
-            'ready': '#23a559',
-            'connected': '#23a559',
-            'warming_up': '#f0b232',
-            'suspended': '#eb459e',
-            'error': '#ed4245',
-            'banned': '#ed4245'
+            'ready': c['ACCENT_SUCCESS'],
+            'connected': c['ACCENT_SUCCESS'],
+            'warming_up': c['ACCENT_WARNING'],
+            'suspended': c['ACCENT_WARNING'],  # Use warning color
+            'error': c['ACCENT_DANGER'],
+            'banned': c['ACCENT_DANGER']
         }
         indicator = QLabel("●")
-        indicator.setStyleSheet(f"color: {status_colors.get(status, '#b5bac1')}; font-size: 16px;")
+        indicator.setStyleSheet(f"color: {status_colors.get(status, c['TEXT_SECONDARY'])}; font-size: 16px;")
         header.addWidget(indicator)
         
         # Phone number
         phone_label = QLabel(self.phone_number)
-        phone_label.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold;")
+        phone_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-size: 14px; font-weight: bold;")
         header.addWidget(phone_label)
         
         header.addStretch()
         
         # Online indicator
         if self.account_data.get('is_online'):
-            online_label = QLabel("🟢 Online")
-            online_label.setStyleSheet("color: #23a559; font-size: 12px;")
+            online_label = QLabel("Online")
+            online_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-size: 12px; font-weight: 600;")
         else:
-            online_label = QLabel("⚫ Offline")
-            online_label.setStyleSheet("color: #b5bac1; font-size: 12px;")
+            online_label = QLabel("Offline")
+            online_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 12px; font-weight: 600;")
         header.addWidget(online_label)
         
         layout.addLayout(header)
+
+        # Status / risk chips
+        chips_row = QHBoxLayout()
+        status_chip = self._create_chip(
+            status.capitalize(),
+            {
+                'ready': 'ok',
+                'connected': 'ok',
+                'warming_up': 'warn',
+                'suspended': 'warn',
+                'error': 'bad',
+                'banned': 'bad'
+            }.get(status, 'info')
+        )
+        chips_row.addWidget(status_chip)
+
+        risk_level = self.account_data.get('risk_level', 'safe')
+        risk_chip = self._create_chip(
+            risk_level.upper(),
+            {
+                'safe': 'ok',
+                'low': 'ok',
+                'moderate': 'warn',
+                'medium': 'warn',
+                'high': 'bad',
+                'critical': 'bad',
+                'quarantined': 'bad'
+            }.get(risk_level, 'warn')
+        )
+        chips_row.addWidget(risk_chip)
+        chips_row.addStretch()
+        layout.addLayout(chips_row)
         
         # Risk Level
+        c = ThemeManager.get_colors()
         risk_layout = QHBoxLayout()
         risk_label = QLabel("Risk Level:")
-        risk_label.setStyleSheet("color: #b5bac1; font-size: 12px;")
+        risk_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px;")
         risk_layout.addWidget(risk_label)
         
-        risk_level = self.account_data.get('risk_level', 'safe')
         risk_colors = {
-            'safe': '#23a559',
-            'low': '#57f287',
-            'moderate': '#f0b232',
-            'high': '#eb459e',
-            'critical': '#ed4245',
-            'quarantined': '#ed4245'
+            'safe': c['ACCENT_SUCCESS'],
+            'low': c['ACCENT_SUCCESS'],
+            'moderate': c['ACCENT_WARNING'],
+            'high': c['ACCENT_WARNING'],
+            'critical': c['ACCENT_DANGER'],
+            'quarantined': c['ACCENT_DANGER']
         }
+        risk_level = self.account_data.get('risk_level', 'safe')
         risk_value = QLabel(risk_level.upper())
-        risk_value.setStyleSheet(f"color: {risk_colors.get(risk_level, '#b5bac1')}; font-size: 12px; font-weight: bold;")
+        risk_value.setStyleSheet(f"color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])}; font-size: 12px; font-weight: bold;")
         risk_layout.addWidget(risk_value)
         
         risk_layout.addStretch()
@@ -199,7 +242,7 @@ class AccountHealthCard(QFrame):
         # Ban probability
         ban_prob = self.account_data.get('ban_probability', 0.0)
         prob_label = QLabel(f"Ban: {int(ban_prob * 100)}%")
-        prob_label.setStyleSheet(f"color: {risk_colors.get(risk_level, '#b5bac1')}; font-size: 12px;")
+        prob_label.setStyleSheet(f"color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])}; font-size: 12px;")
         risk_layout.addWidget(prob_label)
         
         layout.addLayout(risk_layout)
@@ -210,13 +253,14 @@ class AccountHealthCard(QFrame):
         self.risk_bar.setValue(int(ban_prob * 100))
         self.risk_bar.setTextVisible(False)
         self.risk_bar.setMaximumHeight(6)
+        c = ThemeManager.get_colors()
         self.risk_bar.setStyleSheet(f"""
             QProgressBar {{
-                background-color: #1e1f22;
+                background-color: {c['BG_PRIMARY']};
                 border-radius: 3px;
             }}
             QProgressBar::chunk {{
-                background-color: {risk_colors.get(risk_level, '#b5bac1')};
+                background-color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])};
                 border-radius: 3px;
             }}
         """)
@@ -227,16 +271,16 @@ class AccountHealthCard(QFrame):
         metrics_layout.setSpacing(8)
         
         # Messages sent
-        metrics_layout.addWidget(self._create_metric("📤 Sent 24h", 
+        metrics_layout.addWidget(self._create_metric("Sent 24h", 
             str(self.account_data.get('messages_sent_24h', 0))), 0, 0)
         
         # Errors
-        metrics_layout.addWidget(self._create_metric("❌ Errors", 
+        metrics_layout.addWidget(self._create_metric("Errors", 
             str(self.account_data.get('errors_24h', 0))), 0, 1)
         
         # Diversity score
         diversity = self.account_data.get('message_diversity', 1.0)
-        metrics_layout.addWidget(self._create_metric("📊 Diversity", 
+        metrics_layout.addWidget(self._create_metric("Diversity", 
             f"{diversity:.0%}"), 1, 0)
         
         # Last activity
@@ -253,54 +297,58 @@ class AccountHealthCard(QFrame):
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(5)
         
+        c = ThemeManager.get_colors()
         if self.account_data.get('is_quarantined'):
             release_btn = QPushButton("🔓 Release")
-            release_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #23a559;
-                    color: white;
+            release_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {c['ACCENT_SUCCESS']};
+                    color: {c['TEXT_BRIGHT']};
                     border: none;
                     border-radius: 4px;
                     padding: 5px 10px;
                     font-size: 11px;
-                }
-                QPushButton:hover {
-                    background-color: #1e8e4d;
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {c['ACCENT_SUCCESS']};
+                    opacity: 0.9;
+                }}
             """)
             release_btn.clicked.connect(lambda: self.action_requested.emit(self.phone_number, 'release'))
             actions_layout.addWidget(release_btn)
         else:
             pause_btn = QPushButton("⏸️ Pause")
-            pause_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #f0b232;
-                    color: white;
+            pause_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {c['ACCENT_WARNING']};
+                    color: {c['TEXT_BRIGHT']};
                     border: none;
                     border-radius: 4px;
                     padding: 5px 10px;
                     font-size: 11px;
-                }
-                QPushButton:hover {
-                    background-color: #d99e2b;
-                }
+                }}
+                QPushButton:hover {{
+                    background-color: {c['ACCENT_WARNING']};
+                    opacity: 0.9;
+                }}
             """)
             pause_btn.clicked.connect(lambda: self.action_requested.emit(self.phone_number, 'pause'))
             actions_layout.addWidget(pause_btn)
         
         details_btn = QPushButton("📋 Details")
-        details_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #5865f2;
-                color: white;
+        details_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {c['ACCENT_PRIMARY']};
+                color: {c['TEXT_BRIGHT']};
                 border: none;
                 border-radius: 4px;
                 padding: 5px 10px;
                 font-size: 11px;
-            }
-            QPushButton:hover {
-                background-color: #4752c4;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {c['ACCENT_PRIMARY']};
+                opacity: 0.9;
+            }}
         """)
         details_btn.clicked.connect(lambda: self.action_requested.emit(self.phone_number, 'details'))
         actions_layout.addWidget(details_btn)
@@ -314,16 +362,25 @@ class AccountHealthCard(QFrame):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
         
+        c = ThemeManager.get_colors()
         label_widget = QLabel(label)
-        label_widget.setStyleSheet("color: #b5bac1; font-size: 10px;")
+        label_widget.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 10px;")
         layout.addWidget(label_widget)
         
         value_widget = QLabel(value)
-        value_widget.setStyleSheet("color: #ffffff; font-size: 12px; font-weight: bold;")
+        value_widget.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-size: 12px; font-weight: bold;")
         layout.addWidget(value_widget)
         
         return widget
     
+    def _create_chip(self, text: str, state: str) -> QLabel:
+        """Create a status/risk chip with Aurora styling."""
+        chip = QLabel(text)
+        chip.setObjectName("status_chip")
+        chip.setProperty("state", state)
+        chip.setStyleSheet("padding: 4px 10px; border-radius: 10px;")
+        return chip
+
     def update_data(self, data: Dict):
         """Update card with new data."""
         self.account_data = data
@@ -337,6 +394,7 @@ class AccountHealthDashboard(QWidget):
         super().__init__(parent)
         self.account_manager = account_manager
         self.anti_detection = None
+        self.accounts_cache: List[Dict[str, Any]] = []
         
         # Pagination state
         self.current_page = 1
@@ -351,33 +409,35 @@ class AccountHealthDashboard(QWidget):
         
         self.setup_ui()
         self.setup_timer()
+        self.loading_overlay = LoadingOverlay(self, "Refreshing account health…") if LoadingOverlay else None
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         
+        c = ThemeManager.get_colors()
         # Title
-        title = QLabel("📊 Account Health Dashboard")
-        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #ffffff;")
+        title = QLabel("Account Health Dashboard")
+        title.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {c['TEXT_BRIGHT']};")
         layout.addWidget(title)
         
         # Summary Stats
         stats_layout = QHBoxLayout()
         
         # Total accounts
-        self.total_accounts_card = self._create_summary_card("Total Accounts", "0", "#5865f2")
+        self.total_accounts_card = self._create_summary_card("Total Accounts", "0", c['ACCENT_PRIMARY'])
         stats_layout.addWidget(self.total_accounts_card)
         
         # Healthy accounts
-        self.healthy_accounts_card = self._create_summary_card("Healthy", "0", "#23a559")
+        self.healthy_accounts_card = self._create_summary_card("Healthy", "0", c['ACCENT_SUCCESS'])
         stats_layout.addWidget(self.healthy_accounts_card)
         
         # At risk accounts
-        self.at_risk_card = self._create_summary_card("At Risk", "0", "#f0b232")
+        self.at_risk_card = self._create_summary_card("At Risk", "0", c['ACCENT_WARNING'])
         stats_layout.addWidget(self.at_risk_card)
         
         # Quarantined accounts
-        self.quarantined_card = self._create_summary_card("Quarantined", "0", "#ed4245")
+        self.quarantined_card = self._create_summary_card("Quarantined", "0", c['ACCENT_DANGER'])
         stats_layout.addWidget(self.quarantined_card)
         
         # Overall risk gauge
@@ -388,12 +448,18 @@ class AccountHealthDashboard(QWidget):
         
         # Filter and actions bar
         filter_layout = QHBoxLayout()
-        
-        filter_layout.addWidget(QLabel("Filter:"))
-        self.status_filter = QComboBox()
-        self.status_filter.addItems(["All", "Healthy", "At Risk", "Critical", "Quarantined"])
-        self.status_filter.currentTextChanged.connect(self.refresh_accounts)
-        filter_layout.addWidget(self.status_filter)
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search phone number…")
+        self.search_input.setAccessibleName("Account search")
+        self.search_input.textChanged.connect(self.refresh_accounts)
+        filter_layout.addWidget(self.search_input)
+
+        filter_layout.addWidget(QLabel("Risk:"))
+        self.risk_filter = QComboBox()
+        self.risk_filter.addItems(["All Risks", "Safe", "Low", "Moderate", "High", "Critical", "Quarantined"])
+        self.risk_filter.setAccessibleName("Risk filter")
+        self.risk_filter.currentTextChanged.connect(self.refresh_accounts)
+        filter_layout.addWidget(self.risk_filter)
         
         filter_layout.addStretch()
         
@@ -406,7 +472,7 @@ class AccountHealthDashboard(QWidget):
         self.release_all_btn.clicked.connect(self.release_all_quarantined)
         filter_layout.addWidget(self.release_all_btn)
         
-        self.refresh_btn = QPushButton("🔄 Refresh")
+        self.refresh_btn = QPushButton("Refresh")
         self.refresh_btn.clicked.connect(self.refresh_data)
         filter_layout.addWidget(self.refresh_btn)
         
@@ -415,8 +481,9 @@ class AccountHealthDashboard(QWidget):
         # Pagination controls
         pagination_layout = QHBoxLayout()
         
+        c = ThemeManager.get_colors()
         self.page_info_label = QLabel("Showing 0-0 of 0")
-        self.page_info_label.setStyleSheet("color: #b5bac1;")
+        self.page_info_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         pagination_layout.addWidget(self.page_info_label)
         
         pagination_layout.addStretch()
@@ -430,7 +497,7 @@ class AccountHealthDashboard(QWidget):
         pagination_layout.addWidget(self.prev_page_btn)
         
         self.page_label = QLabel("Page 1")
-        self.page_label.setStyleSheet("color: #ffffff; font-weight: bold; margin: 0 10px;")
+        self.page_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-weight: bold; margin: 0 10px;")
         pagination_layout.addWidget(self.page_label)
         
         self.next_page_btn = QPushButton("Next")
@@ -461,27 +528,29 @@ class AccountHealthDashboard(QWidget):
         scroll.setWidget(self.cards_container)
         layout.addWidget(scroll)
         
+        c = ThemeManager.get_colors()
         # Status bar
         status_layout = QHBoxLayout()
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #b5bac1;")
+        self.status_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         status_layout.addWidget(self.status_label)
         
         status_layout.addStretch()
         
         self.auto_refresh = QCheckBox("Auto-refresh")
         self.auto_refresh.setChecked(True)
-        self.auto_refresh.setStyleSheet("color: #b5bac1;")
+        self.auto_refresh.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         status_layout.addWidget(self.auto_refresh)
         
         layout.addLayout(status_layout)
     
     def _create_summary_card(self, title: str, value: str, color: str) -> QFrame:
         """Create a summary statistic card."""
+        c = ThemeManager.get_colors()
         frame = QFrame()
         frame.setStyleSheet(f"""
             QFrame {{
-                background-color: #2b2d31;
+                background-color: {c['BG_TERTIARY']};
                 border-radius: 10px;
                 border-left: 4px solid {color};
                 min-width: 120px;
@@ -492,7 +561,7 @@ class AccountHealthDashboard(QWidget):
         layout.setContentsMargins(15, 10, 15, 10)
         
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #b5bac1; font-size: 11px;")
+        title_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 11px;")
         layout.addWidget(title_label)
         
         value_label = QLabel(value)
@@ -519,11 +588,23 @@ class AccountHealthDashboard(QWidget):
         if not self.auto_refresh.isChecked():
             return
         
-        accounts = self._get_account_data()
-        self._update_summary(accounts)
-        self.refresh_accounts()
-        
-        self.status_label.setText(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
+        if not ANTI_DETECTION_AVAILABLE and not self.account_manager:
+            self.status_label.setText("Risk monitoring unavailable (anti-detection module missing)")
+            return
+        try:
+            if self.loading_overlay:
+                self.loading_overlay.show_loading("Refreshing account health…")
+            accounts = self._get_account_data()
+            self.accounts_cache = accounts
+            self._update_summary(accounts)
+            self.refresh_accounts()
+            self.status_label.setText(f"Last updated: {datetime.now().strftime('%H:%M:%S')}")
+        except Exception as exc:
+            logger.error(f"Failed to refresh account health: {exc}")
+            self.status_label.setText(f"Error: {str(exc)[:60]}")
+        finally:
+            if self.loading_overlay:
+                self.loading_overlay.hide_loading()
     
     def _get_account_data(self) -> List[Dict]:
         """Get account data from account manager."""
@@ -601,15 +682,28 @@ class AccountHealthDashboard(QWidget):
             if item.widget():
                 item.widget().deleteLater()
         
-        accounts = self._get_account_data()
+        accounts = self.accounts_cache or self._get_account_data()
         
-        # Apply filter
-        filter_text = self.status_filter.currentText().lower()
-        if filter_text != "all":
-            if filter_text == "healthy":
-                accounts = [a for a in accounts if a.get('risk_level') in ['safe', 'low']]
-            elif filter_text == "at risk":
-                accounts = [a for a in accounts if a.get('risk_level') in ['moderate', 'high']]
+        # Apply search filter
+        search_text = self.search_input.text().lower() if hasattr(self, "search_input") else ""
+        if search_text:
+            accounts = [
+                a for a in accounts
+                if search_text in str(a.get('phone_number', '')).lower()
+                or search_text in str(a.get('status', '')).lower()
+            ]
+
+        # Apply risk filter
+        filter_text = self.risk_filter.currentText().lower() if hasattr(self, "risk_filter") else "all"
+        if filter_text != "all risks":
+            if filter_text == "safe":
+                accounts = [a for a in accounts if a.get('risk_level') in ['safe']]
+            elif filter_text == "low":
+                accounts = [a for a in accounts if a.get('risk_level') in ['low']]
+            elif filter_text in ["moderate", "medium", "med"]:
+                accounts = [a for a in accounts if a.get('risk_level') in ['moderate', 'medium']]
+            elif filter_text == "high":
+                accounts = [a for a in accounts if a.get('risk_level') == 'high']
             elif filter_text == "critical":
                 accounts = [a for a in accounts if a.get('risk_level') == 'critical']
             elif filter_text == "quarantined":
@@ -622,7 +716,35 @@ class AccountHealthDashboard(QWidget):
         start_idx = (self.current_page - 1) * self.page_size
         end_idx = start_idx + self.page_size
         paginated_accounts = accounts[start_idx:end_idx]
-        
+
+        # Empty state
+        if not paginated_accounts:
+            from ui.theme_manager import ThemeManager
+            empty_frame = QFrame()
+            empty_frame.setObjectName("empty_state")
+            empty_frame.setStyleSheet(ThemeManager.get_empty_state_style())
+            empty_layout = QVBoxLayout(empty_frame)
+            empty_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            empty_icon = QLabel("📋")
+            empty_icon.setObjectName("empty_state_icon")
+            empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_layout.addWidget(empty_icon)
+            
+            empty_title = QLabel("No Accounts Found")
+            empty_title.setObjectName("empty_state_title")
+            empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_layout.addWidget(empty_title)
+            
+            empty_msg = QLabel("No accounts match the current filters.")
+            empty_msg.setObjectName("empty_state_message")
+            empty_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_layout.addWidget(empty_msg)
+            
+            self.cards_layout.addWidget(empty_frame, 0, 0, 1, 3)
+            self.update_pagination_controls()
+            return
+
         # Create cards
         cols = 3
         for i, account in enumerate(paginated_accounts):
@@ -641,8 +763,12 @@ class AccountHealthDashboard(QWidget):
         total_pages = (self.total_accounts_filtered + self.page_size - 1) // self.page_size if self.page_size > 0 else 1
         
         # Update labels
-        start_idx = (self.current_page - 1) * self.page_size + 1
-        end_idx = min(self.current_page * self.page_size, self.total_accounts_filtered)
+        if self.total_accounts_filtered == 0:
+            start_idx = 0
+            end_idx = 0
+        else:
+            start_idx = (self.current_page - 1) * self.page_size + 1
+            end_idx = min(self.current_page * self.page_size, self.total_accounts_filtered)
         self.page_info_label.setText(f"Showing {start_idx}-{end_idx} of {self.total_accounts_filtered}")
         self.page_label.setText(f"Page {self.current_page} of {total_pages}")
         
@@ -700,7 +826,7 @@ class AccountHealthDashboard(QWidget):
         """Pause/quarantine an account."""
         if self.anti_detection:
             try:
-                from anti_detection_system import QuarantineReason
+                from anti_detection.anti_detection_system import QuarantineReason
                 self.anti_detection.quarantine_account(phone, QuarantineReason.MANUAL, 60)
                 ErrorHandler.safe_information(self, "Success", f"Account {phone} paused for 60 minutes.")
                 self.refresh_data()

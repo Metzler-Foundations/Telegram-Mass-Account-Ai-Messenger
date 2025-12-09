@@ -18,6 +18,8 @@ import time
 import hashlib
 import requests
 from typing import Dict, List, Optional, Any, Tuple
+from utils.http_connection_pool import get_http_connection_pool
+from utils.rate_limiter import get_rate_limit_manager
 from datetime import datetime, timedelta
 from pathlib import Path
 from enum import Enum
@@ -318,6 +320,11 @@ class PhoneNumberProvider:
     def _check_smspool_inventory(self, country: str, api_key: str, config: Dict) -> Tuple[Optional[int], Optional[str]]:
         """Best-effort SMSPool inventory check using service availability endpoints."""
         try:
+            # Apply rate limiting before making request
+            rate_limiter = get_rate_limit_manager()
+            # Use asyncio.run() for synchronous context
+            asyncio.run(rate_limiter.wait_for_domain(config['api_url']))
+
             response = requests.get(
                 f"{config['api_url']}/request/quantity",
                 params={

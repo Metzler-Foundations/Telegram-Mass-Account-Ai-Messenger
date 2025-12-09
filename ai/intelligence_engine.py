@@ -19,6 +19,7 @@ from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict, field
 from enum import Enum
 from collections import defaultdict, deque
+from contextlib import contextmanager
 import statistics
 import hashlib
 
@@ -143,125 +144,144 @@ class IntelligenceEngine:
     def _get_connection(self):
         if self._connection_pool:
             return self._connection_pool.get_connection()
-        return self._get_connection()
-        self._cache = {}
-        self._cache_ttl = 3600  # 1 hour cache
+        else:
+            # Fallback to direct connection
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+    @contextmanager
+    def _connection_context(self):
+        """Context manager for database operations."""
+        conn_manager = self._get_connection()
+        if hasattr(conn_manager, '__enter__'):
+            # Using connection pool (already a context manager)
+            with conn_manager as conn:
+                yield conn
+        else:
+            # Direct connection
+            try:
+                yield conn_manager
+            finally:
+                try:
+                    conn_manager.close()
+                except Exception:
+                    pass
         
     def _init_database(self):
         """Initialize intelligence database schema."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        # User intelligence table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_intelligence (
-                user_id INTEGER PRIMARY KEY,
-                username TEXT,
-                first_name TEXT,
-                last_name TEXT,
-                phone TEXT,
-                bio TEXT,
-                last_online TIMESTAMP,
-                last_seen TIMESTAMP,
-                activity_level TEXT,
-                online_patterns TEXT,
-                timezone_offset INTEGER,
-                username_history TEXT,
-                profile_photo_hash TEXT,
-                profile_changes INTEGER DEFAULT 0,
-                common_groups TEXT,
-                mutual_contacts TEXT,
-                interaction_score REAL DEFAULT 0.0,
-                messages_received INTEGER DEFAULT 0,
-                messages_sent INTEGER DEFAULT 0,
-                reactions_given INTEGER DEFAULT 0,
-                reactions_received INTEGER DEFAULT 0,
-                avg_response_time REAL,
-                value_score REAL DEFAULT 0.0,
-                value_tier TEXT DEFAULT 'cold',
-                conversion_probability REAL DEFAULT 0.0,
-                first_seen TIMESTAMP,
-                last_updated TIMESTAMP
-            )
-        """)
-        
-        # Group intelligence table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS group_intelligence (
-                group_id INTEGER PRIMARY KEY,
-                title TEXT,
-                username TEXT,
-                member_count INTEGER DEFAULT 0,
-                active_member_count INTEGER DEFAULT 0,
-                admin_count INTEGER DEFAULT 0,
-                messages_per_day REAL DEFAULT 0.0,
-                growth_rate REAL DEFAULT 0.0,
-                engagement_rate REAL DEFAULT 0.0,
-                quality_score REAL DEFAULT 0.0,
-                spam_probability REAL DEFAULT 0.0,
-                value_rating INTEGER DEFAULT 0,
-                discovered_at TIMESTAMP,
-                last_analyzed TIMESTAMP
-            )
-        """)
-        
-        # Common groups mapping
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS common_groups_map (
-                user_id INTEGER,
-                group_id INTEGER,
-                discovered_at TIMESTAMP,
-                PRIMARY KEY (user_id, group_id)
-            )
-        """)
-        
-        # Activity log for pattern analysis
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS activity_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                activity_type TEXT,
-                timestamp TIMESTAMP,
-                hour_of_day INTEGER,
-                day_of_week INTEGER,
-                metadata TEXT
-            )
-        """)
-        
-        # Profile change history
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS profile_changes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                change_type TEXT,
-                old_value TEXT,
-                new_value TEXT,
-                detected_at TIMESTAMP
-            )
-        """)
-        
-        # Interaction history
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS interactions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                interaction_type TEXT,
-                target_id INTEGER,
-                message_id INTEGER,
-                timestamp TIMESTAMP,
-                metadata TEXT
-            )
-        """)
-        
-        # Create indexes
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_value_score ON user_intelligence(value_score DESC)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_activity ON user_intelligence(activity_level, last_online)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_group_quality ON group_intelligence(quality_score DESC)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id, timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_interactions_user ON interactions(user_id, timestamp)")
-        
-        conn.commit()
-        conn.close()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+
+            # User intelligence table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_intelligence (
+                    user_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    phone TEXT,
+                    bio TEXT,
+                    last_online TIMESTAMP,
+                    last_seen TIMESTAMP,
+                    activity_level TEXT,
+                    online_patterns TEXT,
+                    timezone_offset INTEGER,
+                    username_history TEXT,
+                    profile_photo_hash TEXT,
+                    profile_changes INTEGER DEFAULT 0,
+                    common_groups TEXT,
+                    mutual_contacts TEXT,
+                    interaction_score REAL DEFAULT 0.0,
+                    messages_received INTEGER DEFAULT 0,
+                    messages_sent INTEGER DEFAULT 0,
+                    reactions_given INTEGER DEFAULT 0,
+                    reactions_received INTEGER DEFAULT 0,
+                    avg_response_time REAL,
+                    value_score REAL DEFAULT 0.0,
+                    value_tier TEXT DEFAULT 'cold',
+                    conversion_probability REAL DEFAULT 0.0,
+                    first_seen TIMESTAMP,
+                    last_updated TIMESTAMP
+                )
+            """)
+
+            # Group intelligence table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS group_intelligence (
+                    group_id INTEGER PRIMARY KEY,
+                    title TEXT,
+                    username TEXT,
+                    member_count INTEGER DEFAULT 0,
+                    active_member_count INTEGER DEFAULT 0,
+                    admin_count INTEGER DEFAULT 0,
+                    messages_per_day REAL DEFAULT 0.0,
+                    growth_rate REAL DEFAULT 0.0,
+                    engagement_rate REAL DEFAULT 0.0,
+                    quality_score REAL DEFAULT 0.0,
+                    spam_probability REAL DEFAULT 0.0,
+                    value_rating INTEGER DEFAULT 0,
+                    discovered_at TIMESTAMP,
+                    last_analyzed TIMESTAMP
+                )
+            """)
+
+            # Common groups mapping
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS common_groups_map (
+                    user_id INTEGER,
+                    group_id INTEGER,
+                    discovered_at TIMESTAMP,
+                    PRIMARY KEY (user_id, group_id)
+                )
+            """)
+
+            # Activity log for pattern analysis
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS activity_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    activity_type TEXT,
+                    timestamp TIMESTAMP,
+                    hour_of_day INTEGER,
+                    day_of_week INTEGER,
+                    metadata TEXT
+                )
+            """)
+
+            # Profile change history
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS profile_changes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    change_type TEXT,
+                    old_value TEXT,
+                    new_value TEXT,
+                    detected_at TIMESTAMP
+                )
+            """)
+
+            # Interaction history
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS interactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
+                    interaction_type TEXT,
+                    target_id INTEGER,
+                    message_id INTEGER,
+                    timestamp TIMESTAMP,
+                    metadata TEXT
+                )
+            """)
+
+            # Create indexes
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_value_score ON user_intelligence(value_score DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_activity ON user_intelligence(activity_level, last_online)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_group_quality ON group_intelligence(quality_score DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id, timestamp)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_interactions_user ON interactions(user_id, timestamp)")
+
+            conn.commit()
         logger.info("Intelligence database initialized")
     
     async def gather_user_intelligence(self, client: Client, user_id: int, 
@@ -373,15 +393,14 @@ class IntelligenceEngine:
             group_ids = [chat.id for chat in common_chats]
             
             # Save to database
-            conn = self._get_connection()
-            cursor = conn.cursor()
-            for group_id in group_ids:
-                cursor.execute("""
-                    INSERT OR REPLACE INTO common_groups_map (user_id, group_id, discovered_at)
-                    VALUES (?, ?, ?)
-                """, (user_id, group_id, datetime.now()))
-            conn.commit()
-            conn.close()
+            with self._connection_context() as conn:
+                cursor = conn.cursor()
+                for group_id in group_ids:
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO common_groups_map (user_id, group_id, discovered_at)
+                        VALUES (?, ?, ?)
+                    """, (user_id, group_id, datetime.now()))
+                conn.commit()
             
             logger.info(f"Found {len(group_ids)} common groups with user {user_id}")
             return group_ids
@@ -408,10 +427,10 @@ class IntelligenceEngine:
         Returns:
             List of hours (0-23) when user is typically online
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT hour_of_day, COUNT(*) as count
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT hour_of_day, COUNT(*) as count
             FROM activity_log
             WHERE user_id = ? AND activity_type = 'online'
             AND timestamp > datetime('now', '-30 days')
@@ -421,7 +440,6 @@ class IntelligenceEngine:
         """, (user_id,))
         
         patterns = [row[0] for row in cursor.fetchall()]
-        conn.close()
         return patterns
     
     def _infer_timezone(self, online_patterns: List[int]) -> Optional[int]:
@@ -438,10 +456,10 @@ class IntelligenceEngine:
     
     def _calculate_activity_level(self, user_id: int) -> ActivityLevel:
         """Calculate user's activity level."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        # Count activities in last 30 days
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+
+            # Count activities in last 30 days
         cursor.execute("""
             SELECT COUNT(DISTINCT DATE(timestamp)) as active_days
             FROM activity_log
@@ -449,7 +467,6 @@ class IntelligenceEngine:
         """, (user_id,))
         
         row = cursor.fetchone()
-        conn.close()
         
         active_days = row[0] if row else 0
         
@@ -532,11 +549,10 @@ class IntelligenceEngine:
     
     def _load_user_intelligence(self, user_id: int) -> Optional[UserIntelligence]:
         """Load existing intelligence from database."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
         cursor.execute("SELECT * FROM user_intelligence WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
-        conn.close()
         
         if not row:
             return None
@@ -574,8 +590,8 @@ class IntelligenceEngine:
     
     def _save_user_intelligence(self, intel: UserIntelligence):
         """Save user intelligence to database."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
         
         cursor.execute("""
             INSERT OR REPLACE INTO user_intelligence VALUES (
@@ -608,24 +624,22 @@ class IntelligenceEngine:
         ))
         
         conn.commit()
-        conn.close()
     
     def _log_profile_change(self, user_id: int, change_type: str, old_value: str, new_value: str):
         """Log a profile change."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO profile_changes (user_id, change_type, old_value, new_value, detected_at)
             VALUES (?, ?, ?, ?, ?)
         """, (user_id, change_type, old_value, new_value, datetime.now()))
         conn.commit()
-        conn.close()
     
     def _log_activity(self, user_id: int, activity_type: str, metadata: Dict = None):
         """Log user activity."""
         now = datetime.now()
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO activity_log (user_id, activity_type, timestamp, hour_of_day, day_of_week, metadata)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -635,7 +649,6 @@ class IntelligenceEngine:
             json.dumps(metadata) if metadata else None
         ))
         conn.commit()
-        conn.close()
     
     def log_interaction(self, user_id: int, interaction_type: str, 
                        target_id: Optional[int] = None, message_id: Optional[int] = None,
@@ -649,15 +662,14 @@ class IntelligenceEngine:
             message_id: Message ID
             metadata: Additional data
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
         cursor.execute("""
             INSERT INTO interactions (user_id, interaction_type, target_id, message_id, timestamp, metadata)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (user_id, interaction_type, target_id, message_id, datetime.now(), 
               json.dumps(metadata) if metadata else None))
         conn.commit()
-        conn.close()
     
     def get_top_value_users(self, limit: int = 100, min_score: float = 50.0) -> List[UserIntelligence]:
         """Get top value users.
@@ -669,8 +681,8 @@ class IntelligenceEngine:
         Returns:
             List of UserIntelligence objects
         """
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
         cursor.execute("""
             SELECT * FROM user_intelligence
             WHERE value_score >= ?
@@ -682,7 +694,6 @@ class IntelligenceEngine:
         for row in cursor.fetchall():
             users.append(self._row_to_intelligence(row))
         
-        conn.close()
         return users
     
     def _row_to_intelligence(self, row) -> UserIntelligence:
@@ -748,8 +759,8 @@ class IntelligenceEngine:
     
     def get_user_statistics(self) -> Dict[str, Any]:
         """Get overall intelligence statistics."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
         
         # Total users
         cursor.execute("SELECT COUNT(*) FROM user_intelligence")
@@ -767,7 +778,6 @@ class IntelligenceEngine:
         cursor.execute("SELECT activity_level, COUNT(*) FROM user_intelligence GROUP BY activity_level")
         activity_dist = dict(cursor.fetchall())
         
-        conn.close()
         
         return {
             'total_users': total_users,

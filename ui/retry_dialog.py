@@ -11,6 +11,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
+from ui.theme_manager import ThemeManager
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,6 +34,12 @@ class RetryDialog(QDialog):
         self.retry_count = 0
         self.error_details = error_details
         
+        # CRITICAL: Prevent dialog from closing parent window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        
+        # Apply dialog styling
+        self.setStyleSheet(ThemeManager.get_dialog_style())
+        
         self.setWindowTitle(title)
         self.setModal(True)
         self.resize(500, 350)
@@ -39,6 +47,7 @@ class RetryDialog(QDialog):
     
     def setup_ui(self, title: str, message: str):
         """Setup the UI."""
+        c = ThemeManager.get_colors()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(16)
@@ -46,7 +55,7 @@ class RetryDialog(QDialog):
         # Icon and title
         header_layout = QHBoxLayout()
         
-        icon_label = QLabel("❌")
+        icon_label = QLabel("⚠️")
         icon_font = QFont()
         icon_font.setPointSize(32)
         icon_label.setFont(icon_font)
@@ -57,7 +66,7 @@ class RetryDialog(QDialog):
         title_font.setPointSize(16)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #f23f42;")
+        title_label.setStyleSheet(f"color: {c['ACCENT_DANGER']};")
         header_layout.addWidget(title_label)
         
         header_layout.addStretch()
@@ -66,38 +75,41 @@ class RetryDialog(QDialog):
         # Message
         message_label = QLabel(message)
         message_label.setWordWrap(True)
-        message_label.setStyleSheet("color: #e4e4e7; font-size: 13px;")
+        message_label.setStyleSheet(f"color: {c['TEXT_PRIMARY']}; font-size: 13px;")
         layout.addWidget(message_label)
         
         # Error details (collapsible)
         if self.error_details:
             details_frame = QFrame()
-            details_frame.setStyleSheet("""
-                QFrame {
-                    background-color: #1e1f22;
-                    border: 1px solid #2b2d31;
+            details_frame.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {c['BG_PRIMARY']};
+                    border: 1px solid {c['BORDER_DEFAULT']};
                     border-radius: 4px;
-                }
+                }}
             """)
             details_layout = QVBoxLayout(details_frame)
             details_layout.setContentsMargins(12, 12, 12, 12)
             
             details_label = QLabel("Error Details:")
-            details_label.setStyleSheet("color: #b5bac1; font-weight: 500; font-size: 12px;")
+            details_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-weight: 500; font-size: 12px;")
             details_layout.addWidget(details_label)
             
             self.details_text = QTextEdit()
             self.details_text.setPlainText(self.error_details)
             self.details_text.setReadOnly(True)
+            self.details_text.setMinimumHeight(80)
             self.details_text.setMaximumHeight(120)
-            self.details_text.setStyleSheet("""
-                QTextEdit {
-                    background-color: #0d0e10;
-                    color: #949ba4;
+            # Use a slightly darker background for code/details
+            darker_bg = c['BG_PRIMARY']
+            self.details_text.setStyleSheet(f"""
+                QTextEdit {{
+                    background-color: {darker_bg};
+                    color: {c['TEXT_DISABLED']};
                     border: none;
                     font-family: monospace;
                     font-size: 11px;
-                }
+                }}
             """)
             details_layout.addWidget(self.details_text)
             
@@ -105,25 +117,25 @@ class RetryDialog(QDialog):
         
         # Retry status
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #b5bac1; font-size: 12px;")
+        self.status_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 12px;")
         self.status_label.setVisible(False)
         layout.addWidget(self.status_label)
         
         # Progress bar (for retry operations)
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 1px solid #2b2d31;
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
+                border: 1px solid {c['BORDER_DEFAULT']};
                 border-radius: 4px;
-                background-color: #1e1f22;
+                background-color: {c['BG_PRIMARY']};
                 text-align: center;
-                color: #b5bac1;
-            }
-            QProgressBar::chunk {
-                background-color: #5865f2;
+                color: {c['TEXT_SECONDARY']};
+            }}
+            QProgressBar::chunk {{
+                background-color: {c['ACCENT_PRIMARY']};
                 border-radius: 3px;
-            }
+            }}
         """)
         layout.addWidget(self.progress_bar)
         
@@ -136,61 +148,21 @@ class RetryDialog(QDialog):
         buttons_layout.addStretch()
         
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFixedWidth(100)
-        cancel_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2b2d31;
-                color: #b5bac1;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: #3f4147;
-            }
-        """)
+        cancel_btn.setMinimumWidth(100)
+        cancel_btn.setStyleSheet(ThemeManager.get_button_style("default"))
         cancel_btn.clicked.connect(self.reject)
         buttons_layout.addWidget(cancel_btn)
         
         if self.retry_callback:
-            self.retry_btn = QPushButton(f"🔄 Retry")
-            self.retry_btn.setFixedWidth(120)
-            self.retry_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #5865f2;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    font-weight: 500;
-                }
-                QPushButton:hover {
-                    background-color: #4752c4;
-                }
-                QPushButton:disabled {
-                    background-color: #3f4147;
-                    color: #949ba4;
-                }
-            """)
+            self.retry_btn = QPushButton(f"Retry")
+            self.retry_btn.setMinimumWidth(120)
+            self.retry_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
             self.retry_btn.clicked.connect(self.do_retry)
             buttons_layout.addWidget(self.retry_btn)
         else:
             ok_btn = QPushButton("OK")
-            ok_btn.setFixedWidth(100)
-            ok_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #5865f2;
-                    color: white;
-                    border: none;
-                    padding: 8px 16px;
-                    border-radius: 4px;
-                    font-weight: 500;
-                }
-                QPushButton:hover {
-                    background-color: #4752c4;
-                }
-            """)
+            ok_btn.setMinimumWidth(100)
+            ok_btn.setStyleSheet(ThemeManager.get_button_style("primary"))
             ok_btn.clicked.connect(self.accept)
             buttons_layout.addWidget(ok_btn)
         
@@ -203,16 +175,17 @@ class RetryDialog(QDialog):
         
         self.retry_count += 1
         
+        c = ThemeManager.get_colors()
         if self.retry_count > self.max_retries:
-            self.status_label.setText(f"❌ Maximum retry attempts ({self.max_retries}) exceeded")
-            self.status_label.setStyleSheet("color: #f23f42; font-size: 12px;")
+            self.status_label.setText(f"Maximum retry attempts ({self.max_retries}) exceeded")
+            self.status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-size: 12px;")
             self.status_label.setVisible(True)
             self.retry_btn.setEnabled(False)
             return
         
         # Show progress
         self.status_label.setText(f"Retrying... (Attempt {self.retry_count}/{self.max_retries})")
-        self.status_label.setStyleSheet("color: #f0b232; font-size: 12px;")
+        self.status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']}; font-size: 12px;")
         self.status_label.setVisible(True)
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)  # Indeterminate
@@ -224,22 +197,22 @@ class RetryDialog(QDialog):
             
             # Check result
             if result:
-                self.status_label.setText("✅ Operation succeeded!")
-                self.status_label.setStyleSheet("color: #23a55a; font-size: 12px;")
+                self.status_label.setText("Operation succeeded!")
+                self.status_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-size: 12px;")
                 self.progress_bar.setVisible(False)
                 
                 # Close dialog after success
                 QTimer.singleShot(1500, self.accept)
             else:
-                self.status_label.setText(f"❌ Retry {self.retry_count} failed")
-                self.status_label.setStyleSheet("color: #f23f42; font-size: 12px;")
+                self.status_label.setText(f"Retry {self.retry_count} failed")
+                self.status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-size: 12px;")
                 self.progress_bar.setVisible(False)
                 self.retry_btn.setEnabled(True)
                 
         except Exception as e:
             logger.error(f"Retry failed: {e}")
-            self.status_label.setText(f"❌ Retry {self.retry_count} failed: {str(e)[:50]}")
-            self.status_label.setStyleSheet("color: #f23f42; font-size: 12px;")
+            self.status_label.setText(f"Retry {self.retry_count} failed: {str(e)[:50]}")
+            self.status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-size: 12px;")
             self.progress_bar.setVisible(False)
             self.retry_btn.setEnabled(True)
             

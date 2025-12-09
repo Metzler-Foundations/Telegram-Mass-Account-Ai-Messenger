@@ -15,6 +15,8 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
 from database.database_queries import member_queries, campaign_queries, account_queries
+from ui.ui_components import LoadingOverlay
+from ui.theme_manager import ThemeManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +24,12 @@ logger = logging.getLogger(__name__)
 class MetricCard(QFrame):
     """Widget displaying a single metric with REAL data."""
     
-    def __init__(self, title: str, icon: str = "📊", parent=None):
+    def __init__(self, title: str, icon: str = "", parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
-        self.setStyleSheet("""
-            MetricCard {
-                background-color: #2b2d31;
-                border-radius: 8px;
-                padding: 15px;
-            }
-            MetricCard:hover {
-                background-color: #32353b;
-            }
-        """)
+        ThemeManager.apply_to_widget(self, "card")
+        
+        c = ThemeManager._get_palette()
         
         layout = QVBoxLayout(self)
         
@@ -48,7 +43,7 @@ class MetricCard(QFrame):
         header_layout.addWidget(icon_label)
         
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #b5bac1; font-size: 12px;")
+        title_label.setStyleSheet(f"font-size: 12px; color: {c['TEXT_SECONDARY']}; font-weight: 600; text-transform: uppercase;")
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         
@@ -60,18 +55,36 @@ class MetricCard(QFrame):
         value_font.setPointSize(24)
         value_font.setBold(True)
         self.value_label.setFont(value_font)
-        self.value_label.setStyleSheet("color: #ffffff;")
+        self.value_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-weight: 800;")
         layout.addWidget(self.value_label)
         
         # Subtext
         self.subtext_label = QLabel("")
-        self.subtext_label.setStyleSheet("color: #949ba4; font-size: 11px;")
+        self.subtext_label.setStyleSheet(f"font-size: 11px; color: {c['TEXT_SECONDARY']};")
         layout.addWidget(self.subtext_label)
+
+        # Trend / sparkline label
+        self.trend_label = QLabel("")
+        self.trend_label.setObjectName("metric_spark")
+        self.trend_label.setProperty("state", "info")
+        self.trend_label.setStyleSheet(f"font-size: 11px; color: {c['ACCENT_PRIMARY']}; font-weight: 600;")
+        self.trend_label.setVisible(False)
+        layout.addWidget(self.trend_label)
     
-    def set_value(self, value: str, subtext: str = ""):
-        """Update the metric value."""
+    def set_value(self, value: str, subtext: str = "", trend: Optional[str] = None, trend_state: str = "info"):
+        """Update the metric value with optional trend sparkline text."""
         self.value_label.setText(value)
         self.subtext_label.setText(subtext)
+        self.set_trend(trend, trend_state)
+
+    def set_trend(self, trend: Optional[str], state: str = "info"):
+        """Display a mini trend text using Aurora spark styling."""
+        if trend:
+            self.trend_label.setText(trend)
+            self.trend_label.setProperty("state", state)
+            self.trend_label.setVisible(True)
+        else:
+            self.trend_label.setVisible(False)
 
 
 class AnalyticsDashboard(QWidget):
@@ -82,6 +95,7 @@ class AnalyticsDashboard(QWidget):
         self._last_refresh_at: Optional[datetime] = None
         self._min_refresh_interval = timedelta(seconds=5)
         self._showing_empty_state = False
+        self.loading_overlay: Optional[LoadingOverlay] = None
         self.setup_ui()
 
         # Auto-refresh every 30 seconds
@@ -95,12 +109,12 @@ class AnalyticsDashboard(QWidget):
     def setup_ui(self):
         """Setup the UI."""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(12, 12, 12, 12)
         
         # Title and header
         header_layout = QHBoxLayout()
         
-        title = QLabel("📊 Real-Time Analytics")
+        title = QLabel("Real-Time Analytics")
         title_font = QFont()
         title_font.setPointSize(16)
         title_font.setBold(True)
@@ -111,38 +125,31 @@ class AnalyticsDashboard(QWidget):
         
         # Export button
         from PyQt6.QtWidgets import QPushButton
-        export_btn = QPushButton("📥 Export All")
+        export_btn = QPushButton("Export All")
+        export_btn.setObjectName("secondary")
         export_btn.clicked.connect(self.export_dashboard_data)
-        export_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #5865f2;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: #4752c4;
-            }
-        """)
         header_layout.addWidget(export_btn)
+
+        self.last_updated_chip = QLabel("Last updated --")
+        self.last_updated_chip.setObjectName("status_chip")
+        self.last_updated_chip.setProperty("state", "warn")
+        header_layout.addWidget(self.last_updated_chip)
         
         layout.addLayout(header_layout)
         
         # Empty state widget (initially hidden)
         from PyQt6.QtWidgets import QFrame
         self.empty_state_widget = QFrame()
-        self.empty_state_widget.setStyleSheet("""
+        ThemeManager.apply_to_widget(self.empty_state_widget, "card")
+        c = ThemeManager._get_palette()
+        self.empty_state_widget.setStyleSheet(self.empty_state_widget.styleSheet() + """
             QFrame {
-                background-color: #2b2d31;
-                border-radius: 10px;
-                padding: 40px;
+                padding: 32px;
             }
         """)
         empty_layout = QVBoxLayout(self.empty_state_widget)
         
-        empty_icon = QLabel("📊")
+        empty_icon = QLabel("")
         empty_icon_font = QFont()
         empty_icon_font.setPointSize(48)
         empty_icon.setFont(empty_icon_font)
@@ -155,12 +162,12 @@ class AnalyticsDashboard(QWidget):
         empty_title_font.setBold(True)
         empty_title.setFont(empty_title_font)
         empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        empty_title.setStyleSheet("color: #b5bac1; margin-top: 20px;")
+        empty_title.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; margin-top: 20px;")
         empty_layout.addWidget(empty_title)
         
         self.empty_message = QLabel("Start by creating accounts and running campaigns to see analytics here.")
         self.empty_message.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_message.setStyleSheet("color: #949ba4; font-size: 12px; margin-top: 10px;")
+        self.empty_message.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 12px; margin-top: 10px;")
         self.empty_message.setWordWrap(True)
         empty_layout.addWidget(self.empty_message)
         
@@ -175,64 +182,65 @@ class AnalyticsDashboard(QWidget):
         
         content = QWidget()
         content_layout = QVBoxLayout(content)
+        self.loading_overlay = LoadingOverlay(content, "Refreshing analytics…")
         
         # Overview metrics
-        overview_group = QGroupBox("📈 Overview")
+        overview_group = QGroupBox("Overview")
         overview_layout = QGridLayout()
         
-        self.total_members_card = MetricCard("Total Members", "👥")
+        self.total_members_card = MetricCard("Total Members", "")
         overview_layout.addWidget(self.total_members_card, 0, 0)
         
-        self.total_accounts_card = MetricCard("Active Accounts", "📱")
+        self.total_accounts_card = MetricCard("Active Accounts", "")
         overview_layout.addWidget(self.total_accounts_card, 0, 1)
         
-        self.total_campaigns_card = MetricCard("Total Campaigns", "📧")
+        self.total_campaigns_card = MetricCard("Total Campaigns", "")
         overview_layout.addWidget(self.total_campaigns_card, 0, 2)
         
-        self.messages_sent_card = MetricCard("Messages Sent", "📤")
+        self.messages_sent_card = MetricCard("Messages Sent", "")
         overview_layout.addWidget(self.messages_sent_card, 1, 0)
         
-        self.success_rate_card = MetricCard("Success Rate", "✅")
+        self.success_rate_card = MetricCard("Success Rate", "")
         overview_layout.addWidget(self.success_rate_card, 1, 1)
         
-        self.accounts_warmed_card = MetricCard("Warmed Accounts", "♨️")
+        self.accounts_warmed_card = MetricCard("Warmed Accounts", "")
         overview_layout.addWidget(self.accounts_warmed_card, 1, 2)
         
         overview_group.setLayout(overview_layout)
         content_layout.addWidget(overview_group)
         
         # Campaign metrics
-        campaign_group = QGroupBox("📧 Campaign Performance")
+        campaign_group = QGroupBox("Campaign Performance")
         campaign_layout = QGridLayout()
         
-        self.active_campaigns_card = MetricCard("Running", "▶️")
+        self.active_campaigns_card = MetricCard("Running", "")
         campaign_layout.addWidget(self.active_campaigns_card, 0, 0)
         
-        self.completed_campaigns_card = MetricCard("Completed", "✅")
+        self.completed_campaigns_card = MetricCard("Completed", "")
         campaign_layout.addWidget(self.completed_campaigns_card, 0, 1)
         
-        self.campaign_success_card = MetricCard("Campaign Success", "🎯")
+        self.campaign_success_card = MetricCard("Campaign Success", "")
         campaign_layout.addWidget(self.campaign_success_card, 0, 2)
         
-        self.failed_messages_card = MetricCard("Failed Messages", "❌")
+        self.failed_messages_card = MetricCard("Failed Messages", "")
         campaign_layout.addWidget(self.failed_messages_card, 1, 0)
         
-        self.avg_delivery_card = MetricCard("Avg Delivery Rate", "📊")
+        self.avg_delivery_card = MetricCard("Avg Delivery Rate", "")
         campaign_layout.addWidget(self.avg_delivery_card, 1, 1)
         
-        self.messages_today_card = MetricCard("Messages Today", "📅")
+        self.messages_today_card = MetricCard("Messages Today", "")
         campaign_layout.addWidget(self.messages_today_card, 1, 2)
         
         campaign_group.setLayout(campaign_layout)
         content_layout.addWidget(campaign_group)
         
         # Template Variant Analytics (A/B Testing)
-        variant_group = QGroupBox("🧪 Template Variant Performance (A/B Testing)")
+        variant_group = QGroupBox("Template Variant Performance (A/B Testing)")
         variant_layout = QVBoxLayout()
         
         # Info label
         variant_info = QLabel("Performance breakdown by message template variant")
-        variant_info.setStyleSheet("color: #949ba4; font-size: 11px; margin-bottom: 5px;")
+        variant_info.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 11px; margin-bottom: 5px;")
         variant_layout.addWidget(variant_info)
         
         # Variant stats container - will be populated dynamically
@@ -240,41 +248,33 @@ class AnalyticsDashboard(QWidget):
         self.variant_stats_display = QTextEdit()
         self.variant_stats_display.setReadOnly(True)
         self.variant_stats_display.setMaximumHeight(150)
-        self.variant_stats_display.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                border: 1px solid #2b2d31;
-                border-radius: 5px;
-                padding: 10px;
-                font-family: monospace;
-            }
-        """)
+        # Global theme handles QTextEdit
+        self.variant_stats_display.setStyleSheet(f"font-family: monospace; color: {c['TEXT_SECONDARY']};")
         variant_layout.addWidget(self.variant_stats_display)
         
         variant_group.setLayout(variant_layout)
         content_layout.addWidget(variant_group)
         
         # Member insights
-        member_group = QGroupBox("👥 Member Insights")
+        member_group = QGroupBox("Member Insights")
         member_layout = QGridLayout()
         
-        self.members_with_username_card = MetricCard("With Username", "📇")
+        self.members_with_username_card = MetricCard("With Username", "")
         member_layout.addWidget(self.members_with_username_card, 0, 0)
         
-        self.verified_members_card = MetricCard("Verified", "✓")
+        self.verified_members_card = MetricCard("Verified", "")
         member_layout.addWidget(self.verified_members_card, 0, 1)
         
-        self.premium_members_card = MetricCard("Premium", "⭐")
+        self.premium_members_card = MetricCard("Premium", "")
         member_layout.addWidget(self.premium_members_card, 0, 2)
         
-        self.active_members_card = MetricCard("Active Recently", "🟢")
+        self.active_members_card = MetricCard("Active Recently", "")
         member_layout.addWidget(self.active_members_card, 1, 0)
         
-        self.channels_tracked_card = MetricCard("Channels Tracked", "📺")
+        self.channels_tracked_card = MetricCard("Channels Tracked", "")
         member_layout.addWidget(self.channels_tracked_card, 1, 1)
         
-        self.avg_per_channel_card = MetricCard("Avg Per Channel", "📊")
+        self.avg_per_channel_card = MetricCard("Avg Per Channel", "")
         member_layout.addWidget(self.avg_per_channel_card, 1, 2)
         
         member_group.setLayout(member_layout)
@@ -288,7 +288,7 @@ class AnalyticsDashboard(QWidget):
         except Exception as e:
             logger.warning(f"Could not load cost trend chart: {e}")
             cost_error_label = QLabel("💰 Cost trend charts unavailable")
-            cost_error_label.setStyleSheet("color: #949ba4; padding: 20px;")
+            cost_error_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; padding: 20px;")
             content_layout.addWidget(cost_error_label)
         
         # Risk Distribution Chart
@@ -300,18 +300,18 @@ class AnalyticsDashboard(QWidget):
             content_layout.addWidget(self.risk_chart)
         except Exception as e:
             logger.warning(f"Could not load risk distribution chart: {e}")
-            risk_error_label = QLabel("⚠️ Risk distribution charts unavailable")
-            risk_error_label.setStyleSheet("color: #949ba4; padding: 20px;")
+            risk_error_label = QLabel("Risk distribution charts unavailable")
+            risk_error_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; padding: 20px;")
             content_layout.addWidget(risk_error_label)
         
         # Last update timestamp
         self.last_update_label = QLabel()
-        self.last_update_label.setStyleSheet("color: #949ba4; font-size: 11px; padding: 10px;")
+        self.last_update_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px; padding: 10px;")
         content_layout.addWidget(self.last_update_label)
 
         # Empty-state and degraded-mode banner
         self.partial_data_label = QLabel()
-        self.partial_data_label.setStyleSheet("color: #f0b232; font-size: 11px; padding: 4px 10px;")
+        self.partial_data_label.setStyleSheet(f"color: {c['ACCENT_WARNING']}; font-size: 11px; padding: 4px 10px;")
         self.partial_data_label.setVisible(False)
         content_layout.addWidget(self.partial_data_label)
         
@@ -325,6 +325,8 @@ class AnalyticsDashboard(QWidget):
         if self._last_refresh_at and (now - self._last_refresh_at) < self._min_refresh_interval:
             logger.info("Skipping analytics refresh: rate limit in effect")
             return
+        if self.loading_overlay:
+            self.loading_overlay.show_loading("Refreshing analytics…")
         try:
             logger.info("Refreshing ALL analytics with REAL database data...")
 
@@ -353,7 +355,9 @@ class AnalyticsDashboard(QWidget):
             # Update overview cards
             self.total_members_card.set_value(
                 f"{member_stats['total']:,}",
-                f"{member_stats['new_today']} added today"
+                f"{member_stats['new_today']} added today",
+                trend=f"+{member_stats['new_today']:,} today" if member_stats['new_today'] else None,
+                trend_state="ok" if member_stats['new_today'] >= 0 else "warn"
             )
             
             self.total_accounts_card.set_value(
@@ -385,7 +389,9 @@ class AnalyticsDashboard(QWidget):
             
             self.accounts_warmed_card.set_value(
                 f"{account_stats['warmed_up']}/{account_stats['total']}",
-                f"{account_stats['warmup_pct']:.0f}% ready"
+                f"{account_stats['warmup_pct']:.0f}% ready",
+                trend=f"{account_stats['warmup_pct']:.0f}% warmed",
+                trend_state="info"
             )
             
             # Update campaign cards
@@ -417,7 +423,12 @@ class AnalyticsDashboard(QWidget):
             
             self.messages_today_card.set_value(
                 f"{campaign_stats['sent_today']:,}",
-                f"{campaign_stats['yesterday_sent']} yesterday"
+                f"{campaign_stats['yesterday_sent']} yesterday",
+                trend=self._format_delta(
+                    campaign_stats['sent_today'] - campaign_stats['yesterday_sent'],
+                    "vs yesterday"
+                ),
+                trend_state=self._delta_state(campaign_stats['sent_today'] - campaign_stats['yesterday_sent'])
             )
             
             # Update member cards
@@ -460,7 +471,7 @@ class AnalyticsDashboard(QWidget):
             if 'variant_breakdown' in campaign_stats and campaign_stats['variant_breakdown']:
                 variant_text = "Template Variant Performance:\n\n"
                 for variant, stats in sorted(campaign_stats['variant_breakdown'].items()):
-                    variant_text += f"📊 {variant}:\n"
+                    variant_text += f"{variant}:\n"
                     variant_text += f"   Total: {stats['total']:,} | "
                     variant_text += f"Sent: {stats['sent']:,} | "
                     variant_text += f"Failed: {stats['failed']:,} | "
@@ -476,7 +487,7 @@ class AnalyticsDashboard(QWidget):
             # Update timestamp
             if errors:
                 self.last_update_label.setText(
-                    f"⚠️ Partial data: {', '.join(errors)} — last attempted refresh at "
+                    f"Partial data: {', '.join(errors)} — last attempted refresh at "
                     f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
                 )
                 self.partial_data_label.setText(
@@ -484,22 +495,28 @@ class AnalyticsDashboard(QWidget):
                     ". Showing cached defaults. Check DB connections and retry."
                 )
                 self.partial_data_label.setVisible(True)
+                self._set_last_updated_chip("Partial data", "warn")
             else:
                 self.last_update_label.setText(
                     f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} "
                     f"(Refreshes every 30 seconds)"
                 )
                 self.partial_data_label.setVisible(False)
+                self._set_last_updated_chip("Healthy", "ok")
 
-            logger.info("✅ Analytics refreshed with REAL data")
+            logger.info("Analytics refreshed with REAL data")
             self._last_refresh_at = datetime.now()
 
         except Exception as e:
             logger.error(f"Failed to refresh analytics: {e}", exc_info=True)
             # Don't fail silently - show error to user
             self.last_update_label.setText(
-                f"❌ Update failed: {str(e)[:50]}... Check logs for details."
+                f"Update failed: {str(e)[:50]}... Check logs for details."
             )
+            self._set_last_updated_chip("Error", "bad")
+        finally:
+            if self.loading_overlay:
+                self.loading_overlay.hide_loading()
 
     @staticmethod
     def _empty_member_stats() -> Dict[str, float]:
@@ -527,7 +544,9 @@ class AnalyticsDashboard(QWidget):
             'completion_rate': 0.0,
             'total_sent': 0,
             'sent_today': 0,
-            'total_failed': 0
+            'failed_today': 0,
+            'total_failed': 0,
+            'yesterday_sent': 0
         }
 
     @staticmethod
@@ -619,6 +638,9 @@ class AnalyticsDashboard(QWidget):
         self._showing_empty_state = True
         self.empty_message.setText(message)
         self.empty_state_widget.setVisible(True)
+        if self.loading_overlay:
+            self.loading_overlay.hide_loading()
+        self._set_last_updated_chip("No data", "warn")
         
         # Hide scroll area with data
         for child in self.findChildren(QScrollArea):
@@ -708,6 +730,32 @@ class AnalyticsDashboard(QWidget):
             stats['warmup_pct'] = 0
         
         return stats
+
+    @staticmethod
+    def _delta_state(delta: float) -> str:
+        """Map delta to chip state."""
+        if delta > 0:
+            return "ok"
+        if delta < 0:
+            return "warn"
+        return "info"
+
+    @staticmethod
+    def _format_delta(delta: float, suffix: str) -> str:
+        """Format delta text for trend label."""
+        if delta == 0:
+            return f"— {suffix}"
+        arrow = "▲" if delta > 0 else "▼"
+        return f"{arrow} {abs(delta):,} {suffix}"
+
+    def _set_last_updated_chip(self, text: str, state: str):
+        """Update the header chip to reflect current health."""
+        self.last_updated_chip.setText(text)
+        self.last_updated_chip.setProperty("state", state)
+        # Force style refresh for dynamic property
+        self.last_updated_chip.style().unpolish(self.last_updated_chip)
+        self.last_updated_chip.style().polish(self.last_updated_chip)
+        self.last_updated_chip.update()
     
     def export_dashboard_data(self):
         """Export all dashboard data."""

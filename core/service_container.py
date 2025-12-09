@@ -8,11 +8,12 @@ from typing import Dict, Any, Optional, List
 from abc import ABC, abstractmethod
 
 from core.config_manager import ConfigurationManager
-from telegram.telegram_client import TelegramClient
 from ai.gemini_service import GeminiService
-from scraping.member_scraper import MemberDatabase
+from scraping.database import MemberDatabase
 from anti_detection.anti_detection_system import AntiDetectionSystem
 from integrations.api_key_manager import APIKeyManager
+
+# TelegramClient will be imported lazily in the factory method
 
 logger = logging.getLogger(__name__)
 
@@ -371,22 +372,36 @@ class ServiceFactory:
 
     @staticmethod
     def create_telegram_client(config_manager: ConfigurationManager) -> TelegramMessageService:
-        telegram_cfg = config_manager.get("telegram", {})
-        api_id = telegram_cfg.get("api_id") or os.getenv("TELEGRAM_API_ID", "")
-        api_hash = telegram_cfg.get("api_hash") or os.getenv("TELEGRAM_API_HASH", "")
+        # Lazy import TelegramClient to avoid startup hangs
+        TelegramClient = None
+        try:
+            from telegram.telegram_client import TelegramClient
+        except Exception as e:
+            logger.warning(f"TelegramClient import failed, using fallback: {e}")
+
+        # Get API credentials from secrets manager
+        api_id = config_manager.get_telegram_api_id() or os.getenv("TELEGRAM_API_ID", "")
+        api_hash = config_manager.get_telegram_api_hash() or os.getenv("TELEGRAM_API_HASH", "")
 
         if not api_id or not api_hash:
             logger.warning(
                 "Telegram API credentials not configured. "
                 "Please set them in Settings > API & Auth or environment variables (TELEGRAM_API_ID, TELEGRAM_API_HASH)."
             )
-            # Create a client that will fail gracefully
-            telegram_client = TelegramClient(
-                api_id="",  # Empty credentials will cause graceful failure
-                api_hash="",
-                phone_number=""
-            )
+            # Create a fallback client
+            if TelegramClient:
+                telegram_client = TelegramClient(
+                    api_id="",  # Empty credentials will cause graceful failure
+                    api_hash="",
+                    phone_number=""
+                )
+            else:
+                logger.error("TelegramClient not available due to import issues")
+                # Create a mock client for when Pyrogram import fails
+                telegram_client = None
         else:
+            # Get phone number from config
+            telegram_cfg = config_manager.get("telegram", {})
             phone_number = telegram_cfg.get("phone_number", "")
             telegram_client = TelegramClient(
                 api_id=api_id,
@@ -397,14 +412,24 @@ class ServiceFactory:
 
     @staticmethod
     def create_ai_service(config_manager: ConfigurationManager) -> GeminiAIService:
-        # Get API key from secrets manager
-        api_key = config_manager.get_gemini_api_key()
+        # Get API key from secrets manager or environment
+        api_key = (
+            config_manager.get_gemini_api_key()
+            or os.getenv("GEMINI_API_KEY", "")
+            or ""
+        )
+
         if not api_key:
-            api_key = ""  # Fallback to empty string for initialization
-        gemini_service = GeminiService(api_key)
+            logger.warning("Gemini API key not configured, creating service without API key")
+            # Create a minimal service that won't try to initialize Gemini
+            gemini_service = GeminiService("", performance=config_manager.get("performance", {}))
+            ai_adapter = GeminiAIService(gemini_service, APIKeyManager())
+            return ai_adapter
+
+        performance_cfg = config_manager.get("performance", {})
+        gemini_service = GeminiService(api_key, performance=performance_cfg)
         ai_adapter = GeminiAIService(gemini_service, APIKeyManager())
-        if api_key:
-            ai_adapter.update_configuration({"api_key": api_key})
+        ai_adapter.update_configuration({"api_key": api_key})
         return ai_adapter
 
     @staticmethod

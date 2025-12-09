@@ -11,6 +11,7 @@ from pathlib import Path
 import aiohttp
 import google.generativeai as genai
 from monitoring.performance_monitor import get_resilience_manager
+from core.security_audit import audit_api_validation, audit_security_violation
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ class APIKeyManager:
         # Service configurations
         self.service_configs = {
             'gemini': {
-                'validation_url': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+                'validation_url': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
                 'test_prompt': 'Say "Hello" in exactly 5 words.',
                 'headers': {'Content-Type': 'application/json'},
                 'rate_limit': 60,  # requests per minute
@@ -152,7 +153,16 @@ class APIKeyManager:
         # Try to use OS keyring first (most secure)
         try:
             import keyring
+            from keyring.errors import NoKeyringError
             keyring_service_name = "telegram_bot_api_keys"
+
+            # Ensure a usable backend exists
+            try:
+                backend = keyring.get_keyring()
+                if getattr(backend, "priority", 0) <= 0:
+                    raise NoKeyringError("No usable keyring backend")
+            except NoKeyringError:
+                raise ImportError("No keyring backend available")
 
             # Try to get existing key from keyring
             stored_key = keyring.get_password(keyring_service_name, "encryption_key")
@@ -166,9 +176,9 @@ class APIKeyManager:
             return key
 
         except ImportError:
-            logger.warning("keyring library not available, falling back to secure directory storage")
+            logger.debug("Keyring unavailable; falling back to secure directory storage")
         except Exception as e:
-            logger.warning(f"Failed to use OS keyring: {e}, falling back to secure directory storage")
+            logger.debug(f"Keyring unusable: {e}; falling back to secure directory storage")
 
         # Fallback: Use secure directory with restricted permissions
         try:
@@ -288,7 +298,7 @@ class APIKeyManager:
     def _validate_api_key(self, service: str, key: str) -> bool:
         """Validate API key format for specific service."""
         try:
-            from user_helpers import ValidationHelper
+            from utils.user_helpers import ValidationHelper
 
             service = self._normalize_service_name(service)
 
@@ -392,6 +402,27 @@ class APIKeyManager:
             self.api_key_circuit_breaker.record_failure(e)
             return False
 
+    async def validate_api_key_raw(self, service: str, key: str) -> Tuple[bool, str]:
+        """
+        Validate an API key without persisting it to disk.
+        This is used for pre-save checks (e.g., setup wizard/settings) to avoid
+        leaving stale credentials on the filesystem.
+        """
+        try:
+            service = self._normalize_service_name(service)
+            if not self._validate_api_key(service, key):
+                audit_api_validation(service, success=False)
+                return False, "Invalid API key format"
+
+            result = await self._test_api_key(service, key)
+            success, message = result
+            audit_api_validation(service, success=success)
+            return result
+        except Exception as exc:
+            logger.error(f"Raw API key validation failed for {service}: {exc}")
+            audit_api_validation(service, success=False)
+            return False, str(exc)
+
     def get_api_key(self, service: str) -> Optional[str]:
         """Get a decrypted API key with resilience features."""
         service = self._normalize_service_name(service)
@@ -475,11 +506,13 @@ class APIKeyManager:
             is_valid, error_msg = await self._test_api_key(service, decrypted_key)
 
             self._update_validation_result(service, is_valid, error_msg)
+            audit_api_validation(service, success=is_valid)
             return is_valid, error_msg
 
         except Exception as e:
             error_msg = f"Validation error: {str(e)}"
             self._update_validation_result(service, False, error_msg)
+            audit_api_validation(service, success=False)
             return False, error_msg
 
     def _update_validation_result(self, service: str, is_valid: bool, error_msg: str = ""):
@@ -525,7 +558,8 @@ class APIKeyManager:
         """Test Gemini API key."""
         try:
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash-latest")
+            model = genai.GenerativeModel(model_name)
 
             response = await model.generate_content_async(config['test_prompt'])
             if response and response.text:
@@ -539,16 +573,22 @@ class APIKeyManager:
     async def _test_openai_key(self, api_key: str, config: Dict) -> Tuple[bool, str]:
         """Test OpenAI API key."""
         try:
-            timeout = aiohttp.ClientTimeout(total=30)  # 30 second timeout
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                headers = {**config['headers'], 'Authorization': f'Bearer {api_key}'}
-                data = {
-                    'model': 'gpt-3.5-turbo',
-                    'messages': [{'role': 'user', 'content': config['test_prompt']}],
-                    'max_tokens': 10
-                }
+            # Use HTTP connection pool for better performance
+            from utils.http_connection_pool import get_http_connection_pool
+            http_pool = get_http_connection_pool()
 
-                async with session.post(config['validation_url'], headers=headers, json=data) as response:
+            # Apply rate limiting
+            from utils.rate_limiter import get_rate_limit_manager
+            rate_limiter = get_rate_limit_manager()
+            await rate_limiter.wait_for_domain('api.openai.com')
+
+            async with http_pool.request('POST', config['validation_url'],
+                                       headers={**config['headers'], 'Authorization': f'Bearer {api_key}'},
+                                       json={
+                                           'model': 'gpt-3.5-turbo',
+                                           'messages': [{'role': 'user', 'content': config['test_prompt']}],
+                                           'max_tokens': 10
+                                       }) as response:
                     if response.status == 200:
                         result = await response.json()
                         if 'choices' in result and len(result['choices']) > 0:

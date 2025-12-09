@@ -16,6 +16,7 @@ from typing import List, Dict, Optional, Tuple, Set
 from datetime import datetime
 from dataclasses import dataclass, field
 from collections import defaultdict
+from contextlib import contextmanager
 
 try:
     import networkx as nx
@@ -64,8 +65,28 @@ class NetworkAnalytics:
     def _get_connection(self):
         if self._connection_pool:
             return self._connection_pool.get_connection()
-        return self._get_connection()
-        
+        else:
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            return conn
+
+    @contextmanager
+    def _connection_context(self):
+        """Context manager for DB operations."""
+        conn_manager = self._get_connection()
+        if hasattr(conn_manager, "__enter__"):
+            with conn_manager as conn:
+                yield conn
+        else:
+            try:
+                yield conn_manager
+            finally:
+                try:
+                    conn_manager.close()
+                except Exception:
+                    pass
+
+        # Initialize graph
         if NETWORKX_AVAILABLE:
             self.graph = nx.Graph()
         else:
@@ -73,58 +94,57 @@ class NetworkAnalytics:
     
     def _init_database(self):
         """Initialize network database."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
-        
-        # Network nodes
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS network_nodes (
-                user_id INTEGER PRIMARY KEY,
-                username TEXT,
-                connections INTEGER DEFAULT 0,
-                centrality_score REAL DEFAULT 0.0,
-                influence_score REAL DEFAULT 0.0,
-                cluster_id INTEGER,
-                last_updated TIMESTAMP
-            )
-        """)
-        
-        # Network edges (connections)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS network_edges (
-                user_id_1 INTEGER,
-                user_id_2 INTEGER,
-                strength REAL DEFAULT 1.0,
-                interaction_count INTEGER DEFAULT 1,
-                last_interaction TIMESTAMP,
-                PRIMARY KEY (user_id_1, user_id_2)
-            )
-        """)
-        
-        # Clusters/communities
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS network_clusters (
-                cluster_id INTEGER PRIMARY KEY,
-                member_count INTEGER,
-                density REAL,
-                top_influencers TEXT,
-                common_topics TEXT,
-                created_at TIMESTAMP,
-                last_updated TIMESTAMP
-            )
-        """)
-        
-        # Network metrics
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS network_metrics (
-                metric_name TEXT PRIMARY KEY,
-                metric_value REAL,
-                calculated_at TIMESTAMP
-            )
-        """)
-        
-        conn.commit()
-        conn.close()
+        with self._connection_context() as conn:
+            cursor = conn.cursor()
+
+            # Network nodes
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS network_nodes (
+                    user_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    connections INTEGER DEFAULT 0,
+                    centrality_score REAL DEFAULT 0.0,
+                    influence_score REAL DEFAULT 0.0,
+                    cluster_id INTEGER,
+                    last_updated TIMESTAMP
+                )
+            """)
+            
+            # Network edges (connections)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS network_edges (
+                    user_id_1 INTEGER,
+                    user_id_2 INTEGER,
+                    strength REAL DEFAULT 1.0,
+                    interaction_count INTEGER DEFAULT 1,
+                    last_interaction TIMESTAMP,
+                    PRIMARY KEY (user_id_1, user_id_2)
+                )
+            """)
+            
+            # Clusters/communities
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS network_clusters (
+                    cluster_id INTEGER PRIMARY KEY,
+                    member_count INTEGER,
+                    density REAL,
+                    top_influencers TEXT,
+                    common_topics TEXT,
+                    created_at TIMESTAMP,
+                    last_updated TIMESTAMP
+                )
+            """)
+            
+            # Network metrics
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS network_metrics (
+                    metric_name TEXT PRIMARY KEY,
+                    metric_value REAL,
+                    calculated_at TIMESTAMP
+                )
+            """)
+            
+            conn.commit()
         logger.info("Network analytics database initialized")
     
     def add_connection(self, user_id_1: int, user_id_2: int, strength: float = 1.0):

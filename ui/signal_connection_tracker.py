@@ -453,8 +453,14 @@ if __name__ == '__main__':
     if PYQT_AVAILABLE:
         from PyQt6.QtWidgets import QApplication, QPushButton, QWidget
         import sys
+        try:
+            from ui.theme_manager import ThemeManager
+        except Exception:
+            ThemeManager = None
         
         app = QApplication(sys.argv)
+        if ThemeManager:
+            ThemeManager.apply_to_application(app)
         
         # Example 1: Manual tracking
         tracker = get_signal_tracker()

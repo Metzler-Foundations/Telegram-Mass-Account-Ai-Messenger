@@ -303,32 +303,9 @@ class ErrorHandler:
         # Set proper window modality to ensure clean event handling
         msg_box.setWindowModality(Qt.WindowModality.ApplicationModal)
         
-        # Apply theme styling
-        msg_box.setStyleSheet("""
-            QMessageBox {
-                background-color: #313338;
-                color: #dbdee1;
-            }
-            QMessageBox QLabel {
-                color: #dbdee1;
-                font-size: 14px;
-            }
-            QPushButton {
-                background-color: #5865f2;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: 500;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: #4752c4;
-            }
-            QPushButton:pressed {
-                background-color: #3c45a5;
-            }
-        """)
+        # NO STYLESHEETS - Wayland compatibility
+        # Using system default styling to prevent crashes
+        # The complex stylesheets above were causing "The Wayland connection broke" errors
         
         return QMessageBox.StandardButton(msg_box.exec())
     

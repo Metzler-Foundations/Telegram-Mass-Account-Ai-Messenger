@@ -103,25 +103,31 @@ class StatusIntelligence:
         self._init_database()
     
     def _get_connection(self):
+        """Get database connection."""
         if self._connection_pool:
             return self._connection_pool.get_connection()
-        return self._get_connection()
-
-        # In-memory tracking
-        self._status_cache: Dict[int, UserStatusProfile] = {}
-        self._pending_receipts: Dict[int, ReadReceiptData] = {}  # {message_id: data}
-        self._seen_receipts: set[int] = set()
-        self._load_seen_receipts()
-        
-        # Batch processing queue
-        self._status_queue: deque = deque(maxlen=1000)
+        else:
+            import sqlite3
+            return sqlite3.connect(self.db_path)
         
     def _init_database(self):
         """Initialize status tracking database."""
-        conn = self._get_connection()
-        cursor = conn.cursor()
+        if self._connection_pool:
+            with self._connection_pool.get_connection() as conn:
+                cursor = conn.cursor()
+                self._create_tables(cursor)
+                conn.commit()
+        else:
+            import sqlite3
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            self._create_tables(cursor)
+            conn.commit()
+            conn.close()
+    
+    def _create_tables(self, cursor):
+        """Create database tables."""
         
-        # User status profiles
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS status_profiles (
                 user_id INTEGER PRIMARY KEY,
@@ -196,9 +202,7 @@ class StatusIntelligence:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_receipts_user ON read_receipts(user_id)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_response_user ON response_times(user_id)")
         
-        conn.commit()
-        conn.close()
-        logger.info("Status intelligence database initialized")
+        logger.info("Status intelligence database tables created")
 
     def _load_seen_receipts(self):
         """Load previously stored read receipts to avoid reprocessing after restarts."""

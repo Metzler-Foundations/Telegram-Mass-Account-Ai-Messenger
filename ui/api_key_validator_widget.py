@@ -121,8 +121,10 @@ class APIKeyValidatorWidget(QWidget):
         layout.addWidget(self.status_label)
         
         # Error message
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
         self.error_label = QLabel("")
-        self.error_label.setStyleSheet("color: #ed4245; font-size: 10px;")
+        self.error_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-size: 10px;")
         self.error_label.setWordWrap(True)
         self.error_label.setVisible(False)
         layout.addWidget(self.error_label)
@@ -174,8 +176,10 @@ class APIKeyValidatorWidget(QWidget):
             return
         
         # Show validating state
-        self.status_label.setText("⏳")
-        self.status_label.setStyleSheet("color: #f0b232;")
+        self.status_label.setText("Validating...")
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        self.status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
         self.validate_btn.setEnabled(False)
         self.validate_btn.setText("Validating...")
         self.error_label.setVisible(False)
@@ -203,20 +207,24 @@ class APIKeyValidatorWidget(QWidget):
     def _show_success(self, message: str = "Valid"):
         """Show success state."""
         self._is_valid = True
-        self.status_label.setText("✅")
-        self.status_label.setStyleSheet("color: #23a559;")
+        self.status_label.setText("✓")
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        self.status_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']};")
         self.error_label.setText(f"✓ {message}")
-        self.error_label.setStyleSheet("color: #23a559; font-size: 10px;")
+        self.error_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-size: 10px;")
         self.error_label.setVisible(True)
         self.validation_changed.emit(True)
     
     def _show_error(self, message: str):
         """Show error state."""
         self._is_valid = False
-        self.status_label.setText("❌")
-        self.status_label.setStyleSheet("color: #ed4245;")
+        self.status_label.setText("✗")
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        self.status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']};")
         self.error_label.setText(f"✗ {message}")
-        self.error_label.setStyleSheet("color: #ed4245; font-size: 10px;")
+        self.error_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-size: 10px;")
         self.error_label.setVisible(True)
         self.validation_changed.emit(False)
     

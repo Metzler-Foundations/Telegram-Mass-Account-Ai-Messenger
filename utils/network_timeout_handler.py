@@ -14,6 +14,7 @@ import asyncio
 import logging
 import time
 import socket
+import threading
 from typing import Optional, Callable, TypeVar, Any
 from functools import wraps
 from contextlib import contextmanager
@@ -56,13 +57,16 @@ class NetworkTimeoutHandler:
         self.timeouts = {**self.DEFAULT_TIMEOUTS}
         if custom_timeouts:
             self.timeouts.update(custom_timeouts)
-        
+
         self._timeout_statistics = {
             'total_timeouts': 0,
             'timeouts_by_operation': {},
             'total_operations': 0,
             'avg_operation_time': 0.0
         }
+
+        # Thread synchronization
+        self._stats_lock = threading.Lock()
     
     def get_timeout(self, operation_type: str) -> float:
         """Get timeout value for an operation type.
@@ -162,9 +166,12 @@ class NetworkTimeoutHandler:
         
         def wrapper():
             try:
-                result[0] = operation(*args, **kwargs)
+                operation_result = operation(*args, **kwargs)
+                with self._stats_lock:
+                    result[0] = operation_result
             except Exception as e:
-                exception[0] = e
+                with self._stats_lock:
+                    exception[0] = e
         
         thread = threading.Thread(target=wrapper)
         thread.daemon = True
@@ -183,14 +190,19 @@ class NetworkTimeoutHandler:
             raise TimeoutError(
                 f"{operation_type} operation timed out after {timeout}s"
             )
-        
-        if exception[0]:
-            raise exception[0]
-        
-        self._timeout_statistics['total_operations'] += 1
-        self._update_avg_time(elapsed)
-        
-        return result[0]
+
+        # Synchronize access to shared result/exception
+        with self._stats_lock:
+            if exception[0]:
+                raise exception[0]
+
+            final_result = result[0]
+
+        with self._stats_lock:
+            self._timeout_statistics['total_operations'] += 1
+            self._update_avg_time(elapsed)
+
+        return final_result
     
     @contextmanager
     def socket_timeout(self, operation_type: str = 'socket_connect'):
@@ -259,41 +271,45 @@ class NetworkTimeoutHandler:
     
     def _record_timeout(self, operation_type: str, elapsed: float):
         """Record a timeout occurrence.
-        
+
         Args:
             operation_type: Type of operation that timed out
             elapsed: Time elapsed before timeout
         """
-        self._timeout_statistics['total_timeouts'] += 1
-        
-        if operation_type not in self._timeout_statistics['timeouts_by_operation']:
-            self._timeout_statistics['timeouts_by_operation'][operation_type] = 0
-        self._timeout_statistics['timeouts_by_operation'][operation_type] += 1
+        with self._stats_lock:
+            self._timeout_statistics['total_timeouts'] += 1
+
+            if operation_type not in self._timeout_statistics['timeouts_by_operation']:
+                self._timeout_statistics['timeouts_by_operation'][operation_type] = 0
+            self._timeout_statistics['timeouts_by_operation'][operation_type] += 1
     
     def _update_avg_time(self, elapsed: float):
         """Update average operation time.
-        
+
         Args:
             elapsed: Time elapsed for operation
         """
-        total_ops = self._timeout_statistics['total_operations']
-        current_avg = self._timeout_statistics['avg_operation_time']
-        
-        # Running average calculation
-        new_avg = ((current_avg * (total_ops - 1)) + elapsed) / total_ops
-        self._timeout_statistics['avg_operation_time'] = new_avg
+        with self._stats_lock:
+            total_ops = self._timeout_statistics['total_operations']
+            current_avg = self._timeout_statistics['avg_operation_time']
+
+            # Running average calculation
+            new_avg = ((current_avg * (total_ops - 1)) + elapsed) / total_ops
+            self._timeout_statistics['avg_operation_time'] = new_avg
     
     def get_statistics(self) -> dict:
         """Get timeout statistics.
-        
+
         Returns:
             Dictionary with timeout statistics
         """
-        total_ops = self._timeout_statistics['total_operations']
-        total_timeouts = self._timeout_statistics['total_timeouts']
-        
+        with self._stats_lock:
+            stats_copy = self._timeout_statistics.copy()
+            total_ops = stats_copy['total_operations']
+            total_timeouts = stats_copy['total_timeouts']
+
         return {
-            **self._timeout_statistics,
+            **stats_copy,
             'timeout_rate': (
                 total_timeouts / total_ops * 100
                 if total_ops > 0 else 0.0

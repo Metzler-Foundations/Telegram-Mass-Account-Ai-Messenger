@@ -20,6 +20,8 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QColor
 
+from ui.theme_manager import ThemeManager
+
 logger = logging.getLogger(__name__)
 
 # Try to import warmup service
@@ -62,7 +64,7 @@ class WarmupProgressWidget(QWidget):
         # Header
         header_layout = QHBoxLayout()
         
-        title = QLabel("🔥 Account Warmup Progress")
+        title = QLabel("Account Warmup Progress")
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
@@ -72,8 +74,8 @@ class WarmupProgressWidget(QWidget):
         header_layout.addStretch()
         
         # Refresh button
-        refresh_btn = QPushButton("🔄")
-        refresh_btn.setMaximumWidth(40)
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.setMinimumWidth(80)
         refresh_btn.clicked.connect(self.refresh_data)
         header_layout.addWidget(refresh_btn)
         
@@ -82,16 +84,16 @@ class WarmupProgressWidget(QWidget):
         # Summary
         summary_layout = QHBoxLayout()
         
-        self.queued_label = QLabel("⏸ Queued: 0")
+        self.queued_label = QLabel("Queued: 0")
         summary_layout.addWidget(self.queued_label)
         
-        self.active_label = QLabel("🔄 Active: 0")
+        self.active_label = QLabel("Active: 0")
         summary_layout.addWidget(self.active_label)
         
-        self.completed_label = QLabel("✅ Completed: 0")
+        self.completed_label = QLabel("Completed: 0")
         summary_layout.addWidget(self.completed_label)
         
-        self.failed_label = QLabel("❌ Failed: 0")
+        self.failed_label = QLabel("Failed: 0")
         summary_layout.addWidget(self.failed_label)
         
         summary_layout.addStretch()
@@ -122,22 +124,23 @@ class WarmupProgressWidget(QWidget):
         self.jobs_table.setColumnWidth(1, 150)
         self.jobs_table.setColumnWidth(4, 150)
         
-        self.jobs_table.setStyleSheet("""
-            QTableWidget {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                gridline-color: #2b2d31;
+        c = ThemeManager.get_colors()
+        self.jobs_table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: {c['BG_PRIMARY']};
+                color: {c['TEXT_SECONDARY']};
+                gridline-color: {c['BORDER_DEFAULT']};
                 border: none;
-            }
-            QTableWidget::item {
+            }}
+            QTableWidget::item {{
                 padding: 8px;
-            }
-            QHeaderView::section {
-                background-color: #2b2d31;
-                color: #b5bac1;
+            }}
+            QHeaderView::section {{
+                background-color: {c['BG_TERTIARY']};
+                color: {c['TEXT_SECONDARY']};
                 padding: 8px;
                 border: none;
-            }
+            }}
         """)
         
         jobs_layout.addWidget(self.jobs_table)
@@ -145,7 +148,7 @@ class WarmupProgressWidget(QWidget):
         
         # Status
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #949ba4; font-size: 11px; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 11px; padding: 5px;")
         layout.addWidget(self.status_label)
     
     def refresh_data(self):
@@ -165,10 +168,10 @@ class WarmupProgressWidget(QWidget):
             failed = len(self.warmup_service.failed_jobs)
             
             # Update summary
-            self.queued_label.setText(f"⏸ Queued: {queued}")
-            self.active_label.setText(f"🔄 Active: {active}")
-            self.completed_label.setText(f"✅ Completed: {completed}")
-            self.failed_label.setText(f"❌ Failed: {failed}")
+            self.queued_label.setText(f"Queued: {queued}")
+            self.active_label.setText(f"Active: {active}")
+            self.completed_label.setText(f"Completed: {completed}")
+            self.failed_label.setText(f"Failed: {failed}")
             
             # Get active and queued jobs for display
             display_jobs = list(self.warmup_service.active_jobs.values()) + self.warmup_service.job_queue[:10]
@@ -194,17 +197,18 @@ class WarmupProgressWidget(QWidget):
                 progress_bar.setRange(0, 100)
                 progress_bar.setValue(int(job.progress))
                 progress_bar.setFormat(f"{job.progress:.1f}%")
-                progress_bar.setStyleSheet("""
-                    QProgressBar {
-                        border: 1px solid #2b2d31;
+                c = ThemeManager.get_colors()
+                progress_bar.setStyleSheet(f"""
+                    QProgressBar {{
+                        border: 1px solid {c['BORDER_DEFAULT']};
                         border-radius: 3px;
-                        background-color: #1e1f22;
+                        background-color: {c['BG_PRIMARY']};
                         text-align: center;
-                    }
-                    QProgressBar::chunk {
-                        background-color: #5865f2;
+                    }}
+                    QProgressBar::chunk {{
+                        background-color: {c['ACCENT_PRIMARY']};
                         border-radius: 2px;
-                    }
+                    }}
                 """)
                 progress_layout.addWidget(progress_bar)
                 
@@ -213,7 +217,7 @@ class WarmupProgressWidget(QWidget):
                 # Status message
                 status_item = QTableWidgetItem(job.status_message or "Processing...")
                 if job.error_message:
-                    status_item.setForeground(QColor("#ed4245"))
+                    status_item.setForeground(QColor(c['ACCENT_DANGER']))
                 self.jobs_table.setItem(row, 3, status_item)
                 
                 # Last activity
@@ -225,7 +229,7 @@ class WarmupProgressWidget(QWidget):
                 self.jobs_table.setItem(row, 4, last_activity_item)
             
             self.status_label.setText(
-                f"🔄 Real-time updates: {active} active, {queued} queued | "
+                f"Real-time updates: {active} active, {queued} queued | "
                 f"Last refresh: {datetime.now().strftime('%H:%M:%S')}"
             )
             

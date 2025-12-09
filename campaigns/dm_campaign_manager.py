@@ -166,12 +166,12 @@ class MessageTemplateEngine:
         """
         # Import InputValidator for sanitization
         try:
-            from utils import InputValidator
+            from utils.utils import InputValidator
             sanitize = lambda text: InputValidator.sanitize_text(str(text), max_length=100)
-        except ImportError:
-            # Fallback sanitization
+        except (ImportError, AttributeError):
+            # Fallback sanitization that preserves apostrophes
             import re
-            sanitize = lambda text: re.sub(r'[^\w\s@._-]', '', str(text))[:100]
+            sanitize = lambda text: re.sub(r'[^\w\s@._\'-]', '', str(text))[:100]
 
         message = template
 
@@ -542,39 +542,29 @@ class DMCampaignManager:
                 )
             ''')
             
-            # Add scheduling columns to existing tables (migration)
+            # Add scheduling columns to existing tables (migration) with explicit checks
             try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN scheduled_start TIMESTAMP')
-            except sqlite3.OperationalError:
-                pass  # Column exists
-            try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN scheduled_end TIMESTAMP')
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN active_hours_start INTEGER')
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN active_hours_end INTEGER')
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN active_days TEXT')
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN timezone TEXT DEFAULT "UTC"')
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN recurring INTEGER DEFAULT 0')
-            except sqlite3.OperationalError:
-                pass
-            try:
-                conn.execute('ALTER TABLE campaigns ADD COLUMN recurrence_interval INTEGER')
-            except sqlite3.OperationalError:
-                pass
+                col_rows = conn.execute("PRAGMA table_info(campaigns)").fetchall()
+                existing_cols = {row[1] for row in col_rows}
+            except Exception:
+                existing_cols = set()
+
+            def add_column(col_def: str, name: str):
+                if name in existing_cols:
+                    return
+                try:
+                    conn.execute(f"ALTER TABLE campaigns ADD COLUMN {col_def}")
+                except sqlite3.OperationalError:
+                    pass
+
+            add_column("scheduled_start TIMESTAMP", "scheduled_start")
+            add_column("scheduled_end TIMESTAMP", "scheduled_end")
+            add_column("active_hours_start INTEGER", "active_hours_start")
+            add_column("active_hours_end INTEGER", "active_hours_end")
+            add_column("active_days TEXT", "active_days")
+            add_column("timezone TEXT DEFAULT 'UTC'", "timezone")
+            add_column("recurring INTEGER DEFAULT 0", "recurring")
+            add_column("recurrence_interval INTEGER", "recurrence_interval")
             
             # Messages table
             conn.execute('''
@@ -907,7 +897,7 @@ class DMCampaignManager:
             campaign = self.active_campaigns[campaign_id]
             
             # Get member data from database
-            from member_scraper import MemberDatabase
+            from scraping.member_scraper import MemberDatabase
             member_db = MemberDatabase()
             
             # Get account clients - ensure accounts are started
@@ -1514,7 +1504,7 @@ class DMCampaignManager:
         """Mark user as messaged in member database and track for reply handling."""
         try:
             # Update member database to mark as messaged
-            from member_scraper import MemberDatabase
+            from scraping.member_scraper import MemberDatabase
             member_db = MemberDatabase()
             
             # Get member efficiently

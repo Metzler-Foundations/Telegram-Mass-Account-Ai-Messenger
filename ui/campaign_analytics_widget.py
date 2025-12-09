@@ -38,25 +38,32 @@ except ImportError:
 class CampaignSummaryCard(QFrame):
     """Summary card for campaign statistics."""
     
-    def __init__(self, title: str, value: str, subtitle: str = "", color: str = "#5865f2", parent=None):
+    def __init__(self, title: str, value: str, subtitle: str = "", color: str = None, parent=None):
         super().__init__(parent)
+        if color is None:
+            from ui.theme_manager import ThemeManager
+            color = ThemeManager.get_color("ACCENT_PRIMARY")
         self.setup_ui(title, value, subtitle, color)
     
     def setup_ui(self, title: str, value: str, subtitle: str, color: str):
-        self.setStyleSheet(f"""
+        self.setStyleSheet(
+            f"""
             QFrame {{
-                background-color: #2b2d31;
+                background-color: palette(base);
+                border: 1px solid palette(mid);
                 border-radius: 10px;
                 border-left: 4px solid {color};
             }}
-        """)
+            QLabel {{ background: transparent; color: palette(text); }}
+        """
+        )
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 12, 15, 12)
         layout.setSpacing(5)
         
         title_label = QLabel(title)
-        title_label.setStyleSheet("color: #b5bac1; font-size: 11px;")
+        title_label.setStyleSheet("font-size: 11px;")
         layout.addWidget(title_label)
         
         self.value_label = QLabel(value)
@@ -65,7 +72,7 @@ class CampaignSummaryCard(QFrame):
         
         if subtitle:
             self.subtitle_label = QLabel(subtitle)
-            self.subtitle_label.setStyleSheet("color: #b5bac1; font-size: 10px;")
+            self.subtitle_label.setStyleSheet("font-size: 10px; color: palette(mid);")
             layout.addWidget(self.subtitle_label)
         else:
             self.subtitle_label = None
@@ -86,11 +93,16 @@ class DeliveryRateChart(QWidget):
     
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+        
+        from ui.theme_manager import ThemeManager
+        chart_colors = ThemeManager.get_chart_colors()
+        c = ThemeManager.get_colors()
         
         if not CHARTS_AVAILABLE:
-            label = QLabel("📊 Charts require PyQt6-Charts package")
-            label.setStyleSheet("color: #b5bac1; font-size: 14px;")
+            label = QLabel("Charts require PyQt6-Charts package")
+            label.setStyleSheet(f"color: {chart_colors['text_secondary']}; font-size: 14px;")
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(label)
             return
@@ -98,10 +110,10 @@ class DeliveryRateChart(QWidget):
         # Create chart
         self.chart = QChart()
         self.chart.setTitle("Delivery Rate Over Time")
-        self.chart.setTitleBrush(QColor("#ffffff"))
-        self.chart.setBackgroundBrush(QColor("#2b2d31"))
+        self.chart.setTitleBrush(QColor(chart_colors['text']))
+        self.chart.setBackgroundBrush(QColor(chart_colors['surface']))
         self.chart.legend().setVisible(True)
-        self.chart.legend().setLabelColor(QColor("#b5bac1"))
+        self.chart.legend().setLabelColor(QColor(chart_colors['text_secondary']))
         
         # Create chart view
         self.chart_view = QChartView(self.chart)
@@ -115,14 +127,17 @@ class DeliveryRateChart(QWidget):
         
         self.chart.removeAllSeries()
         
+        from ui.theme_manager import ThemeManager
+        chart_colors = ThemeManager.get_chart_colors()
+        
         # Create series for sent and failed
         sent_series = QLineSeries()
         sent_series.setName("Sent")
-        sent_series.setColor(QColor("#23a559"))
+        sent_series.setColor(QColor(chart_colors['success']))
         
         failed_series = QLineSeries()
         failed_series.setName("Failed")
-        failed_series.setColor(QColor("#ed4245"))
+        failed_series.setColor(QColor(chart_colors['danger']))
         
         for point in data:
             timestamp = point.get('timestamp', 0)
@@ -147,8 +162,10 @@ class AccountPerformanceTable(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Title
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
         title = QLabel("📱 Account Performance")
-        title.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold;")
+        title.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-size: 14px; font-weight: bold;")
         layout.addWidget(title)
         
         # Table
@@ -158,27 +175,10 @@ class AccountPerformanceTable(QWidget):
             "Account", "Messages Sent", "Delivered", "Failed", "Blocked", "Success Rate", "Status"
         ])
         
-        self.table.setStyleSheet("""
-            QTableWidget {
-                background-color: #2b2d31;
-                border: none;
-                gridline-color: #3f4147;
-            }
-            QTableWidget::item {
-                padding: 8px;
-                color: #dbdee1;
-            }
-            QTableWidget::item:selected {
-                background-color: #5865f2;
-            }
-            QHeaderView::section {
-                background-color: #1e1f22;
-                color: #b5bac1;
-                padding: 8px;
-                border: none;
-                font-weight: bold;
-            }
-        """)
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setWordWrap(False)
         
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -203,18 +203,20 @@ class AccountPerformanceTable(QWidget):
             delivered = account.get('delivered', 0)
             self.table.setItem(row, 2, QTableWidgetItem(str(delivered)))
             
+            from ui.theme_manager import ThemeManager
+            c = ThemeManager.get_colors()
             # Failed
             failed = account.get('failed', 0)
             failed_item = QTableWidgetItem(str(failed))
             if failed > 0:
-                failed_item.setForeground(QColor('#ed4245'))
+                failed_item.setForeground(QColor(c['ACCENT_DANGER']))
             self.table.setItem(row, 3, failed_item)
             
             # Blocked
             blocked = account.get('blocked', 0)
             blocked_item = QTableWidgetItem(str(blocked))
             if blocked > 0:
-                blocked_item.setForeground(QColor('#eb459e'))
+                blocked_item.setForeground(QColor(c['ACCENT_WARNING']))
             self.table.setItem(row, 4, blocked_item)
             
             # Success rate
@@ -225,23 +227,23 @@ class AccountPerformanceTable(QWidget):
             
             rate_item = QTableWidgetItem(f"{rate:.1f}%")
             if rate >= 90:
-                rate_item.setForeground(QColor('#23a559'))
+                rate_item.setForeground(QColor(c['ACCENT_SUCCESS']))
             elif rate >= 70:
-                rate_item.setForeground(QColor('#f0b232'))
+                rate_item.setForeground(QColor(c['ACCENT_WARNING']))
             else:
-                rate_item.setForeground(QColor('#ed4245'))
+                rate_item.setForeground(QColor(c['ACCENT_DANGER']))
             self.table.setItem(row, 5, rate_item)
             
             # Status
             status = account.get('status', 'unknown')
             status_item = QTableWidgetItem(status.capitalize())
             status_colors = {
-                'active': '#23a559',
-                'paused': '#f0b232',
-                'error': '#ed4245',
-                'quarantined': '#ed4245'
+                'active': c['ACCENT_SUCCESS'],
+                'paused': c['ACCENT_WARNING'],
+                'error': c['ACCENT_DANGER'],
+                'quarantined': c['ACCENT_DANGER']
             }
-            status_item.setForeground(QColor(status_colors.get(status, '#b5bac1')))
+            status_item.setForeground(QColor(status_colors.get(status, c['TEXT_SECONDARY'])))
             self.table.setItem(row, 6, status_item)
 
 
@@ -257,8 +259,10 @@ class ErrorBreakdownWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         
         # Title
-        title = QLabel("❌ Error Breakdown")
-        title.setStyleSheet("color: #ffffff; font-size: 14px; font-weight: bold;")
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        title = QLabel("Error Breakdown")
+        title.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-size: 14px; font-weight: bold;")
         layout.addWidget(title)
         
         # Error list
@@ -270,12 +274,14 @@ class ErrorBreakdownWidget(QWidget):
         scroll.setWidget(self.errors_container)
         scroll.setWidgetResizable(True)
         scroll.setMaximumHeight(200)
-        scroll.setStyleSheet("""
-            QScrollArea {
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        scroll.setStyleSheet(f"""
+            QScrollArea {{
                 border: none;
-                background-color: #2b2d31;
+                background-color: {c['BG_TERTIARY']};
                 border-radius: 8px;
-            }
+            }}
         """)
         
         layout.addWidget(scroll)
@@ -289,8 +295,10 @@ class ErrorBreakdownWidget(QWidget):
                 item.widget().deleteLater()
         
         if not errors:
+            from ui.theme_manager import ThemeManager
+            c = ThemeManager.get_colors()
             label = QLabel("No errors recorded")
-            label.setStyleSheet("color: #b5bac1; padding: 10px;")
+            label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; padding: 10px;")
             self.errors_layout.addWidget(label)
             return
         
@@ -307,26 +315,28 @@ class ErrorBreakdownWidget(QWidget):
     
     def _create_error_row(self, error_type: str, count: int, total: int) -> QWidget:
         """Create a row for an error type."""
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
         widget = QWidget()
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(10, 5, 10, 5)
         
         # Error type label
         type_label = QLabel(error_type)
-        type_label.setStyleSheet("color: #dbdee1; font-size: 12px;")
+        type_label.setStyleSheet(f"color: {c['TEXT_PRIMARY']}; font-size: 12px;")
         layout.addWidget(type_label)
         
         layout.addStretch()
         
         # Count
         count_label = QLabel(str(count))
-        count_label.setStyleSheet("color: #ed4245; font-size: 12px; font-weight: bold;")
+        count_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-size: 12px; font-weight: bold;")
         layout.addWidget(count_label)
         
         # Percentage
         percent = (count / total) * 100 if total > 0 else 0
         percent_label = QLabel(f"({percent:.1f}%)")
-        percent_label.setStyleSheet("color: #b5bac1; font-size: 11px;")
+        percent_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 11px;")
         layout.addWidget(percent_label)
         
         return widget
@@ -347,27 +357,27 @@ class CampaignAnalyticsWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        
         # Header
         header = QHBoxLayout()
         
         title = QLabel("📈 Campaign Analytics")
-        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #ffffff;")
+        title.setStyleSheet(f"font-size: 20px; font-weight: bold; color: {c['TEXT_BRIGHT']};")
         header.addWidget(title)
         
         header.addStretch()
         
         # Empty state (initially hidden)
         self.empty_state_frame = QFrame()
-        self.empty_state_frame.setStyleSheet("""
-            QFrame {
-                background-color: #2b2d31;
-                border-radius: 10px;
-                padding: 60px;
-            }
-        """)
+        self.empty_state_frame.setObjectName("empty_state")
+        self.empty_state_frame.setStyleSheet(ThemeManager.get_empty_state_style())
         empty_layout = QVBoxLayout(self.empty_state_frame)
+        empty_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         empty_icon = QLabel("📭")
+        empty_icon.setObjectName("empty_state_icon")
         empty_icon_font = QFont()
         empty_icon_font.setPointSize(64)
         empty_icon.setFont(empty_icon_font)
@@ -375,17 +385,17 @@ class CampaignAnalyticsWidget(QWidget):
         empty_layout.addWidget(empty_icon)
         
         empty_title = QLabel("No Campaigns Yet")
+        empty_title.setObjectName("empty_state_title")
         empty_title_font = QFont()
         empty_title_font.setPointSize(20)
         empty_title_font.setBold(True)
         empty_title.setFont(empty_title_font)
         empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        empty_title.setStyleSheet("color: #b5bac1; margin-top: 20px;")
         empty_layout.addWidget(empty_title)
         
         self.empty_desc = QLabel("Create your first campaign to start tracking delivery and engagement metrics.")
+        self.empty_desc.setObjectName("empty_state_message")
         self.empty_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_desc.setStyleSheet("color: #949ba4; font-size: 13px; margin-top: 10px;")
         self.empty_desc.setWordWrap(True)
         empty_layout.addWidget(self.empty_desc)
         
@@ -400,7 +410,7 @@ class CampaignAnalyticsWidget(QWidget):
         header.addWidget(self.campaign_selector)
         
         # Refresh button
-        refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self.refresh_data)
         header.addWidget(refresh_btn)
         
@@ -417,64 +427,67 @@ class CampaignAnalyticsWidget(QWidget):
         # Summary cards
         summary_layout = QHBoxLayout()
         
-        self.total_messages_card = CampaignSummaryCard("Total Messages", "0", "Queued + Sent", "#5865f2")
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        self.total_messages_card = CampaignSummaryCard("Total Messages", "0", "Queued + Sent", c['ACCENT_PRIMARY'])
         summary_layout.addWidget(self.total_messages_card)
         
-        self.sent_card = CampaignSummaryCard("Successfully Sent", "0", "Delivered to users", "#23a559")
+        self.sent_card = CampaignSummaryCard("Successfully Sent", "0", "Delivered to users", c['ACCENT_SUCCESS'])
         summary_layout.addWidget(self.sent_card)
         
-        self.failed_card = CampaignSummaryCard("Failed", "0", "Could not deliver", "#ed4245")
+        self.failed_card = CampaignSummaryCard("Failed", "0", "Could not deliver", c['ACCENT_DANGER'])
         summary_layout.addWidget(self.failed_card)
         
-        self.blocked_card = CampaignSummaryCard("Blocked/Privacy", "0", "User restrictions", "#eb459e")
+        self.blocked_card = CampaignSummaryCard("Blocked/Privacy", "0", "User restrictions", c['ACCENT_WARNING'])
         summary_layout.addWidget(self.blocked_card)
         
-        self.success_rate_card = CampaignSummaryCard("Success Rate", "0%", "Overall delivery rate", "#f0b232")
+        self.success_rate_card = CampaignSummaryCard("Success Rate", "0%", "Overall delivery rate", c['ACCENT_WARNING'])
         summary_layout.addWidget(self.success_rate_card)
         
         layout.addLayout(summary_layout)
         
         # Progress bar for active campaign
         progress_group = QGroupBox("Campaign Progress")
-        progress_group.setStyleSheet("""
-            QGroupBox {
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
+        progress_group.setStyleSheet(f"""
+            QGroupBox {{
                 font-weight: bold;
-                border: 1px solid #3f4147;
+                border: 1px solid {c['BORDER_DEFAULT']};
                 border-radius: 8px;
                 margin-top: 10px;
                 padding-top: 10px;
-                color: #b5bac1;
-            }
-            QGroupBox::title {
+                color: {c['TEXT_SECONDARY']};
+            }}
+            QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px;
-            }
+            }}
         """)
         progress_layout = QVBoxLayout(progress_group)
         
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
+        self.progress_bar.setStyleSheet(f"""
+            QProgressBar {{
                 border: none;
                 border-radius: 5px;
-                background-color: #1e1f22;
+                background-color: {c['BG_PRIMARY']};
                 height: 20px;
                 text-align: center;
-                color: white;
-            }
-            QProgressBar::chunk {
+                color: {c['TEXT_BRIGHT']};
+            }}
+            QProgressBar::chunk {{
                 border-radius: 5px;
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                    stop:0 #5865f2, stop:1 #7289da);
-            }
+                background: {c['ACCENT_PRIMARY']};
+            }}
         """)
         progress_layout.addWidget(self.progress_bar)
         
         self.progress_label = QLabel("0 / 0 messages processed")
-        self.progress_label.setStyleSheet("color: #b5bac1;")
+        self.progress_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         self.progress_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         progress_layout.addWidget(self.progress_label)
         
@@ -482,26 +495,26 @@ class CampaignAnalyticsWidget(QWidget):
         
         # Tabs for different analytics views
         tabs = QTabWidget()
-        tabs.setStyleSheet("""
-            QTabWidget::pane {
+        tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
                 border: none;
                 background-color: transparent;
-            }
-            QTabBar::tab {
-                background-color: #1e1f22;
-                color: #b5bac1;
+            }}
+            QTabBar::tab {{
+                background-color: {c['BG_PRIMARY']};
+                color: {c['TEXT_SECONDARY']};
                 padding: 10px 20px;
                 margin-right: 2px;
                 border-top-left-radius: 8px;
                 border-top-right-radius: 8px;
-            }
-            QTabBar::tab:selected {
-                background-color: #5865f2;
-                color: white;
-            }
-            QTabBar::tab:hover:!selected {
-                background-color: #3f4147;
-            }
+            }}
+            QTabBar::tab:selected {{
+                background-color: {c['ACCENT_PRIMARY']};
+                color: {c['TEXT_BRIGHT']};
+            }}
+            QTabBar::tab:hover:!selected {{
+                background-color: {c['BG_TERTIARY']};
+            }}
         """)
         
         # Account Performance Tab
@@ -510,15 +523,15 @@ class CampaignAnalyticsWidget(QWidget):
         
         # Delivery Chart Tab
         self.delivery_chart = DeliveryRateChart()
-        tabs.addTab(self.delivery_chart, "📊 Delivery Trends")
+        tabs.addTab(self.delivery_chart, "Delivery Trends")
         
         # Error Breakdown Tab
         self.error_breakdown = ErrorBreakdownWidget()
-        tabs.addTab(self.error_breakdown, "❌ Error Analysis")
+        tabs.addTab(self.error_breakdown, "Error Analysis")
         
         # Risk Analysis Tab
         risk_widget = self._create_risk_tab()
-        tabs.addTab(risk_widget, "⚠️ Risk Analysis")
+        tabs.addTab(risk_widget, "Risk Analysis")
         
         layout.addWidget(tabs)
         
@@ -526,14 +539,14 @@ class CampaignAnalyticsWidget(QWidget):
         status_layout = QHBoxLayout()
         
         self.status_label = QLabel("Select a campaign to view analytics")
-        self.status_label.setStyleSheet("color: #b5bac1;")
+        self.status_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         status_layout.addWidget(self.status_label)
         
         status_layout.addStretch()
         
         self.auto_refresh = QCheckBox("Auto-refresh")
         self.auto_refresh.setChecked(True)
-        self.auto_refresh.setStyleSheet("color: #b5bac1;")
+        self.auto_refresh.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
         status_layout.addWidget(self.auto_refresh)
         
         layout.addLayout(status_layout)
@@ -542,28 +555,34 @@ class CampaignAnalyticsWidget(QWidget):
         """Create risk analysis tab."""
         widget = QWidget()
         layout = QVBoxLayout(widget)
+        from ui.theme_manager import ThemeManager
+        c = ThemeManager.get_colors()
         
         # Risk report section
         report_group = QGroupBox("Campaign Risk Report")
-        report_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #3f4147;
-                border-radius: 8px;
+        report_group.setStyleSheet(
+            f"""
+            QGroupBox {{
+                font-weight: 700;
+                border: 0.5px solid {c['BORDER_DEFAULT']};
+                border-radius: 10px;
                 margin-top: 10px;
-                padding-top: 10px;
-                color: #b5bac1;
-            }
-            QGroupBox::title {
+                padding: 10px 12px 12px 12px;
+                color: {c['TEXT_PRIMARY']};
+                background-color: {c['BG_SECONDARY']};
+            }}
+            QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-        """)
+                left: 12px;
+                padding: 0 6px;
+                color: {c['TEXT_SECONDARY']};
+            }}
+        """
+        )
         report_layout = QVBoxLayout(report_group)
         
         self.risk_text = QLabel("No risk analysis available. Select a campaign.")
-        self.risk_text.setStyleSheet("color: #b5bac1; padding: 15px;")
+        self.risk_text.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; padding: 15px;")
         self.risk_text.setWordWrap(True)
         report_layout.addWidget(self.risk_text)
         
@@ -575,7 +594,7 @@ class CampaignAnalyticsWidget(QWidget):
         rec_layout = QVBoxLayout(rec_group)
         
         self.recommendations_text = QLabel("No recommendations available.")
-        self.recommendations_text.setStyleSheet("color: #b5bac1; padding: 15px;")
+        self.recommendations_text.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; padding: 15px;")
         self.recommendations_text.setWordWrap(True)
         rec_layout.addWidget(self.recommendations_text)
         
@@ -755,18 +774,20 @@ class CampaignAnalyticsWidget(QWidget):
                 return
             
             # Build risk text
+            from ui.theme_manager import ThemeManager
+            c = ThemeManager.get_colors()
             risk_level = report.get('overall_risk', 'unknown')
             risk_colors = {
-                'low': '#23a559',
-                'high': '#eb459e',
-                'critical': '#ed4245'
+                'low': c['ACCENT_SUCCESS'],
+                'high': c['ACCENT_WARNING'],
+                'critical': c['ACCENT_DANGER']
             }
             
             risk_html = f"""
-            <p style="color: {risk_colors.get(risk_level, '#b5bac1')}; font-size: 14px; font-weight: bold;">
+            <p style="color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])}; font-size: 14px; font-weight: bold;">
                 Overall Risk: {risk_level.upper()}
             </p>
-            <p style="color: #b5bac1; font-size: 12px;">
+            <p style="color: {c['TEXT_SECONDARY']}; font-size: 12px;">
                 Accounts monitored: {len(report.get('accounts', []))}
             </p>
             """
@@ -775,8 +796,8 @@ class CampaignAnalyticsWidget(QWidget):
             high_risk = [a for a in report.get('accounts', []) if a.get('risk_level') in ['high', 'critical']]
             if high_risk:
                 risk_html += f"""
-                <p style="color: #ed4245; font-size: 12px;">
-                    ⚠️ {len(high_risk)} accounts at high risk
+                <p style="color: {c['ACCENT_DANGER']}; font-size: 12px;">
+                    {len(high_risk)} accounts at high risk
                 </p>
                 """
             
@@ -785,13 +806,13 @@ class CampaignAnalyticsWidget(QWidget):
             # Update recommendations
             recommendations = report.get('recommendations', [])
             if recommendations:
-                rec_html = "<ul style='color: #b5bac1;'>"
+                rec_html = f"<ul style='color: {c['TEXT_SECONDARY']};'>"
                 for rec in recommendations:
                     rec_html += f"<li>{rec}</li>"
                 rec_html += "</ul>"
                 self.recommendations_text.setText(rec_html)
             else:
-                self.recommendations_text.setText("✅ No recommendations - campaign is healthy")
+                self.recommendations_text.setText("No recommendations - campaign is healthy")
             
         except Exception as e:
             logger.error(f"Failed to get risk analysis: {e}")

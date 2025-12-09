@@ -3,25 +3,18 @@
 
 from PyQt6.QtWidgets import QLabel, QGraphicsOpacityEffect
 from PyQt6.QtCore import QTimer, QPropertyAnimation, Qt
-from PyQt6.QtGui import QPalette
 
 
 class ToastNotification(QLabel):
     """Toast notification widget."""
     
-    def __init__(self, parent, message: str, duration: int = 3000):
+    def __init__(self, parent, message: str, duration: int = 3000, variant: str = "info"):
         super().__init__(message, parent)
         
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("""
-            QLabel {
-                background-color: rgba(50, 50, 50, 200);
-                color: white;
-                padding: 10px 20px;
-                border-radius: 5px;
-                font-size: 12px;
-            }
-        """)
+        self.setObjectName("toast")
+        self.setProperty("variant", variant)
+        self.setStyleSheet("")  # Use global QSS
         
         self.adjustSize()
         
@@ -49,9 +42,9 @@ class ToastNotification(QLabel):
         self.fade_animation.start()
 
 
-def show_toast(parent, message: str, duration: int = 3000):
+def show_toast(parent, message: str, duration: int = 3000, variant: str = "info"):
     """Show toast notification."""
-    toast = ToastNotification(parent, message, duration)
+    toast = ToastNotification(parent, message, duration, variant)
     toast.show()
     return toast
 

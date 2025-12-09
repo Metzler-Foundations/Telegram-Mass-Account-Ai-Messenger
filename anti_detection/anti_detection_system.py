@@ -512,10 +512,17 @@ class AntiDetectionSystem:
         self.detection_events = []
         self.is_active = False
 
+        # Thread synchronization
+        self._events_lock = threading.RLock()
+        self._active_lock = threading.Lock()
+
     def activate(self):
         """Activate all anti-detection measures."""
         try:
-            self.is_active = True
+            with self._active_lock:
+                if self.is_active:
+                    return  # Already active
+                self.is_active = True
 
             # Apply system masking
             self.system_masker.apply_system_masking()
@@ -530,7 +537,8 @@ class AntiDetectionSystem:
 
     def deactivate(self):
         """Deactivate anti-detection measures."""
-        self.is_active = False
+        with self._active_lock:
+            self.is_active = False
         logger.info("Anti-detection system deactivated")
 
     def update_settings(self, settings: Dict):
@@ -563,9 +571,11 @@ class AntiDetectionSystem:
 
             # Update enabled status
             if 'enabled' in settings:
-                if settings['enabled'] and not self.is_active:
+                with self._active_lock:
+                    current_active = self.is_active
+                if settings['enabled'] and not current_active:
                     self.activate()
-                elif not settings['enabled'] and self.is_active:
+                elif not settings['enabled'] and current_active:
                     self.deactivate()
 
             logger.info(f"Anti-detection settings updated: {settings}")
@@ -594,37 +604,41 @@ class AntiDetectionSystem:
         # Check CPU usage patterns
         cpu_percent = psutil.cpu_percent(interval=1)
         if cpu_percent > 90:  # Suspiciously high CPU usage
-            self.detection_events.append({
-                "type": "high_cpu",
-                "value": cpu_percent,
-                "timestamp": datetime.now()
-            })
+            with self._events_lock:
+                self.detection_events.append({
+                    "type": "high_cpu",
+                    "value": cpu_percent,
+                    "timestamp": datetime.now()
+                })
 
         # Check memory usage
         memory = psutil.virtual_memory()
         if memory.percent > 95:  # Suspiciously high memory usage
-            self.detection_events.append({
-                "type": "high_memory",
-                "value": memory.percent,
-                "timestamp": datetime.now()
-            })
+            with self._events_lock:
+                self.detection_events.append({
+                    "type": "high_memory",
+                    "value": memory.percent,
+                    "timestamp": datetime.now()
+                })
 
         # Check for suspicious processes
         suspicious_processes = ["wireshark", "tcpdump", "ettercap", "burp"]
         for proc in psutil.process_iter(['name']):
             if any(susp_proc in proc.info['name'].lower() for susp_proc in suspicious_processes):
-                self.detection_events.append({
-                    "type": "suspicious_process",
-                    "process": proc.info['name'],
-                    "timestamp": datetime.now()
-                })
+                with self._events_lock:
+                    self.detection_events.append({
+                        "type": "suspicious_process",
+                        "process": proc.info['name'],
+                        "timestamp": datetime.now()
+                    })
 
     def get_detection_risk_level(self) -> str:
         """Get current detection risk level."""
-        recent_events = [
-            event for event in self.detection_events
-            if (datetime.now() - event["timestamp"]).seconds < 3600  # Last hour
-        ]
+        with self._events_lock:
+            recent_events = [
+                event for event in self.detection_events
+                if (datetime.now() - event["timestamp"]).seconds < 3600  # Last hour
+            ]
 
         if len(recent_events) >= 5:
             return "HIGH"
@@ -687,8 +701,10 @@ class AntiDetectionSystem:
 
     def get_system_status(self) -> Dict:
         """Get comprehensive system status."""
+        with self._active_lock:
+            is_active = self.is_active
         return {
-            "anti_detection_active": self.is_active,
+            "anti_detection_active": is_active,
             "detection_risk_level": self.get_detection_risk_level(),
             "recent_detection_events": len([
                 e for e in self.detection_events
@@ -1212,8 +1228,30 @@ class AccountQuarantineManager:
     
     def __init__(self, db_path: str = "quarantine.db"):
         self.db_path = db_path
+        self._connection_pool = None
+        try:
+            from database.connection_pool import get_pool
+            self._connection_pool = get_pool(db_path)
+        except:
+            pass
         self._init_database()
         self.quarantine_callbacks: List[Callable[[str, QuarantineReason], None]] = []
+    
+    def _get_connection(self):
+        """Get database connection."""
+        if self._connection_pool:
+            return self._connection_pool.get_connection()
+        else:
+            import sqlite3
+            from contextlib import contextmanager
+            @contextmanager
+            def direct_connection():
+                conn = sqlite3.connect(self.db_path)
+                try:
+                    yield conn
+                finally:
+                    conn.close()
+            return direct_connection()
     
     def _init_database(self):
         """Initialize quarantine database."""

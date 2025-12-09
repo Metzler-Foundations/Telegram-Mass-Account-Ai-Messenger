@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+  #!/usr/bin/env python3
 """
 Settings Window - Configuration interface for the Telegram bot
 """
@@ -9,9 +9,11 @@ import json
 import datetime
 import threading
 import time
-from typing import Dict, Any, Optional, List
+import asyncio
+from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 import requests
+from concurrent.futures import ThreadPoolExecutor
 
 from PyQt6.QtWidgets import (
     QDialog, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
@@ -19,14 +21,19 @@ from PyQt6.QtWidgets import (
     QSpinBox, QDoubleSpinBox, QCheckBox, QGroupBox, QTabWidget,
     QScrollArea, QMessageBox, QFileDialog, QListWidget,
     QListWidgetItem, QProgressBar, QInputDialog, QFrame,
-    QToolButton, QApplication, QProgressDialog
+    QToolButton, QApplication, QProgressDialog, QSizePolicy
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QPropertyAnimation, QCoreApplication
 from PyQt6.QtGui import QIcon, QFont
 
 from utils.user_helpers import ValidationHelper, get_tooltip
 from core.error_handler import ErrorHandler
+from ui.theme_manager import ThemeManager
 import webbrowser
+from integrations.api_key_manager import APIKeyManager
+from pyrogram import Client
+from pyrogram.raw.functions.help import GetNearestDc
+from pyrogram.errors import SessionPasswordNeeded
 
 logger = logging.getLogger(__name__)
 
@@ -340,15 +347,28 @@ class QCollapsibleGroupBox(QGroupBox):
 class APISettingsWidget(QWidget):
     """API and Authentication settings widget."""
 
-    # Styles for validation feedback
-    VALID_STYLE = "border: 1px solid #23a559;"
-    INVALID_STYLE = "border: 1px solid #ed4245;"
+    # Styles for validation feedback - will be set dynamically
+    VALID_STYLE = None
+    INVALID_STYLE = None
     NORMAL_STYLE = ""
+    
+    @classmethod
+    def _get_styles(cls):
+        """Get validation styles from theme."""
+        if cls.VALID_STYLE is None:
+            c = ThemeManager.get_colors()
+            cls.VALID_STYLE = f"border: 1px solid {c['ACCENT_SUCCESS']};"
+            cls.INVALID_STYLE = f"border: 1px solid {c['ACCENT_DANGER']};"
+        return cls.VALID_STYLE, cls.INVALID_STYLE
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
         self._setup_validation()
+
+    def _update_checklist(self, *args, **kwargs):
+        """Stub checklist updater to keep signal connections safe."""
+        return
 
     def _setup_validation(self):
         """Set up real-time validation for input fields."""
@@ -377,38 +397,41 @@ class APISettingsWidget(QWidget):
             self.api_hash_edit.setStyleSheet(self.NORMAL_STYLE)
             return True
         import re
+        valid_style, invalid_style = self._get_styles()
         if len(text) == 32 and re.match(r'^[a-f0-9]{32}$', text.lower()):
-            self.api_hash_edit.setStyleSheet(self.VALID_STYLE)
+            self.api_hash_edit.setStyleSheet(valid_style)
             return True
         else:
-            self.api_hash_edit.setStyleSheet(self.INVALID_STYLE)
+            self.api_hash_edit.setStyleSheet(invalid_style)
             return False
 
     def _validate_phone(self):
         """Validate phone number field."""
+        valid_style, invalid_style = self._get_styles()
         text = self.phone_edit.text().strip()
         if not text:
             self.phone_edit.setStyleSheet(self.NORMAL_STYLE)
             return True
         cleaned = text.replace(" ", "").replace("-", "")
         if cleaned.startswith("+") and cleaned[1:].isdigit() and 10 <= len(cleaned) <= 16:
-            self.phone_edit.setStyleSheet(self.VALID_STYLE)
+            self.phone_edit.setStyleSheet(valid_style)
             return True
         else:
-            self.phone_edit.setStyleSheet(self.INVALID_STYLE)
+            self.phone_edit.setStyleSheet(invalid_style)
             return False
 
     def _validate_gemini_key(self):
         """Validate Gemini API key field."""
+        valid_style, invalid_style = self._get_styles()
         text = self.gemini_key_edit.text().strip()
         if not text:
             self.gemini_key_edit.setStyleSheet(self.NORMAL_STYLE)
             return True
         if text.startswith("AI") and len(text) >= 30:
-            self.gemini_key_edit.setStyleSheet(self.VALID_STYLE)
+            self.gemini_key_edit.setStyleSheet(valid_style)
             return True
         else:
-            self.gemini_key_edit.setStyleSheet(self.INVALID_STYLE)
+            self.gemini_key_edit.setStyleSheet(invalid_style)
             return False
 
     def validate_all(self) -> tuple:
@@ -508,6 +531,11 @@ class APISettingsWidget(QWidget):
 
         # Advanced settings (collapsible)
         advanced_group = QCollapsibleGroupBox("Advanced Settings")
+        # Ensure advanced section is expanded and interactive by default
+        try:
+            advanced_group.setChecked(True)
+        except Exception:
+            pass
         # Note: Will be expanded if in wizard mode
         advanced_layout = QVBoxLayout()
         advanced_layout.setSpacing(12)
@@ -544,11 +572,14 @@ class APISettingsWidget(QWidget):
             "TextVerified",
             "DaisySMS"
         ])
+        self.sms_service_combo.setEnabled(True)
+        self.sms_service_combo.currentTextChanged.connect(self._update_checklist)
         sms_layout.addRow("SMS Service:", self.sms_service_combo)
 
         self.sms_api_key_edit = QLineEdit()
         self.sms_api_key_edit.setPlaceholderText("SMS service API key")
         self.sms_api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.sms_api_key_edit.textChanged.connect(self._update_checklist)
         sms_layout.addRow("SMS API Key:", self.sms_api_key_edit)
 
         sms_group.setLayout(sms_layout)
@@ -880,7 +911,8 @@ class TelegramStepWidget(QWidget):
             "• Phone: +1234567890 (with country code)"
         )
         help_text.setWordWrap(True)
-        help_text.setStyleSheet("color: #a1a1aa; padding: 8px; background-color: #2b2d31; border-radius: 4px;")
+        c = ThemeManager.get_colors()
+        help_text.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;")
         layout.addWidget(help_text)
         
         layout.addStretch()
@@ -927,7 +959,8 @@ class GeminiStepWidget(QWidget):
             "<b>Format:</b> API key starts with 'AIza' and is 39+ characters long"
         )
         help_text.setWordWrap(True)
-        help_text.setStyleSheet("color: #a1a1aa; padding: 8px; background-color: #2b2d31; border-radius: 4px;")
+        c = ThemeManager.get_colors()
+        help_text.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; padding: 8px; background-color: {c['BG_TERTIARY']}; border-radius: 4px;")
         layout.addWidget(help_text)
         
         layout.addStretch()
@@ -1013,7 +1046,8 @@ class SMSProviderSetupWidget(QWidget):
         # Provider description
         self.provider_description = QLabel()
         self.provider_description.setWordWrap(True)
-        self.provider_description.setStyleSheet("color: #a1a1aa; font-style: italic; padding: 8px;")
+        c = ThemeManager.get_colors()
+        self.provider_description.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-style: italic; padding: 8px;")
         provider_layout.addWidget(self.provider_description)
         
         # API Key input
@@ -1115,19 +1149,20 @@ class SMSProviderSetupWidget(QWidget):
         """Test the API key (basic validation for now)."""
         api_key = self.api_key_edit.text().strip()
         
+        c = ThemeManager.get_colors()
         if not api_key:
-            self.status_label.setText("❌ Please enter an API key first")
-            self.status_label.setStyleSheet("color: #ed4245;")
+            self.status_label.setText("Error: Please enter an API key first")
+            self.status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']};")
             return
         
         if len(api_key) < 10:
-            self.status_label.setText("⚠️ API key seems too short")
-            self.status_label.setStyleSheet("color: #f59e0b;")
+            self.status_label.setText("Warning: API key seems too short")
+            self.status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
             return
         
         # Basic validation passed
-        self.status_label.setText("✅ API key format looks valid (actual connectivity will be tested during account creation)")
-        self.status_label.setStyleSheet("color: #23a559;")
+        self.status_label.setText("Valid: API key format looks valid (actual connectivity will be tested during account creation)")
+        self.status_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']};")
     
     def is_step_complete(self) -> tuple[bool, List[str]]:
         """Check if SMS provider step is complete."""
@@ -1177,25 +1212,43 @@ class SettingsWindow(QDialog):
         self.setWindowTitle("Settings - Telegram Auto-Reply Bot")
         self.setAccessibleName("Bot Configuration Settings")
         self.setAccessibleDescription("Dialog for configuring Telegram bot settings and preferences")
-        self.resize(900, 700)
+        
+        # Smaller, more comfortable size
+        self.resize(850, 650)
+        self.setMinimumSize(700, 500)
+        
         self.settings_data = {}
         self.balance_cache: Dict[tuple[str, str], Dict[str, Any]] = {}
+        self._user_has_interacted = False
         
         # CRITICAL: Prevent dialog from closing parent window when dismissed
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        
+        # Set window flags to ensure it's a proper child dialog that won't close parent
+        if parent:
+            self.setWindowFlags(
+                Qt.WindowType.Dialog |
+                Qt.WindowType.WindowTitleHint |
+                Qt.WindowType.WindowCloseButtonHint
+            )
+            self.setWindowModality(Qt.WindowModality.ApplicationModal)
         
         self.load_settings()
         
         # Initialize wizard manager
         self.wizard_manager = SetupWizardManager(self.settings_data)
         self.wizard_mode = force_wizard or self.wizard_manager.is_wizard_needed()
+        self.suppress_intro_warnings = self.wizard_mode or not Path(".wizard_complete").exists()
         self.current_wizard_step = 0
         
         if self.wizard_mode:
             self.current_wizard_step = self.wizard_manager.get_starting_step()
 
-        # Apply theme
+        # Apply theme first
         self.apply_theme()
+        
+        # Then apply dialog border (overrides theme to ensure visibility)
+        self._apply_dialog_border()
 
         self.setup_ui()
         self.load_ui_from_settings()
@@ -1206,6 +1259,54 @@ class SettingsWindow(QDialog):
         if self.wizard_mode:
             self._show_wizard_step(self.current_wizard_step)
 
+    def _show_warning(self, title: str, message: str, user_initiated: bool = False):
+        """Show warning dialogs, suppressing first-launch noise until user acts."""
+        if user_initiated:
+            self._user_has_interacted = True
+        if getattr(self, "suppress_intro_warnings", False) and not user_initiated:
+            logger.info(f"Suppressing startup warning: {title}")
+            return
+        ErrorHandler.safe_warning(self, title, message)
+
+    def closeEvent(self, event):
+        """Ensure closing the dialog does not exit the application."""
+        try:
+            event.accept()
+            self.hide()
+        except Exception:
+            event.accept()
+
+    def _apply_dialog_border(self):
+        """Apply unmissable border styling to dialog - modern design principles."""
+        # Use a simple, guaranteed-to-work approach
+        # Set window to stay on top temporarily to ensure visibility
+        from PyQt6.QtCore import Qt
+        from ui.theme_manager import ThemeManager
+        
+        # Make window modal and ensure it's visible
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+        
+        c = ThemeManager.get_colors()
+        
+        # Apply a simple, visible border that won't fail parsing
+        simple_border_style = f"""
+            QDialog {{
+                border: 2px solid {c["ACCENT_PRIMARY"]};
+            }}
+        """
+        
+        # Apply border style directly
+        current_style = self.styleSheet()
+        if current_style:
+            # Combine styles
+            self.setStyleSheet(current_style + simple_border_style)
+        else:
+            self.setStyleSheet(simple_border_style)
+        
+        # Also set background to ensure contrast using theme
+        dialog_style = ThemeManager.get_dialog_style()
+        self.setStyleSheet(self.styleSheet() + dialog_style)
+    
     def _setup_accessibility(self):
         """Set up accessibility features for the settings dialog."""
         # Set up keyboard navigation
@@ -1305,16 +1406,32 @@ class SettingsWindow(QDialog):
     def apply_theme(self):
         """Apply clean professional theme."""
         try:
-            from ui_redesign import DISCORD_THEME
-            self.setStyleSheet(DISCORD_THEME)
-        except ImportError:
-            logger.warning("Could not import theme")
+            app = QApplication.instance()
+            # Keep whatever theme the user selected; don't force dark.
+            ThemeManager.set_theme(ThemeManager.current_theme, app=app, persist=False)
+        except Exception as exc:
+            logger.warning(f"Could not apply theme, using fallback: {exc}")
+            c = ThemeManager.get_colors()
+            self.setStyleSheet(
+                f"""
+                QWidget {{
+                    background-color: {c['BG_PRIMARY']};
+                    color: {c['TEXT_PRIMARY']};
+                }}
+                QLineEdit {{
+                    background-color: {c['BG_PRIMARY']};
+                    border: 1px solid {c['BORDER_DEFAULT']};
+                    color: {c['TEXT_PRIMARY']};
+                }}
+            """
+            )
 
     def setup_ui(self):
         """Set up the user interface."""
+        c = ThemeManager.get_colors()
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(10)
+        layout.setContentsMargins(24, 24, 24, 20)
+        layout.setSpacing(14)
 
         # Wizard progress indicator (only shown in wizard mode)
         if self.wizard_mode:
@@ -1324,19 +1441,19 @@ class SettingsWindow(QDialog):
         # Title
         if self.wizard_mode:
             title_label = QLabel("Initial Setup Wizard")
-            title_label.setStyleSheet("font-size: 24px; font-weight: 600; color: #e4e4e7; margin-bottom: 8px;")
+            title_label.setStyleSheet(f"font-size: 26px; font-weight: 700; color: {c['TEXT_BRIGHT']}; margin-bottom: 6px; letter-spacing: -0.2px;")
             layout.addWidget(title_label)
             
             subtitle_label = QLabel("Let's configure the essential settings to get you started.")
-            subtitle_label.setStyleSheet("color: #a1a1aa; font-size: 14px; margin-bottom: 20px;")
+            subtitle_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.5em; margin-bottom: 18px;")
             layout.addWidget(subtitle_label)
         else:
             title_label = QLabel("Bot Configuration")
-            title_label.setStyleSheet("font-size: 24px; font-weight: 600; color: #e4e4e7; margin-bottom: 8px;")
+            title_label.setStyleSheet(f"font-size: 24px; font-weight: 600; color: {c['TEXT_BRIGHT']}; margin-bottom: 8px;")
             layout.addWidget(title_label)
 
             subtitle_label = QLabel("Configure API keys, account creation, anti-detection, and advanced features.")
-            subtitle_label.setStyleSheet("color: #a1a1aa; font-size: 14px; margin-bottom: 20px;")
+            subtitle_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 14px; margin-bottom: 20px;")
             layout.addWidget(subtitle_label)
 
         # Create widgets first
@@ -1347,11 +1464,30 @@ class SettingsWindow(QDialog):
         
         # Wizard content area or Tab widget
         if self.wizard_mode:
-            # In wizard mode, show single step at a time
+            # In wizard mode, show single step at a time with scrolling
+            scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            scroll_area.setStyleSheet("""
+                QScrollArea {
+                    background-color: transparent;
+                    border: none;
+                }
+                QScrollArea > QWidget > QWidget {
+                    background-color: transparent;
+                    padding: 4px 0 8px 0;
+                }
+            """)
+            
             self.wizard_content_widget = QWidget()
             self.wizard_content_layout = QVBoxLayout(self.wizard_content_widget)
             self.wizard_content_layout.setContentsMargins(0, 0, 0, 0)
-            layout.addWidget(self.wizard_content_widget)
+            self.wizard_content_layout.addStretch()  # Push content to top
+            
+            scroll_area.setWidget(self.wizard_content_widget)
+            layout.addWidget(scroll_area, 1)  # Give it stretch factor
             
             # Create wizard step widgets
             self._create_wizard_steps()
@@ -1369,35 +1505,51 @@ class SettingsWindow(QDialog):
             self.tab_widget.addTab(self.create_account_creator_tab(), "Account Factory")
             self.tab_widget.addTab(self.create_advanced_tab(), "Advanced Controls")
 
-        # Buttons
-        button_layout = QHBoxLayout()
+        # Buttons (sticky footer)
+        button_bar = QFrame()
+        button_bar.setObjectName("wizard_button_bar")
+        button_bar.setStyleSheet(
+            f"""
+            QFrame#wizard_button_bar {{
+                background-color: {c["BG_SECONDARY"]};
+                border-top: 1px solid {c["BORDER_DEFAULT"]};
+                border-radius: 12px;
+                padding: 14px 16px;
+            }}
+            """
+        )
+        # Add subtle elevation to footer in wizard mode
+        if self.wizard_mode:
+            ThemeManager.apply_shadow(button_bar, blur_radius=36, y_offset=14, opacity=0.45)
+        button_layout = QHBoxLayout(button_bar)
+        button_layout.setContentsMargins(0, 0, 0, 0)
         button_layout.setSpacing(12)
 
         if self.wizard_mode:
             # Wizard navigation buttons
-            self.wizard_prev_button = QPushButton("← Previous")
+            self.wizard_prev_button = QPushButton("Back")
             self.wizard_prev_button.clicked.connect(self.previous_step)
             self.wizard_prev_button.setObjectName("secondary")
-            self.wizard_prev_button.setFixedWidth(100)
+            self.wizard_prev_button.setMinimumWidth(120)
             self.wizard_prev_button.setAutoDefault(False)
             self.wizard_prev_button.setDefault(False)
             button_layout.addWidget(self.wizard_prev_button)
             
             button_layout.addStretch()
             
-            self.wizard_skip_button = QPushButton("Skip")
+            self.wizard_skip_button = QPushButton("Skip for now")
             self.wizard_skip_button.clicked.connect(self.skip_optional)
             self.wizard_skip_button.setObjectName("secondary")
-            self.wizard_skip_button.setFixedWidth(80)
+            self.wizard_skip_button.setMinimumWidth(120)
             self.wizard_skip_button.setAutoDefault(False)
             self.wizard_skip_button.setDefault(False)
             self.wizard_skip_button.setVisible(False)  # Only show on optional step
             button_layout.addWidget(self.wizard_skip_button)
             
-            self.wizard_next_button = QPushButton("Next →")
+            self.wizard_next_button = QPushButton("Next")
             self.wizard_next_button.clicked.connect(self.next_step)
             self.wizard_next_button.setObjectName("primary")
-            self.wizard_next_button.setFixedWidth(100)
+            self.wizard_next_button.setMinimumWidth(148)  # Keeps long labels from truncating
             self.wizard_next_button.setAutoDefault(False)
             self.wizard_next_button.setDefault(False)
             button_layout.addWidget(self.wizard_next_button)
@@ -1409,14 +1561,14 @@ class SettingsWindow(QDialog):
             # Debounce to prevent double-saves
             from utils.button_debouncer import protect_button
             protect_button(save_button, self.save_settings, debounce_ms=1500)
-            save_button.setFixedWidth(120)
+            save_button.setFixedWidth(130)
             save_button.setAutoDefault(False)
             save_button.setDefault(False)
             button_layout.addWidget(save_button)
 
             test_button = QPushButton("Test Configuration")
             test_button.clicked.connect(self.test_configuration)
-            test_button.setFixedWidth(140)
+            test_button.setFixedWidth(150)
             test_button.setAutoDefault(False)
             test_button.setDefault(False)
             button_layout.addWidget(test_button)
@@ -1424,23 +1576,34 @@ class SettingsWindow(QDialog):
             cancel_button = QPushButton("Cancel")
             cancel_button.clicked.connect(self.reject)
             cancel_button.setObjectName("secondary")
-            cancel_button.setFixedWidth(80)
+            cancel_button.setFixedWidth(96)
             cancel_button.setAutoDefault(False)
             cancel_button.setDefault(False)
             button_layout.addWidget(cancel_button)
 
             button_layout.addStretch()
             
-        layout.addLayout(button_layout)
+        layout.addWidget(button_bar)
 
     def _create_progress_indicator(self) -> QWidget:
         """Create the wizard progress indicator."""
         progress_widget = QFrame()
         progress_widget.setFrameShape(QFrame.Shape.StyledPanel)
-        progress_widget.setStyleSheet("background-color: #2b2d31; border-radius: 8px; padding: 16px;")
+        c = ThemeManager.get_colors()
+        progress_widget.setStyleSheet(
+            f"""
+            QFrame {{
+                background-color: {c['BG_SECONDARY']};
+                border: 1px solid {c['BORDER_DEFAULT']};
+                border-radius: 14px;
+                padding: 14px 16px;
+            }}
+            """
+        )
         
         progress_layout = QHBoxLayout(progress_widget)
-        progress_layout.setSpacing(8)
+        progress_layout.setSpacing(12)
+        progress_layout.setContentsMargins(4, 2, 4, 2)
         
         self.progress_labels = []
         steps = [
@@ -1454,25 +1617,27 @@ class SettingsWindow(QDialog):
             if i > 0:
                 # Add arrow separator
                 arrow_label = QLabel("→")
-                arrow_label.setStyleSheet("color: #71717a; font-size: 16px;")
+                arrow_label.setStyleSheet(f"color: {c['TEXT_DISABLED']}; font-size: 16px;")
                 progress_layout.addWidget(arrow_label)
             
             # Step container
             step_container = QHBoxLayout()
-            step_container.setSpacing(6)
+            step_container.setSpacing(8)
             
             # Step number circle
             step_num = QLabel(num)
-            step_num.setFixedSize(28, 28)
+            step_num.setFixedSize(30, 30)
             step_num.setAlignment(Qt.AlignmentFlag.AlignCenter)
             step_num.setStyleSheet(
-                "background-color: #3f3f46; color: #a1a1aa; "
-                "border-radius: 14px; font-weight: 600;"
+                f"background-color: {c['BG_TERTIARY']}; color: {c['TEXT_SECONDARY']}; "
+                "border-radius: 15px; font-weight: 600; font-size: 14px;"
             )
             
             # Step name
             step_name = QLabel(name)
-            step_name.setStyleSheet("color: #a1a1aa;")
+            step_name.setMinimumWidth(132)
+            step_name.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-weight: 600;")
+            step_name.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
             
             step_container.addWidget(step_num)
             step_container.addWidget(step_name)
@@ -1491,31 +1656,32 @@ class SettingsWindow(QDialog):
     
     def _update_progress_indicator(self):
         """Update the progress indicator to show current step with checkmarks."""
+        c = ThemeManager.get_colors()
         for i, (num_label, name_label) in enumerate(self.progress_labels):
             if i < self.current_wizard_step:
                 # Completed step - show checkmark
                 num_label.setText("✓")
                 num_label.setStyleSheet(
-                    "background-color: #23a559; color: #ffffff; "
+                    f"background-color: {c['ACCENT_SUCCESS']}; color: {c['TEXT_BRIGHT']}; "
                     "border-radius: 14px; font-weight: 600; font-size: 16px;"
                 )
-                name_label.setStyleSheet("color: #23a559; font-weight: 600;")
+                name_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-weight: 600;")
             elif i == self.current_wizard_step:
                 # Current step - show number
                 num_label.setText(str(i + 1))
                 num_label.setStyleSheet(
-                    "background-color: #5865f2; color: #ffffff; "
+                    f"background-color: {c['ACCENT_PRIMARY']}; color: {c['TEXT_BRIGHT']}; "
                     "border-radius: 14px; font-weight: 600;"
                 )
-                name_label.setStyleSheet("color: #e4e4e7; font-weight: 600;")
+                name_label.setStyleSheet(f"color: {c['TEXT_BRIGHT']}; font-weight: 600;")
             else:
                 # Future step - show number
                 num_label.setText(str(i + 1))
                 num_label.setStyleSheet(
-                    "background-color: #3f3f46; color: #a1a1aa; "
+                    f"background-color: {c['BG_SECONDARY']}; color: {c['TEXT_SECONDARY']}; "
                     "border-radius: 14px; font-weight: 600;"
                 )
-                name_label.setStyleSheet("color: #a1a1aa;")
+                name_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
     
     def _create_wizard_steps(self):
         """Create wizard step widgets."""
@@ -1591,7 +1757,7 @@ class SettingsWindow(QDialog):
             "Fine-tune advanced settings - or skip and use smart defaults.",
             self.anti_detection_widget,
             instructions="""
-            <p><b>⚡ You can safely skip this step!</b></p>
+            <p><b>Note: You can safely skip this step!</b></p>
             <p>The default settings are optimized for safety and work great for beginners. 
             You can always adjust these later in the Settings menu.</p>
             
@@ -1613,51 +1779,85 @@ class SettingsWindow(QDialog):
         """Create a wizard step widget with title, description, and content."""
         step_widget = QWidget()
         step_layout = QVBoxLayout(step_widget)
-        step_layout.setContentsMargins(0, 0, 0, 0)
-        step_layout.setSpacing(16)
+        step_layout.setContentsMargins(4, 4, 4, 12)
+        step_layout.setSpacing(18)
         
+        c = ThemeManager.get_colors()
         # Title
         title_label = QLabel(title)
-        title_label.setStyleSheet("font-size: 20px; font-weight: 600; color: #e4e4e7;")
+        title_label.setStyleSheet(f"font-size: 22px; font-weight: 700; color: {c['TEXT_BRIGHT']}; letter-spacing: -0.2px;")
         step_layout.addWidget(title_label)
         
         # Description
         desc_label = QLabel(description)
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("color: #a1a1aa; font-size: 14px;")
+        desc_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.55em; letter-spacing: -0.05px;")
         step_layout.addWidget(desc_label)
         
         # Instructions (if provided)
         if instructions:
-            instructions_group = QGroupBox("📚 Instructions")
+            instructions_group = QGroupBox("Instructions")
             instructions_layout = QVBoxLayout()
             
             instructions_label = QLabel(instructions)
             instructions_label.setWordWrap(True)
             instructions_label.setTextFormat(Qt.TextFormat.RichText)
             instructions_label.setOpenExternalLinks(True)
-            instructions_label.setStyleSheet("color: #d4d4d8;")
+            instructions_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 14px; line-height: 1.6em;")
             instructions_layout.addWidget(instructions_label)
             
             if help_url:
-                help_button = QPushButton("🔗 Open Setup Page")
+                help_button = QPushButton("Open Setup Page")
                 help_button.setObjectName("primary")
-                help_button.setFixedWidth(150)
+                help_button.setMinimumWidth(170)
                 help_button.clicked.connect(lambda: webbrowser.open(help_url))
                 instructions_layout.addWidget(help_button)
             
             instructions_group.setLayout(instructions_layout)
+            instructions_group.setStyleSheet(
+                f"""
+                QGroupBox {{
+                    background-color: {c['BG_SECONDARY']};
+                    border: 1px solid {c['BORDER_DEFAULT']};
+                    border-radius: 12px;
+                    margin-top: 10px;
+                    padding: 18px;
+                }}
+                QGroupBox::title {{
+                    subcontrol-origin: margin;
+                    left: 10px;
+                    padding: 0 6px;
+                    color: {c['TEXT_SECONDARY']};
+                }}
+                """
+            )
             step_layout.addWidget(instructions_group)
         
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet("background-color: #3f3f46;")
+        separator.setStyleSheet(f"background-color: {c['BORDER_DEFAULT']};")
         step_layout.addWidget(separator)
         
         # Content widget (scroll area)
         scroll = QScrollArea()
-        scroll.setWidget(content_widget)
+        content_shell = QFrame()
+        content_shell.setObjectName("wizard_content_shell")
+        content_shell.setStyleSheet(
+            f"""
+            QFrame#wizard_content_shell {{
+                background-color: {c['BG_SECONDARY']};
+                border: 1px solid {c['BORDER_DEFAULT']};
+                border-radius: 14px;
+            }}
+            """
+        )
+        shell_layout = QVBoxLayout(content_shell)
+        shell_layout.setContentsMargins(18, 18, 18, 18)
+        shell_layout.setSpacing(12)
+        shell_layout.addWidget(content_widget)
+        
+        scroll.setWidget(content_shell)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         step_layout.addWidget(scroll)
@@ -1687,9 +1887,11 @@ class SettingsWindow(QDialog):
         
         # Update next button text
         if step == SetupWizardManager.STEP_OPTIONAL:
-            self.wizard_next_button.setText("Complete Setup ✓")
+            self.wizard_next_button.setText("Finish Setup")
+            self.wizard_next_button.setMinimumWidth(148)  # Ensure wide enough
         else:
-            self.wizard_next_button.setText("Next →")
+            self.wizard_next_button.setText("Next")
+            self.wizard_next_button.setMinimumWidth(130)
         
         # Auto-focus first empty required field
         QTimer.singleShot(100, lambda: self._focus_first_field(step))
@@ -1739,7 +1941,7 @@ class SettingsWindow(QDialog):
         
         if not is_valid:
             # Show validation errors with error icon (not warning)
-            error_msg = "❌ Please fix the following issues before continuing:\n\n" + "\n".join(f"• {err}" for err in errors)
+            error_msg = "Error: Please fix the following issues before continuing:\n\n" + "\n".join(f"• {err}" for err in errors)
             ErrorHandler.safe_critical(self, "Validation Required", error_msg)
             return
         
@@ -1753,9 +1955,10 @@ class SettingsWindow(QDialog):
                 # Save was deferred due to throttling - show brief notification
                 if hasattr(self, 'status_label') and self.status_label:
                     self.status_label.setText(
-                        "⏳ Progress save deferred (rate limit) - will save on next action"
+                        "Progress save deferred (rate limit) - will save on next action"
                     )
-                    self.status_label.setStyleSheet("color: #f0b232;")  # Warning color
+                    c = ThemeManager.get_colors()
+                    self.status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
                     # Reset status after a moment
                     from PyQt6.QtCore import QTimer
                     QTimer.singleShot(3000, lambda: self.status_label.setText(""))
@@ -1783,17 +1986,16 @@ class SettingsWindow(QDialog):
     
     def complete_wizard(self):
         """Complete the wizard and save settings."""
-        # Show loading indicator
-        from PyQt6.QtWidgets import QProgressDialog
-        progress = QProgressDialog("Saving configuration...", None, 0, 0, self)
-        progress.setWindowTitle("Please Wait")
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setMinimumDuration(0)
-        progress.setValue(0)
-        progress.show()
-        QApplication.processEvents()
-        
         try:
+            # Disable buttons to prevent double-click
+            self.wizard_next_button.setEnabled(False)
+            self.wizard_prev_button.setEnabled(False)
+            if self.wizard_skip_button.isVisible():
+                self.wizard_skip_button.setEnabled(False)
+            
+            # Process events to update UI
+            QApplication.processEvents()
+            
             # Save settings
             self.save_settings()
             
@@ -1803,13 +2005,11 @@ class SettingsWindow(QDialog):
             # Clear progress tracking
             self.wizard_manager.clear_step_progress()
             
-            progress.close()
-            
             # Show success message with security warnings and tips
             success_msg = (
-                "✅ Setup Complete!\n\n"
+                "Setup Complete!\n\n"
                 "Your bot is now configured and ready to use.\n\n"
-                "🔒 SECURITY REMINDER:\n"
+                "SECURITY REMINDER:\n"
                 "• Never share your API keys or config.json file\n"
                 "• Don't post screenshots showing your credentials\n"
                 "• Keep your API keys secure - treat them like passwords\n"
@@ -1824,17 +2024,31 @@ class SettingsWindow(QDialog):
                 "• Keyboard shortcuts: Enter=Next, Shift+Enter=Previous, Ctrl+S=Complete\n"
                 "• Start with 1-2 accounts to test your setup"
             )
-            ErrorHandler.safe_information(self, "Setup Complete", success_msg)
             
-            # Close dialog
-            self.accept()
+            # Use QMessageBox directly instead of ErrorHandler to avoid Wayland issues
+            msg_box = QMessageBox()  # No parent to prevent app closure
+            msg_box.setWindowTitle("Setup Complete")
+            msg_box.setText(success_msg)
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.setWindowModality(Qt.WindowModality.ApplicationModal)
+            msg_box.exec()
+            
+            # Close dialog after a small delay to ensure message box is processed
+            QTimer.singleShot(100, lambda: self.accept())
             
         except Exception as e:
-            progress.close()
-            logger.error(f"Failed to complete wizard: {e}")
-            ErrorHandler.safe_critical(
-                self, 
-                "Save Failed",
+            logger.error(f"Failed to complete wizard: {e}", exc_info=True)
+            # Re-enable buttons on error
+            self.wizard_next_button.setEnabled(True)
+            self.wizard_prev_button.setEnabled(True)
+            if self.wizard_skip_button.isVisible():
+                self.wizard_skip_button.setEnabled(True)
+            
+            # Use QMessageBox directly to avoid Wayland crashes
+            msg_box = QMessageBox()  # No parent to prevent app closure
+            msg_box.setWindowTitle("Save Failed")
+            msg_box.setText(
                 f"Failed to save configuration:\n\n{str(e)}\n\n"
                 "Please check:\n"
                 "• You have write permissions\n"
@@ -1842,7 +2056,10 @@ class SettingsWindow(QDialog):
                 "• config.json is not open in another program\n\n"
                 "The wizard will remain open so you can try again."
             )
-            # Don't mark wizard complete or close dialog on failure
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.setWindowModality(Qt.WindowModality.ApplicationModal)
+            msg_box.exec()
 
     def create_api_tab(self):
         """Create the wrapped API & Auth tab."""
@@ -1897,16 +2114,18 @@ class SettingsWindow(QDialog):
         # Control buttons
         button_layout = QHBoxLayout()
 
-        self.scrape_button = QPushButton("🔍 Scrape Members")
+        self.scrape_button = QPushButton("Scrape Members")
         self.scrape_button.clicked.connect(self.scrape_channel_members)
         self.scrape_button.setObjectName("secondary")
+        self.scrape_button.setFixedHeight(32)
         self.scrape_button.setToolTip("Start scraping members from the specified channel.\nThis may take several minutes for large channels.")
         button_layout.addWidget(self.scrape_button)
 
-        self.stop_scrape_button = QPushButton("⏹️ Stop Scraping")
+        self.stop_scrape_button = QPushButton("Stop Scraping")
         self.stop_scrape_button.clicked.connect(self.stop_scraping)
         self.stop_scrape_button.setEnabled(False)
         self.stop_scrape_button.setObjectName("secondary")
+        self.stop_scrape_button.setFixedHeight(32)
         self.stop_scrape_button.setToolTip("Stop the current scraping operation")
         button_layout.addWidget(self.stop_scrape_button)
 
@@ -2065,12 +2284,13 @@ class SettingsWindow(QDialog):
         bulk_layout.addLayout(api_layout)
 
         # Balance Label
+        c = ThemeManager.get_colors()
         self.balance_label = QLabel("Balance: --")
-        self.balance_label.setStyleSheet("color: #b5bac1; font-weight: bold;")
+        self.balance_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-weight: bold;")
         bulk_layout.addWidget(self.balance_label)
 
         # Setup Checklist
-        checklist_group = QGroupBox("✅ Setup Checklist")
+        checklist_group = QGroupBox("Setup Checklist")
         checklist_layout = QVBoxLayout()
 
         self.checklist_api_key = QLabel("Provider API Key")
@@ -2081,11 +2301,11 @@ class SettingsWindow(QDialog):
         self.checklist_proxies.setStyleSheet("padding: 4px;")
         checklist_layout.addWidget(self.checklist_proxies)
 
-        self.checklist_country = QLabel("✅ Country Selected")
+        self.checklist_country = QLabel("Country Selected")
         self.checklist_country.setStyleSheet("padding: 4px;")
         checklist_layout.addWidget(self.checklist_country)
 
-        self.checklist_anti_detection = QLabel("✅ Anti-Detection Enabled")
+        self.checklist_anti_detection = QLabel("Anti-Detection Enabled")
         self.checklist_anti_detection.setStyleSheet("padding: 4px;")
         checklist_layout.addWidget(self.checklist_anti_detection)
 
@@ -2109,14 +2329,19 @@ class SettingsWindow(QDialog):
             "• Monitor progress in the results section below"
         )
         help_label.setWordWrap(True)
-        help_label.setStyleSheet("color: #7289da; padding: 8px; background: rgba(114, 137, 218, 0.1); border-radius: 4px;")
+        accent_hex = c['ACCENT_PRIMARY'].lstrip('#')
+        accent_r = int(accent_hex[0:2], 16)
+        accent_g = int(accent_hex[2:4], 16)
+        accent_b = int(accent_hex[4:6], 16)
+        help_label.setStyleSheet(f"color: {c['ACCENT_PRIMARY']}; padding: 8px; background: rgba({accent_r}, {accent_g}, {accent_b}, 0.1); border-radius: 4px;")
         bulk_layout.addWidget(help_label)
 
         # Control buttons
         control_layout = QHBoxLayout()
-        self.start_creation_button = QPushButton("🚀 Start Bulk Creation")
+        self.start_creation_button = QPushButton("Start Bulk Creation")
         self.start_creation_button.clicked.connect(self.start_bulk_creation)
         self.start_creation_button.setObjectName("success")
+        self.start_creation_button.setFixedHeight(32)
         self.start_creation_button.setToolTip("Start creating the specified number of accounts")
         control_layout.addWidget(self.start_creation_button)
 
@@ -2163,7 +2388,7 @@ class SettingsWindow(QDialog):
             "Configure default settings for new accounts. Each account can have its own type, brain, and voice settings."
         )
         config_info.setWordWrap(True)
-        config_info.setStyleSheet("color: #a1a1aa; margin-bottom: 8px;")
+        config_info.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; margin-bottom: 8px;")
         account_config_layout.addWidget(config_info)
         
         # Account Type
@@ -2213,7 +2438,7 @@ class SettingsWindow(QDialog):
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet("background: #3f3f46; margin: 8px 0;")
+        separator.setStyleSheet(f"background: {c['BORDER_DEFAULT']}; margin: 8px 0;")
         account_config_layout.addWidget(separator)
         
         # Voice Messages Configuration
@@ -2327,7 +2552,7 @@ class SettingsWindow(QDialog):
         test_voice_layout.addWidget(self.test_voice_button)
         
         self.voice_status_label = QLabel("Voice not tested")
-        self.voice_status_label.setStyleSheet("color: #a1a1aa; font-style: italic;")
+        self.voice_status_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-style: italic;")
         test_voice_layout.addWidget(self.voice_status_label)
         
         test_voice_layout.addStretch()
@@ -2378,27 +2603,32 @@ class SettingsWindow(QDialog):
         layout.addWidget(clone_group)
 
         # Proxy Management Section
-        proxy_group = QGroupBox("🔐 Proxy Management (Required for 10+ Accounts)")
+        proxy_group = QGroupBox("Proxy Management (Required for 10+ Accounts)")
         proxy_layout = QVBoxLayout()
 
         # Proxy info banner
         proxy_info_banner = QLabel(
-            "⚠️ IMPORTANT: For creating 10+ accounts, proxies are REQUIRED.\n"
+            "IMPORTANT: For creating 10+ accounts, proxies are REQUIRED.\n"
             "Each account should ideally have a unique proxy to prevent detection.\n"
             "Format: ip:port or ip:port:username:password (one per line)"
         )
+        c = ThemeManager.get_colors()
         proxy_info_banner.setWordWrap(True)
-        proxy_info_banner.setStyleSheet("""
-            background: rgba(250, 166, 26, 0.15);
+        warn_hex = c['ACCENT_WARNING'].lstrip('#')
+        warn_r = int(warn_hex[0:2], 16)
+        warn_g = int(warn_hex[2:4], 16)
+        warn_b = int(warn_hex[4:6], 16)
+        proxy_info_banner.setStyleSheet(f"""
+            background: rgba({warn_r}, {warn_g}, {warn_b}, 0.15);
             padding: 10px;
             border-radius: 6px;
-            border-left: 3px solid #faa61a;
+            border-left: 3px solid {c['ACCENT_WARNING']};
             font-weight: bold;
         """)
         proxy_layout.addWidget(proxy_info_banner)
 
         # Proxy list display
-        proxy_info_label = QLabel("📝 Paste proxies below or load from file:")
+        proxy_info_label = QLabel("Paste proxies below or load from file:")
         proxy_info_label.setWordWrap(True)
         proxy_layout.addWidget(proxy_info_label)
 
@@ -2429,9 +2659,10 @@ class SettingsWindow(QDialog):
         proxy_buttons_layout.addStretch()
         proxy_layout.addLayout(proxy_buttons_layout)
 
+        c = ThemeManager.get_colors()
         # Proxy count label
         self.proxy_count_label = QLabel("0 proxies loaded")
-        self.proxy_count_label.setStyleSheet("font-weight: bold; color: #7289da;")
+        self.proxy_count_label.setStyleSheet(f"font-weight: bold; color: {c['ACCENT_PRIMARY']};")
         proxy_layout.addWidget(self.proxy_count_label)
 
         # Update proxy count when text changes
@@ -2513,6 +2744,31 @@ class SettingsWindow(QDialog):
         self.enable_logging_checkbox.setChecked(True)
         debug_layout.addRow(self.enable_logging_checkbox)
 
+        # Performance & Power
+        perf_group = QGroupBox("Performance & Power")
+        perf_layout = QFormLayout()
+
+        self.low_power_checkbox = QCheckBox("Enable low-power mode (slower polling, less CPU)")
+        perf_layout.addRow(self.low_power_checkbox)
+
+        self.enable_sampling_checkbox = QCheckBox("Show lightweight CPU/RAM sampling in status bar")
+        perf_layout.addRow(self.enable_sampling_checkbox)
+
+        self.stats_interval_spin = QSpinBox()
+        self.stats_interval_spin.setRange(5000, 300000)
+        self.stats_interval_spin.setSingleStep(5000)
+        self.stats_interval_spin.setSuffix(" ms")
+        perf_layout.addRow("Stats refresh interval:", self.stats_interval_spin)
+
+        self.dashboard_interval_spin = QSpinBox()
+        self.dashboard_interval_spin.setRange(5000, 60000)
+        self.dashboard_interval_spin.setSingleStep(1000)
+        self.dashboard_interval_spin.setSuffix(" ms")
+        perf_layout.addRow("Dashboard refresh interval:", self.dashboard_interval_spin)
+
+        perf_group.setLayout(perf_layout)
+        layout.addWidget(perf_group)
+
         # Human-like typing settings
         human_layout = QGroupBox("Human-like Behavior")
         human_form = QFormLayout()
@@ -2559,12 +2815,13 @@ class SettingsWindow(QDialog):
 
         # Tab title
         title_label = QLabel(title)
-        title_label.setStyleSheet("font-size: 18px; font-weight: 600; color: #e4e4e7; margin-bottom: 4px;")
+        c = ThemeManager.get_colors()
+        title_label.setStyleSheet(f"font-size: 18px; font-weight: 600; color: {c['TEXT_BRIGHT']}; margin-bottom: 4px;")
         tab_layout.addWidget(title_label)
 
         # Tab description
         desc_label = QLabel(description)
-        desc_label.setStyleSheet("color: #a1a1aa; font-size: 13px; margin-bottom: 16px;")
+        desc_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; margin-bottom: 16px;")
         desc_label.setWordWrap(True)
         tab_layout.addWidget(desc_label)
 
@@ -2595,7 +2852,7 @@ class SettingsWindow(QDialog):
         api_key = self.provider_api_edit.text().strip()
 
         if not api_key:
-            ErrorHandler.safe_warning(self, "Missing API Key", "Please enter an API key.")
+            self._show_warning("Missing API Key", "Please enter an API key.", user_initiated=True)
             return
 
         self.balance_label.setText("Checking balance...")
@@ -2609,20 +2866,23 @@ class SettingsWindow(QDialog):
             balance, error = self._fetch_provider_balance(provider, api_key)
             QTimer.singleShot(0, lambda: self._apply_balance_result(balance, error))
 
-        threading.Thread(target=run_balance_lookup, daemon=True).start()
+        t = threading.Thread(target=run_balance_lookup, daemon=True)
+        t.start()
+        self._balance_thread = t
 
     def _apply_balance_result(self, balance: Optional[str], error: Optional[str]):
         """Apply balance result back on the UI thread and update cache."""
         provider = self.phone_provider_combo.currentText()
         api_key = self.provider_api_edit.text().strip()
 
+        c = ThemeManager.get_colors()
         if balance is not None:
             self.balance_label.setText(f"Balance: {balance}")
-            self.balance_label.setStyleSheet("color: #23a559; font-weight: bold;")
+            self.balance_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-weight: bold;")
             self._cache_balance(provider, api_key, balance)
         else:
             self.balance_label.setText("Check failed")
-            self.balance_label.setStyleSheet("color: #f23f42; font-weight: bold;")
+            self.balance_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-weight: bold;")
             if error:
                 logger.error(f"Balance check error: {error}")
 
@@ -2669,11 +2929,11 @@ class SettingsWindow(QDialog):
                 if resp.status_code == 200:
                     balance = str(resp.json().get('balance', 0))
             elif provider == 'daisysms':
-                headers = {'Authorization': f'Bearer {api_key}'}
-                resp = requests.get('https://daisysms.com/api/balance', headers=headers, timeout=10)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    balance = str(data.get('balance', 0))
+                # DaisySMS uses simple GET with api_key param
+                params = {'api_key': api_key, 'action': 'getBalance'}
+                resp = requests.get('https://daisysms.com/api/handler_api.php', params=params, timeout=10)
+                if resp.status_code == 200 and 'ACCESS_BALANCE' in resp.text:
+                    balance = resp.text.split(':')[1]
             elif provider == 'smspool':
                 headers = {'Authorization': f'Bearer {api_key}'}
                 resp = requests.get('https://api.smspool.net/me', headers=headers, timeout=10)
@@ -2703,8 +2963,11 @@ class SettingsWindow(QDialog):
         # Check for API key - use correct widget name
         api_key = self.api_widget.elevenlabs_key_edit.text().strip() if hasattr(self.api_widget, 'elevenlabs_key_edit') else ""
         if not api_key:
-            ErrorHandler.safe_warning(self, "Missing API Key", 
-                "Please enter your ElevenLabs API key in the API & Auth tab first.")
+            self._show_warning(
+                "Missing API Key",
+                "Please enter your ElevenLabs API key in the API & Auth tab first.",
+                user_initiated=True,
+            )
             return
         
         # Get selected voice
@@ -2720,8 +2983,9 @@ class SettingsWindow(QDialog):
         
         # Update UI
         self.test_voice_button.setEnabled(False)
+        c = ThemeManager.get_colors()
         self.voice_status_label.setText("Testing voice generation...")
-        self.voice_status_label.setStyleSheet("color: #faa61a;")
+        self.voice_status_label.setStyleSheet(f"color: {c['ACCENT_WARNING']};")
         
         # Run test in background
         import asyncio
@@ -2741,13 +3005,15 @@ class SettingsWindow(QDialog):
             self.test_voice_button.setEnabled(True)
             
             if success:
-                self.voice_status_label.setText(f"✅ Voice test passed!")
-                self.voice_status_label.setStyleSheet("color: #23a559; font-weight: bold;")
+                c = ThemeManager.get_colors()
+                self.voice_status_label.setText(f"Success: Voice test passed")
+                self.voice_status_label.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; font-weight: 600;")
                 ErrorHandler.safe_information(self, "Voice Test Successful", 
                     f"Voice generation is working!\n\nTest audio saved to:\n{info}")
             else:
-                self.voice_status_label.setText(f"❌ Voice test failed")
-                self.voice_status_label.setStyleSheet("color: #f23f42; font-weight: bold;")
+                c = ThemeManager.get_colors()
+                self.voice_status_label.setText(f"Error: Voice test failed")
+                self.voice_status_label.setStyleSheet(f"color: {c['ACCENT_DANGER']}; font-weight: 600;")
                 ErrorHandler.safe_warning(self, "Voice Test Failed", 
                     f"Could not generate voice message.\n\nError: {info}\n\n"
                     "Please check:\n• ElevenLabs API key is correct\n• You have available credits\n• Internet connection")
@@ -2793,14 +3059,15 @@ class SettingsWindow(QDialog):
 
     def _update_checklist(self):
         """Update the setup checklist based on current inputs."""
+        c = ThemeManager.get_colors()
         # Check API key
         api_key = self.provider_api_edit.text().strip()
         if api_key:
-            self.checklist_api_key.setText("✅ Provider API Key")
-            self.checklist_api_key.setStyleSheet("color: #23a559; padding: 4px;")
+            self.checklist_api_key.setText("Provider API Key")
+            self.checklist_api_key.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; padding: 4px;")
         else:
-            self.checklist_api_key.setText("❌ Provider API Key")
-            self.checklist_api_key.setStyleSheet("color: #f23f42; padding: 4px;")
+            self.checklist_api_key.setText("Provider API Key (Required)")
+            self.checklist_api_key.setStyleSheet(f"color: {c['ACCENT_DANGER']}; padding: 4px;")
 
         # Check proxies - for account creation tab, check proxy pool availability
         account_count = self.account_count_spin.value()
@@ -2820,26 +3087,26 @@ class SettingsWindow(QDialog):
 
         if account_count >= 10:
             if proxy_available and proxy_count >= account_count:
-                self.checklist_proxies.setText(f"✅ Proxies ({proxy_count} available, {account_count} needed)")
-                self.checklist_proxies.setStyleSheet("color: #23a559; padding: 4px;")
+                self.checklist_proxies.setText(f"Proxies ({proxy_count} available, {account_count} needed)")
+                self.checklist_proxies.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; padding: 4px;")
             else:
-                self.checklist_proxies.setText(f"❌ Proxies ({proxy_count} available, {account_count} needed)")
-                self.checklist_proxies.setStyleSheet("color: #f23f42; padding: 4px;")
+                self.checklist_proxies.setText(f"Proxies ({proxy_count} available, {account_count} needed)")
+                self.checklist_proxies.setStyleSheet(f"color: {c['ACCENT_DANGER']}; padding: 4px;")
         else:
             if proxy_available:
-                self.checklist_proxies.setText(f"✅ Proxies ({proxy_count} available, optional)")
-                self.checklist_proxies.setStyleSheet("color: #b5bac1; padding: 4px;")
+                self.checklist_proxies.setText(f"Proxies ({proxy_count} available, optional)")
+                self.checklist_proxies.setStyleSheet(f"color: {c['TEXT_DISABLED']}; padding: 4px;")
             else:
-                self.checklist_proxies.setText("ℹ️ Proxies (Optional for <10 accounts)")
-                self.checklist_proxies.setStyleSheet("color: #b5bac1; padding: 4px;")
+                self.checklist_proxies.setText("Proxies (Optional for <10 accounts)")
+                self.checklist_proxies.setStyleSheet(f"color: {c['TEXT_DISABLED']}; padding: 4px;")
 
         # Country is always selected (has default)
-        self.checklist_country.setText("✅ Country Selected")
-        self.checklist_country.setStyleSheet("color: #23a559; padding: 4px;")
+        self.checklist_country.setText("Country Selected")
+        self.checklist_country.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; padding: 4px;")
 
         # Anti-detection - for account creation, this is always enabled via the backend
-        self.checklist_anti_detection.setText("✅ Anti-Detection Enabled")
-        self.checklist_anti_detection.setStyleSheet("color: #23a559; padding: 4px;")
+        self.checklist_anti_detection.setText("Anti-Detection Enabled")
+        self.checklist_anti_detection.setStyleSheet(f"color: {c['ACCENT_SUCCESS']}; padding: 4px;")
 
     def update_proxy_count(self):
         """Update the proxy count label."""
@@ -2894,7 +3161,7 @@ class SettingsWindow(QDialog):
 
         # Basic input validation
         if not api_key:
-            ErrorHandler.safe_warning(self, "Missing API Key", "Please enter your SMS provider API key.")
+            self._show_warning("Missing API Key", "Please enter your SMS provider API key.", user_initiated=True)
             return
 
         if count <= 0 or count > 100:
@@ -2967,9 +3234,12 @@ class SettingsWindow(QDialog):
                 elevenlabs_key = main_window.api_widget.elevenlabs_key_edit.text().strip()
 
             if not elevenlabs_key:
-                ErrorHandler.safe_warning(self, "Missing ElevenLabs API Key",
+                self._show_warning(
+                    "Missing ElevenLabs API Key",
                     "Voice messages are enabled but no ElevenLabs API key is configured.\n\n"
-                    "Please add your ElevenLabs API key in the API & Auth tab.")
+                    "Please add your ElevenLabs API key in the API & Auth tab.",
+                    user_initiated=True,
+                )
                 return
 
         # Try to validate provider balance before proceeding
@@ -3174,7 +3444,7 @@ class SettingsWindow(QDialog):
         failed = len(results) - successful
 
         # Update summary
-        summary_text = f"✅ Creation Complete\n"
+        summary_text = f"Creation Complete\n"
         summary_text += f"• Total: {len(results)}\n"
         summary_text += f"• Successful: {successful}\n"
         summary_text += f"• Failed: {failed}"
@@ -3215,7 +3485,7 @@ class SettingsWindow(QDialog):
         self.creation_progress.setVisible(False)
 
         self.creation_status.setText("Account creation failed")
-        self.creation_summary.setText(f"❌ Error: {error}")
+        self.creation_summary.setText(f"Error: {error}")
         self.creation_summary.setVisible(True)
 
         ErrorHandler.safe_critical(self, "Creation Failed",
@@ -3303,7 +3573,7 @@ class SettingsWindow(QDialog):
         self.scrape_progress.setVisible(True)
         self.scrape_progress.setMaximum(0)  # Indeterminate progress
         self.scraper_results_text.clear()
-        self.scraper_results_text.append(f"🔍 Starting scrape of: {channel_url}\n")
+        self.scraper_results_text.append(f"Starting scrape of: {channel_url}\n")
         
         # Import and initialize scraper
         try:
@@ -3325,7 +3595,7 @@ class SettingsWindow(QDialog):
             
             async def perform_scrape():
                 try:
-                    self.scraper_results_text.append("📊 Initializing scraper...\n")
+                    self.scraper_results_text.append("Initializing scraper...\n")
                     
                     def progress_update(count):
                         self.scrape_progress.setValue(count)
@@ -3340,11 +3610,11 @@ class SettingsWindow(QDialog):
                     
                     # Update UI with results
                     if result.get('success'):
-                        self.scraper_results_text.append(f"\n✅ Scraping complete!\n")
-                        self.scraper_results_text.append(f"📊 Channel: {result.get('channel_title', 'Unknown')}\n")
-                        self.scraper_results_text.append(f"👥 Members found: {result.get('members_scraped', 0)}\n")
-                        self.scraper_results_text.append(f"🎯 Safe targets: {result.get('safe_targets', 0)}\n")
-                        self.scraper_results_text.append(f"🛡️ Threats filtered: {result.get('threats_filtered', 0)}\n")
+                        self.scraper_results_text.append(f"\nScraping complete!\n")
+                        self.scraper_results_text.append(f"Channel: {result.get('channel_title', 'Unknown')}\n")
+                        self.scraper_results_text.append(f"Members found: {result.get('members_scraped', 0)}\n")
+                        self.scraper_results_text.append(f"Safe targets: {result.get('safe_targets', 0)}\n")
+                        self.scraper_results_text.append(f"Threats filtered: {result.get('threats_filtered', 0)}\n")
                         
                         # Update stats
                         self.stats_total.setText(f"Total: {result.get('members_scraped', 0)}")
@@ -3358,12 +3628,12 @@ class SettingsWindow(QDialog):
                         )
                     else:
                         error_msg = result.get('error', 'Unknown error')
-                        self.scraper_results_text.append(f"\n❌ Error: {error_msg}\n")
+                        self.scraper_results_text.append(f"\nError: {error_msg}\n")
                         ErrorHandler.safe_warning(self, "Scraping Failed", f"Failed to scrape members:\n\n{error_msg}")
                 
                 except Exception as e:
                     logger.error(f"Scraping error: {e}")
-                    self.scraper_results_text.append(f"\n❌ Error: {str(e)}\n")
+                    self.scraper_results_text.append(f"\nError: {str(e)}\n")
                     ErrorHandler.safe_critical(self, "Error", f"Scraping failed:\n\n{str(e)}")
                 
                 finally:
@@ -3386,7 +3656,7 @@ class SettingsWindow(QDialog):
         
         except Exception as e:
             logger.error(f"Failed to start scraping: {e}")
-            self.scraper_results_text.append(f"\n❌ Failed to initialize scraper: {str(e)}\n")
+            self.scraper_results_text.append(f"\nFailed to initialize scraper: {str(e)}\n")
             ErrorHandler.safe_critical(self, "Error", f"Failed to start scraping:\n\n{str(e)}")
             self.scrape_button.setEnabled(True)
             self.stop_scrape_button.setEnabled(False)
@@ -3399,7 +3669,7 @@ class SettingsWindow(QDialog):
         self.stop_scrape_button.setEnabled(False)
         self.scrape_button.setEnabled(True)
         self.scrape_progress.setVisible(False)
-        self.scraper_results_text.append("\n⏹️ Scraping stopped by user\n")
+        self.scraper_results_text.append("\nScraping stopped by user\n")
         
         ErrorHandler.safe_information(self, "Stopped", "Scraping operation stopped.")
 
@@ -3432,9 +3702,9 @@ class SettingsWindow(QDialog):
                     display = f"{name} (@{username})" if username else name
                     self.members_list.addItem(display)
                 
-                self.scraper_results_text.append(f"\n🔄 Refreshed: Showing {len(members)} members from {channels[0].get('title')}\n")
+                self.scraper_results_text.append(f"\nRefreshed: Showing {len(members)} members from {channels[0].get('title')}\n")
             else:
-                self.scraper_results_text.append("\nℹ️ No channels scraped yet.\n")
+                self.scraper_results_text.append("\nNo channels scraped yet.\n")
         
         except Exception as e:
             logger.error(f"Error refreshing members: {e}")
@@ -3513,6 +3783,16 @@ class SettingsWindow(QDialog):
                 "online_simulation": True,
                 "random_skip": True,
                 "enabled": True
+            },
+            "performance": {
+                "low_power": False,
+                "enable_sampling": False,
+                "sampling_interval_seconds": 30,
+                "stats_interval_ms": 30000,
+                "dashboard_interval_ms": 5000,
+                "background_services_enabled": True,
+                "warmup_autostart": True,
+                "campaign_autostart": True
             }
         }
 
@@ -3645,6 +3925,17 @@ class SettingsWindow(QDialog):
             self.proxy_list_edit.setPlainText(proxy_text)
             self.update_proxy_count()
 
+        # Performance settings
+        perf = self.settings_data.get("performance", {})
+        if hasattr(self, 'low_power_checkbox'):
+            self.low_power_checkbox.setChecked(perf.get("low_power", False))
+        if hasattr(self, 'enable_sampling_checkbox'):
+            self.enable_sampling_checkbox.setChecked(perf.get("enable_sampling", False))
+        if hasattr(self, 'stats_interval_spin'):
+            self.stats_interval_spin.setValue(perf.get("stats_interval_ms", 30000))
+        if hasattr(self, 'dashboard_interval_spin'):
+            self.dashboard_interval_spin.setValue(perf.get("dashboard_interval_ms", 5000))
+
     def collect_ui_settings(self) -> Dict[str, Any]:
         """Collect settings from UI elements."""
         voice_trigger_map = {
@@ -3749,6 +4040,16 @@ class SettingsWindow(QDialog):
             "random_delays": self.random_delays_checkbox.isChecked() if hasattr(self, 'random_delays_checkbox') else True
         })
 
+        # Performance settings
+        settings.setdefault("performance", {})
+        settings["performance"].update({
+            "low_power": self.low_power_checkbox.isChecked() if hasattr(self, 'low_power_checkbox') else False,
+            "enable_sampling": self.enable_sampling_checkbox.isChecked() if hasattr(self, 'enable_sampling_checkbox') else False,
+            "sampling_interval_seconds": getattr(self, "sampling_interval_seconds", 30),
+            "stats_interval_ms": self.stats_interval_spin.value() if hasattr(self, 'stats_interval_spin') else 30000,
+            "dashboard_interval_ms": self.dashboard_interval_spin.value() if hasattr(self, 'dashboard_interval_spin') else 5000,
+        })
+
         # Account factory settings
         settings["account_factory"] = {
             "account_count": self.account_count_spin.value() if hasattr(self, 'account_count_spin') else 10,
@@ -3765,8 +4066,12 @@ class SettingsWindow(QDialog):
 
         return settings
 
-    def save_settings(self):
-        """Save settings to configuration file with validation."""
+    def save_settings(self, *args, **kwargs):
+        """Save settings to configuration file with validation and live credential checks.
+
+        Accepts *args/**kwargs to remain compatible with debounced button callbacks
+        that pass the button instance.
+        """
         try:
             self.settings_data = self.collect_ui_settings()
             
@@ -3775,8 +4080,8 @@ class SettingsWindow(QDialog):
             
             # Show warnings but allow saving (flexible validation)
             if errors and not self.wizard_mode:
-                error_msg = "⚠️ Configuration warnings:\n\n" + "\n".join(f"• {err}" for err in errors)
-                error_msg += "\n\n💡 These settings may prevent certain features from working."
+                error_msg = "Configuration warnings:\n\n" + "\n".join(f"• {err}" for err in errors)
+                error_msg += "\n\nNote: These settings may prevent certain features from working."
                 error_msg += "\n\nDo you want to save anyway?"
                 
                 reply = QMessageBox.question(
@@ -3789,6 +4094,35 @@ class SettingsWindow(QDialog):
                 
                 if reply == QMessageBox.StandardButton.No:
                     return
+
+            # Critical online validations (Telegram + Gemini) without persisting keys pre-save
+            tg_ok, tg_profile, tg_err = self._run_async_validation(
+                self._validate_telegram_credentials(self.settings_data.get("telegram", {}))
+            )
+            if not tg_ok:
+                ErrorHandler.safe_warning(self, "Telegram Validation Failed", tg_err or "Telegram credentials could not be validated.")
+                return
+
+            now_ts = datetime.datetime.now().isoformat()
+            self.settings_data.setdefault("telegram", {})
+            self.settings_data["telegram"]["validated"] = True
+            self.settings_data["telegram"]["validated_at"] = now_ts
+            if tg_profile:
+                tg_profile.setdefault("validated", True)
+                tg_profile.setdefault("validated_at", now_ts)
+                self.settings_data["telegram"]["profile"] = tg_profile
+
+            gemini_key = self.settings_data.get("gemini", {}).get("api_key", "")
+            if gemini_key:
+                gem_ok, gem_err = self._run_async_validation(
+                    self._validate_gemini_key(gemini_key)
+                )
+                if not gem_ok:
+                    ErrorHandler.safe_warning(self, "Gemini Validation Failed", gem_err or "Gemini API key could not be validated.")
+                    return
+                self.settings_data.setdefault("gemini", {})
+                self.settings_data["gemini"]["validated"] = True
+                self.settings_data["gemini"]["validated_at"] = now_ts
 
             config_path = Path("config.json")
             
@@ -3804,11 +4138,142 @@ class SettingsWindow(QDialog):
             self.settings_updated.emit(self.settings_data)
             
             if not self.wizard_mode:
-                ErrorHandler.safe_information(self, "✅ Success", "Settings saved successfully!\n\nYou may need to restart for some changes to take effect.")
+                ErrorHandler.safe_information(self, "Success", "Settings saved successfully!\n\nYou may need to restart for some changes to take effect.")
 
         except Exception as e:
             logger.error(f"Failed to save settings: {e}")
             ErrorHandler.show_error(self, "database_connection_failed", str(e))
+
+    def _run_async_validation(self, coro):
+        """Run async validation without freezing the UI."""
+        app = QApplication.instance()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(self._run_coro_blocking, coro)
+            while not future.done():
+                if app:
+                    app.processEvents()
+                else:
+                    QCoreApplication.processEvents()
+            return future.result()
+
+    @staticmethod
+    def _run_coro_blocking(coro):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+    async def _validate_gemini_key(self, api_key: str) -> Tuple[bool, str]:
+        """Validate Gemini key without persisting it."""
+        try:
+            manager = APIKeyManager()
+            return await manager.validate_api_key_raw("gemini", api_key)
+        except Exception as exc:
+            logger.error(f"Gemini validation error: {exc}")
+            return False, str(exc)
+
+    async def _validate_telegram_credentials(self, telegram_cfg: Dict[str, Any]) -> Tuple[bool, Dict[str, Any], str]:
+        """Validate Telegram credentials with sign-in and profile fetch."""
+        api_id = telegram_cfg.get("api_id")
+        api_hash = telegram_cfg.get("api_hash")
+        phone = telegram_cfg.get("phone_number")
+
+        session_dir = Path(".setup_sessions")
+        session_dir.mkdir(exist_ok=True)
+
+        client = Client(
+            name="settings_validation",
+            api_id=api_id,
+            api_hash=api_hash,
+            phone_number=phone,
+            workdir=str(session_dir),
+            in_memory=True,
+            no_updates=True
+        )
+
+        profile: Dict[str, Any] = {}
+
+        try:
+            await client.connect()
+            await client.invoke(GetNearestDc())
+        except Exception as exc:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            return False, profile, f"Could not reach Telegram with these credentials: {exc}"
+
+        try:
+            if not await client.is_authorized():
+                sent = await client.send_code(phone)
+                code, ok = self._prompt_input("Telegram Login", "Enter the login code sent to Telegram:")
+                if not ok or not code.strip():
+                    await client.disconnect()
+                    return False, profile, "Login code was not provided."
+                try:
+                    await client.sign_in(
+                        phone_number=phone,
+                        phone_code_hash=sent.phone_code_hash,
+                        phone_code=code.strip()
+                    )
+                except SessionPasswordNeeded:
+                    password, ok_pwd = self._prompt_input("Two-Factor Password", "Enter your Telegram 2FA password:", password_mode=True)
+                    if not ok_pwd or not password:
+                        await client.disconnect()
+                        return False, profile, "Two-factor password required to finish sign-in."
+                    await client.check_password(password=password)
+
+            me = await client.get_me()
+            if not me:
+                return False, profile, "Could not retrieve profile. Please ensure the account is fully signed in."
+
+            display_name = f"{(me.first_name or '').strip()} {(me.last_name or '').strip()}".strip() or phone
+            profile = {
+                "user_id": getattr(me, "id", None),
+                "username": getattr(me, "username", "") or "",
+                "first_name": getattr(me, "first_name", "") or "",
+                "last_name": getattr(me, "last_name", "") or "",
+                "display_name": display_name,
+                "phone_number": phone,
+                "photo_path": ""
+            }
+
+            if getattr(me, "photo", None):
+                photo_dir = Path("profile_photos")
+                photo_dir.mkdir(exist_ok=True)
+                try:
+                    photo_path = await client.download_media(
+                        me.photo,
+                        file_name=str(photo_dir / f"{me.id}.jpg")
+                    )
+                    if photo_path:
+                        profile["photo_path"] = str(photo_path)
+                except Exception as exc:
+                    logger.debug(f"Profile photo download skipped: {exc}")
+
+        finally:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            # Cleanup transient session files
+            try:
+                if session_dir.exists():
+                    for f in session_dir.glob("*"):
+                        f.unlink(missing_ok=True)
+            except Exception:
+                logger.debug("Skipping cleanup of temporary validation session files")
+
+        return True, profile, ""
+
+    def _prompt_input(self, title: str, label: str, password_mode: bool = False) -> Tuple[str, bool]:
+        """Prompt the user for input without blocking the UI."""
+        echo = QLineEdit.EchoMode.Password if password_mode else QLineEdit.EchoMode.Normal
+        text, ok = QInputDialog.getText(self, title, label, echo)
+        return text, ok
 
     def test_configuration(self):
         """Test the current configuration with detailed validation."""
@@ -3827,18 +4292,18 @@ class SettingsWindow(QDialog):
         test_results = []
         
         # Test Telegram API (just validate format, actual test requires connection)
-        test_results.append("✅ Telegram API credentials format is valid")
+        test_results.append("Telegram API credentials format is valid")
         
         # Test Gemini API if provided
         if config.get("gemini", {}).get("api_key"):
-            test_results.append("✅ Gemini API key format is valid")
+            test_results.append("Gemini API key format is valid")
         
         # Check proxy format if provided
         if hasattr(self, 'proxy_list') and self.proxy_list.count() > 0:
-            test_results.append(f"✅ {self.proxy_list.count()} proxy(ies) configured")
+            test_results.append(f"{self.proxy_list.count()} proxy(ies) configured")
         
-        success_msg = "✅ Configuration Test Passed!\n\n" + "\n".join(test_results)
-        success_msg += "\n\n💡 Note: This validates format only. Actual connectivity will be tested when you connect."
+        success_msg = "Configuration Test Passed!\n\n" + "\n".join(test_results)
+        success_msg += "\n\nNote: This validates format only. Actual connectivity will be tested when you connect."
         
         ErrorHandler.safe_information(self, "Configuration Test Passed", success_msg)
     
