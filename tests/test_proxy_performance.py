@@ -82,7 +82,7 @@ def test_proxy_pool_loading():
         return False
 
 
-def test_ui_performance():
+def test_ui_performance(qapp):
     """Test UI component performance."""
     logger.info("\n" + "=" * 70)
     logger.info("TEST: UI Component Performance")
@@ -91,11 +91,7 @@ def test_ui_performance():
     try:
         # Try to import Qt - may not be available in headless environment
         try:
-            from PyQt6.QtWidgets import QApplication
             from proxy_management_widget import ProxyTableWidget
-
-            logger.info("Initializing Qt application...")
-            app = QApplication.instance() or QApplication(sys.argv)
 
             logger.info("Creating ProxyTableWidget...")
             start_time = time.time()

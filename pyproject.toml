@@ -129,7 +129,9 @@ addopts = [
     "--cov-report=html",
     "--cov-report=term-missing",
     "--cov-fail-under=80",
+    "--asyncio-mode=auto",
 ]
+asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "unit: Unit tests for individual components",

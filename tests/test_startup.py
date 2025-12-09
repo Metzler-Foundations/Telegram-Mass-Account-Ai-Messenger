@@ -11,7 +11,7 @@ import traceback
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def test_startup():
+def test_startup(qapp):
     """Test application startup step by step"""
     print("🔍 Testing application startup...")
 
@@ -65,9 +65,6 @@ def test_startup():
 
         print("4. Testing main window creation...")
         from main import MainWindow
-
-        # Create QApplication first
-        app = QApplication(sys.argv)
 
         # Try to create main window
         main_window = MainWindow()

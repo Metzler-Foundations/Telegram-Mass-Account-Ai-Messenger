@@ -1,46 +1,112 @@
-"""Pytest configuration to guard GUI tests when system dependencies are missing."""
+"""Pytest configuration and fixtures for GUI tests."""
 
-import ctypes.util
 import os
-from pathlib import Path
+import sys
+from typing import Generator
 
 import pytest
 
-# Tests that exercise the PyQt-based UI; these import Qt modules and will fail
-# when the system lacks OpenGL libraries (e.g., libGL.so.1 in headless CI).
-GUI_TEST_FILES = {
-    "test_app.py",
-    "test_wizard.py",
-    "test_proxy_performance.py",
-    "test_system.py",
-}
-
-
-def _has_libgl() -> bool:
-    """Return True if libGL is available on the system."""
-    return ctypes.util.find_library("GL") is not None
-
-
 # Ensure Qt uses an offscreen platform by default to reduce GUI requirements.
+# This must be set before any Qt imports.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Disable Qt plugin paths to avoid issues in CI
+os.environ.setdefault("QT_PLUGIN_PATH", "")
+# Prevent Qt from trying to connect to X server
+os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", "")
 
 
-def pytest_ignore_collect(collection_path: Path, config):
-    """Prevent importing GUI-heavy test modules when libGL is unavailable."""
-    if _has_libgl():
-        return False
-
-    filename = Path(collection_path).name
-    return filename in GUI_TEST_FILES
+# Create QApplication early to avoid issues during test collection
+_qt_app = None
 
 
-def pytest_collection_modifyitems(config, items):
-    """Skip GUI-heavy tests when libGL is missing so the suite can run headless."""
-    if _has_libgl():
+def _ensure_qapplication():
+    """Ensure QApplication exists before tests run."""
+    global _qt_app
+    if _qt_app is None:
+        try:
+            from PyQt6.QtWidgets import QApplication
+            
+            # Get or create QApplication instance
+            _qt_app = QApplication.instance()
+            if _qt_app is None:
+                # Create with minimal arguments for headless operation
+                _qt_app = QApplication(sys.argv if sys.argv else ["pytest"])
+                # Process events to complete initialization
+                _qt_app.processEvents()
+        except ImportError:
+            pass  # PyQt6 not available
+        except Exception:
+            pass  # Ignore initialization errors
+    return _qt_app
+
+
+def pytest_configure(config):
+    """Called after command line options have been parsed and all plugins initialized.
+    
+    This ensures QApplication is created very early, before any test collection or imports.
+    """
+    # Ensure QApplication exists before any test files are imported
+    _ensure_qapplication()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def qapplication() -> Generator:
+    """Create a QApplication instance for the entire test session.
+    
+    This fixture ensures a single QApplication instance is created and properly
+    cleaned up. It works in both headless (CI) and GUI environments.
+    The autouse=True ensures it's created before any tests run.
+    """
+    try:
+        from PyQt6.QtWidgets import QApplication
+    except ImportError:
+        # If PyQt6 is not available, skip silently - some tests don't need it
+        yield None
         return
+    
+    # Ensure QApplication exists
+    app = _ensure_qapplication()
+    if app is None:
+        app = QApplication.instance()
+        if app is None:
+            app = QApplication(sys.argv if sys.argv else ["pytest"])
+    
+    # Process any pending events to ensure initialization is complete
+    app.processEvents()
+    
+    yield app
+    
+    # Cleanup: close all windows and process final events
+    try:
+        # Close all top-level widgets
+        for widget in app.allWidgets():
+            if widget.isWindow() and widget.isVisible():
+                widget.close()
+        app.processEvents()
+    except Exception:
+        pass  # Ignore cleanup errors
 
-    skip_gui = pytest.mark.skip(reason="libGL.so.1 not available; skipping GUI-dependent tests")
-    for item in items:
-        filename = Path(str(item.fspath)).name
-        if filename in GUI_TEST_FILES:
-            item.add_marker(skip_gui)
+
+@pytest.fixture(scope="function")
+def qapp(qapplication) -> Generator:
+    """Provide QApplication instance for individual test functions.
+    
+    This is a function-scoped fixture that ensures the QApplication is
+    available and processes events between tests.
+    """
+    from PyQt6.QtWidgets import QApplication
+    
+    app = QApplication.instance()
+    if app is None:
+        app = qapplication
+        if app is None:
+            # Fallback: create if still None
+            app = QApplication(sys.argv if sys.argv else ["pytest"])
+    
+    # Process any pending events
+    app.processEvents()
+    
+    yield app
+    
+    # Process events after test to ensure cleanup
+    app.processEvents()

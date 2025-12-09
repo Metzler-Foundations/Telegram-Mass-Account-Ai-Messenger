@@ -117,17 +117,11 @@ def test_wizard_manager():
     return True
 
 
-def test_sms_provider_widget():
+def test_sms_provider_widget(qapp):
     """Test the SMSProviderSetupWidget."""
     print("\nTesting SMSProviderSetupWidget...")
 
-    from PyQt6.QtWidgets import QApplication
     from settings_window import SMSProviderSetupWidget
-
-    # Need QApplication for widgets
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication(sys.argv)
 
     widget = SMSProviderSetupWidget()
 
