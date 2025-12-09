@@ -388,9 +388,18 @@ class ServiceFactory:
         except Exception as e:
             logger.warning(f"TelegramClient import failed, using fallback: {e}")
 
-        # Get API credentials from secrets manager
-        api_id = config_manager.get_telegram_api_id() or os.getenv("TELEGRAM_API_ID", "")
-        api_hash = config_manager.get_telegram_api_hash() or os.getenv("TELEGRAM_API_HASH", "")
+        # Get API credentials from secrets manager (with graceful fallback)
+        try:
+            api_id = config_manager.get_telegram_api_id() or os.getenv("TELEGRAM_API_ID", "")
+        except ValueError:
+            # Secret not found, try environment variable
+            api_id = os.getenv("TELEGRAM_API_ID", "")
+        
+        try:
+            api_hash = config_manager.get_telegram_api_hash() or os.getenv("TELEGRAM_API_HASH", "")
+        except ValueError:
+            # Secret not found, try environment variable
+            api_hash = os.getenv("TELEGRAM_API_HASH", "")
 
         if not api_id or not api_hash:
             logger.warning(

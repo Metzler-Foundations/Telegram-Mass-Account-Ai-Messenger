@@ -101,10 +101,27 @@ class WelcomeWizard(QWizard):
         self._page_count = 6
 
         self.button(QWizard.WizardButton.FinishButton).clicked.connect(self.on_finish)
+        
+        # Add cleanup handler for wizard close
+        self.finished.connect(self._cleanup_on_close)
 
     def pageCount(self):
         """Return the number of pages in the wizard."""
         return self._page_count
+
+    def _cleanup_on_close(self):
+        """Cleanup temporary session files when wizard closes."""
+        try:
+            session_dir = Path(".setup_sessions")
+            if session_dir.exists():
+                for f in session_dir.glob("*"):
+                    try:
+                        f.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                logger.debug("Cleaned up temporary validation session files")
+        except Exception as e:
+            logger.debug(f"Error during wizard cleanup: {e}")
 
     def _handle_skip(self, button_id):
         """Handle skip button click."""
@@ -119,11 +136,8 @@ class WelcomeWizard(QWizard):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 # Mark setup as skipped
-                import os
-
-                setup_path = os.path.join(os.getcwd(), ".setup_complete")
-                with open(setup_path, "w") as f:
-                    f.write("skipped")
+                setup_path = Path(".setup_complete")
+                setup_path.write_text("skipped")
                 self.skipped.emit()
                 self.accept()
 
@@ -175,59 +189,96 @@ class WelcomeWizard(QWizard):
             QMessageBox.warning(self, "Incomplete Setup", error_msg)
             return
 
-        # Validate credentials and fetch profile info
-        progress = QProgressDialog("Validating credentials…", "Cancel", 0, 3, self)
-        progress.setWindowTitle("Validating Setup")
-        progress.setWindowModality(Qt.WindowModality.WindowModal)
-        progress.setValue(0)
-        progress.setMinimumDuration(0)
+        # Check if credentials were already validated on their respective pages
+        telegram_page = self.page(1)
+        gemini_page = self.page(3)
+        
+        tg_already_validated = hasattr(telegram_page, '_validated') and telegram_page._validated
+        gemini_already_validated = hasattr(gemini_page, '_validated') and gemini_page._validated
 
-        tg_ok, tg_profile, tg_error = self._run_async_task(
-            self._validate_telegram_settings(config["telegram"])
-        )
-        progress.setValue(1)
-        if progress.wasCanceled():
-            return
-        if not tg_ok:
-            progress.cancel()
-            QMessageBox.critical(self, "Telegram Validation Failed", tg_error)
-            return
+        # Initialize variables
+        tg_ok = True
+        tg_profile = {}
+        tg_error = ""
+        gemini_ok = True
+        gemini_error = ""
 
-        gemini_ok, gemini_error = self._run_async_task(
-            self._validate_gemini_key(config["gemini"]["api_key"])
-        )
-        progress.setValue(2)
-        if progress.wasCanceled():
-            return
-        if not gemini_ok:
-            progress.cancel()
-            QMessageBox.critical(
-                self,
-                "Gemini Validation Failed",
-                gemini_error or "Gemini API key could not be validated.",
-            )
-            return
+        # Only validate if not already done
+        if not tg_already_validated or not gemini_already_validated:
+            progress = QProgressDialog("Validating credentials…", "Cancel", 0, 3, self)
+            progress.setWindowTitle("Validating Setup")
+            progress.setWindowModality(Qt.WindowModality.WindowModal)
+            progress.setValue(0)
+            progress.setMinimumDuration(0)
+
+            if not tg_already_validated:
+                tg_ok, tg_profile, tg_error = self._run_async_task(
+                    self._validate_telegram_settings(config["telegram"])
+                )
+                progress.setValue(1)
+                if progress.wasCanceled():
+                    return
+                if not tg_ok:
+                    progress.cancel()
+                    QMessageBox.critical(self, "Telegram Validation Failed", tg_error)
+                    return
+            else:
+                progress.setValue(1)
+                logger.info("Telegram credentials already validated, skipping")
+
+            if not gemini_already_validated:
+                gemini_ok, gemini_error = self._run_async_task(
+                    self._validate_gemini_key(config["gemini"]["api_key"])
+                )
+                progress.setValue(2)
+                if progress.wasCanceled():
+                    return
+                if not gemini_ok:
+                    progress.cancel()
+                    QMessageBox.critical(
+                        self,
+                        "Gemini Validation Failed",
+                        gemini_error or "Gemini API key could not be validated.",
+                    )
+                    return
+            else:
+                progress.setValue(2)
+                logger.info("Gemini API key already validated, skipping")
+        else:
+            logger.info("All credentials already validated on their pages, skipping validation")
+            tg_profile = {}  # Will be loaded from saved config if needed
 
         # Validate SMS provider API key if provided
         # Fixed: Only validate if API key is actually provided
         sms_config = config.get("sms_providers", {})
         sms_api_key = sms_config.get("api_key", "").strip()
         if sms_api_key:
-            sms_ok, sms_error = self._run_async_task(self._validate_sms_provider(sms_config))
-            progress.setValue(3)
-            if progress.wasCanceled():
-                return
-            if not sms_ok:
-                # Don't fail the setup for SMS validation, just warn
-                QMessageBox.warning(
-                    self,
-                    "SMS Provider Warning",
-                    f"SMS provider API key could not be validated:\n\n{sms_error}\n\n"
-                    "You can still continue with setup, but account creation may not work.",
-                )
-        else:
-            progress.setValue(3)
-            # SMS provider is optional, so no validation needed if not provided
+            # Only update progress if we created it earlier
+            if not tg_already_validated or not gemini_already_validated:
+                sms_ok, sms_error = self._run_async_task(self._validate_sms_provider(sms_config))
+                progress.setValue(3)
+                if progress.wasCanceled():
+                    return
+                if not sms_ok:
+                    # Don't fail the setup for SMS validation, just warn
+                    QMessageBox.warning(
+                        self,
+                        "SMS Provider Warning",
+                        f"SMS provider API key could not be validated:\n\n{sms_error}\n\n"
+                        "You can still continue with setup, but account creation may not work.",
+                    )
+            else:
+                # Both credentials already validated, validate SMS without progress dialog
+                sms_ok, sms_error = self._run_async_task(self._validate_sms_provider(sms_config))
+                if not sms_ok:
+                    # Don't fail the setup for SMS validation, just warn
+                    QMessageBox.warning(
+                        self,
+                        "SMS Provider Warning",
+                        f"SMS provider API key could not be validated:\n\n{sms_error}\n\n"
+                        "You can still continue with setup, but account creation may not work.",
+                    )
+        # SMS provider is optional, so no validation needed if not provided
 
         # Stamp validation metadata
         now_ts = datetime.now().isoformat()
@@ -241,24 +292,37 @@ class WelcomeWizard(QWizard):
         config["gemini"]["validated_at"] = now_ts
 
         # Save to secrets manager first (secure storage)
+        # Note: Credentials may already be saved if validated on their pages
         try:
             from core.secrets_manager import get_secrets_manager
 
             secrets_manager = get_secrets_manager()
 
-            # Save credentials to secrets manager
-            secrets_manager.set_secret("telegram_api_id", config["telegram"]["api_id"])
-            secrets_manager.set_secret("telegram_api_hash", config["telegram"]["api_hash"])
-            secrets_manager.set_secret("gemini_api_key", config["gemini"]["api_key"])
+            # Check if credentials are already saved (from page validation)
+            api_id_exists = secrets_manager.get_secret("telegram_api_id", required=False)
+            api_hash_exists = secrets_manager.get_secret("telegram_api_hash", required=False)
+            gemini_exists = secrets_manager.get_secret("gemini_api_key", required=False)
+
+            # Only save if not already saved
+            if not api_id_exists:
+                secrets_manager.set_secret("telegram_api_id", config["telegram"]["api_id"])
+            if not api_hash_exists:
+                secrets_manager.set_secret("telegram_api_hash", config["telegram"]["api_hash"])
+            if not gemini_exists:
+                secrets_manager.set_secret("gemini_api_key", config["gemini"]["api_key"])
+            
             # Fixed: Use .get() to safely access optional SMS provider API key
             sms_api_key = config.get("sms_providers", {}).get("api_key")
             if sms_api_key:
                 secrets_manager.set_secret("sms_provider_api_key", sms_api_key)
 
-            # Audit the credential setup
-            audit_credential_modification("telegram_api_id", "setup_wizard", success=True)
-            audit_credential_modification("telegram_api_hash", "setup_wizard", success=True)
-            audit_credential_modification("gemini_api_key", "setup_wizard", success=True)
+            # Audit the credential setup (only if newly saved)
+            if not api_id_exists:
+                audit_credential_modification("telegram_api_id", "setup_wizard", success=True)
+            if not api_hash_exists:
+                audit_credential_modification("telegram_api_hash", "setup_wizard", success=True)
+            if not gemini_exists:
+                audit_credential_modification("gemini_api_key", "setup_wizard", success=True)
             # Fixed: Use .get() to safely access optional SMS provider API key
             if sms_api_key:
                 audit_credential_modification("sms_provider_api_key", "setup_wizard", success=True)
@@ -268,16 +332,20 @@ class WelcomeWizard(QWizard):
             # ALSO save to APIKeyManager so MainWindow can find them
             try:
                 api_key_manager = APIKeyManager()
-                # Telegram uses separate services for api_id and api_hash
-                api_key_manager.add_api_key("telegram_api_id", config["telegram"]["api_id"])
-                api_key_manager.add_api_key("telegram_api_hash", config["telegram"]["api_hash"])
-                api_key_manager.add_api_key("gemini", config["gemini"]["api_key"])
+                # Only add if not already present
+                if not api_key_manager.get_api_key("telegram_api_id"):
+                    api_key_manager.add_api_key("telegram_api_id", config["telegram"]["api_id"])
+                if not api_key_manager.get_api_key("telegram_api_hash"):
+                    api_key_manager.add_api_key("telegram_api_hash", config["telegram"]["api_hash"])
+                if not api_key_manager.get_api_key("gemini"):
+                    api_key_manager.add_api_key("gemini", config["gemini"]["api_key"])
                 # Fixed: Use .get() to safely access optional SMS provider settings
                 sms_config = config.get("sms_providers", {})
                 sms_api_key = sms_config.get("api_key")
                 if sms_api_key:
                     provider_name = sms_config.get("provider", "unknown").lower().replace(" ", "_")
-                    api_key_manager.add_api_key(provider_name, sms_api_key)
+                    if not api_key_manager.get_api_key(provider_name):
+                        api_key_manager.add_api_key(provider_name, sms_api_key)
                 logger.info("Credentials also saved to APIKeyManager")
             except Exception as api_mgr_error:
                 logger.warning(f"Failed to save to APIKeyManager: {api_mgr_error}")
@@ -300,10 +368,9 @@ class WelcomeWizard(QWizard):
 
         # Save to config.json (ONLY non-sensitive configuration)
         import json
-        import os
 
         try:
-            config_path = os.path.join(os.getcwd(), "config.json")
+            config_path = Path("config.json")
 
             # Create clean config without credentials
             clean_config = {
@@ -332,9 +399,8 @@ class WelcomeWizard(QWizard):
                 json.dump(clean_config, f, indent=2)
 
             # Mark as not first time
-            setup_path = os.path.join(os.getcwd(), ".setup_complete")
-            with open(setup_path, "w") as f:
-                f.write("1")
+            setup_path = Path(".setup_complete")
+            setup_path.write_text("1")
 
             logger.info(
                 f"Configuration saved successfully to {config_path} (credentials in secrets manager only)"
@@ -437,9 +503,15 @@ class WelcomeWizard(QWizard):
         session_dir = Path(".setup_sessions")
         session_dir.mkdir(exist_ok=True)
 
+        # Convert api_id to int (Pyrogram requires int)
+        try:
+            api_id_int = int(api_id)
+        except (ValueError, TypeError):
+            return False, {}, f"API ID must be a number, got: {api_id}"
+
         client = Client(
             name="setup_validation",
-            api_id=api_id,
+            api_id=api_id_int,
             api_hash=api_hash,
             phone_number=phone,
             workdir=str(session_dir),
@@ -449,17 +521,40 @@ class WelcomeWizard(QWizard):
 
         profile: Dict[str, Any] = {}
 
-        try:
-            await client.connect()
-            # Connectivity and credential check (no auth required)
-            await client.invoke(GetNearestDc())
-        except Exception as exc:
+        # Retry logic for connectivity with exponential backoff
+        import asyncio
+        max_retries = 3
+        base_delay = 1.0
+        last_error = None
+        
+        for attempt in range(max_retries):
             try:
-                await client.disconnect()
-            except Exception:
-                pass
-            logger.error(f"Telegram connectivity failed: {exc}")
-            return False, profile, f"Could not reach Telegram with these credentials: {exc}"
+                await client.connect()
+                # Connectivity and credential check (no auth required)
+                await client.invoke(GetNearestDc())
+                break  # Success
+            except Exception as exc:
+                last_error = exc
+                try:
+                    await client.disconnect()
+                except Exception:
+                    pass
+                
+                # Don't retry on authentication/credential errors
+                error_str = str(exc).lower()
+                if any(keyword in error_str for keyword in ["api_id", "api_hash", "invalid", "unauthorized", "wrong"]):
+                    logger.error(f"Telegram credential error: {exc}")
+                    return False, profile, f"Invalid credentials: {exc}"
+                
+                # Retry on network errors
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2 ** attempt)
+                    logger.debug(f"Telegram connectivity attempt {attempt + 1} failed, retrying in {delay}s: {exc}")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"Telegram connectivity failed after {max_retries} attempts: {exc}")
+                    return False, profile, f"Could not reach Telegram after {max_retries} attempts: {exc}"
 
         try:
             # Ensure account is signed in; prompt user for code/password if needed
@@ -527,17 +622,22 @@ class WelcomeWizard(QWizard):
             # User may not be signed in yet; still treat connectivity as success
             logger.info(f"Telegram profile not available yet: {exc}")
         finally:
+            # Always cleanup client connection
             try:
                 await client.disconnect()
             except Exception:
                 pass
-            # Cleanup transient session files
+            
+            # Always cleanup transient session files
             try:
                 if session_dir.exists():
-                    for f in session_dir.glob("*"):
-                        f.unlink(missing_ok=True)
-            except Exception:
-                logger.debug("Skipping cleanup of temporary validation session files")
+                    for f in session_dir.glob("setup_validation*"):
+                        try:
+                            f.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+            except Exception as cleanup_exc:
+                logger.debug(f"Skipping cleanup of temporary validation session files: {cleanup_exc}")
 
         return True, profile, ""
 
@@ -712,6 +812,8 @@ class TelegramSetupPage(QWizardPage):
         super().__init__()
         self.setTitle("")
         self.setSubTitle("")
+        self._validated = False
+        self._validation_in_progress = False
 
         c = ThemeManager.get_colors()
         layout = QVBoxLayout(self)
@@ -777,6 +879,7 @@ class TelegramSetupPage(QWizardPage):
         id_label.setStyleSheet(f"font-weight: 600; color: {c['TEXT_BRIGHT']};")
         self.api_id_edit = QLineEdit()
         self.api_id_edit.setPlaceholderText("e.g. 12345678")
+        self.api_id_edit.textChanged.connect(self._on_credentials_changed)
         id_layout.addWidget(id_label)
         id_layout.addWidget(self.api_id_edit)
         form_layout.addLayout(id_layout)
@@ -789,9 +892,38 @@ class TelegramSetupPage(QWizardPage):
         hash_label.setStyleSheet(f"font-weight: 600; color: {c['TEXT_BRIGHT']};")
         self.api_hash_edit = QLineEdit()
         self.api_hash_edit.setPlaceholderText("e.g. 0123456789abcdef...")
+        self.api_hash_edit.textChanged.connect(self._on_credentials_changed)
         hash_layout.addWidget(hash_label)
         hash_layout.addWidget(self.api_hash_edit)
         form_layout.addLayout(hash_layout)
+
+        # Validation status and button
+        validation_layout = QVBoxLayout()
+        validation_layout.setSpacing(8)
+        
+        self.validation_status = QLabel("")
+        self.validation_status.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;")
+        validation_layout.addWidget(self.validation_status)
+        
+        # Button layout
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)
+        
+        self.validate_btn = QPushButton("Validate & Login")
+        self.validate_btn.setObjectName("primary")
+        self.validate_btn.setEnabled(False)
+        self.validate_btn.clicked.connect(self._validate_credentials)
+        button_layout.addWidget(self.validate_btn)
+        
+        self.clear_btn = QPushButton("Clear")
+        self.clear_btn.setObjectName("secondary")
+        self.clear_btn.setEnabled(False)
+        self.clear_btn.clicked.connect(self._clear_credentials)
+        self.clear_btn.setVisible(False)
+        button_layout.addWidget(self.clear_btn)
+        
+        validation_layout.addLayout(button_layout)
+        form_layout.addLayout(validation_layout)
 
         # Phone - Removed from page 1 to avoid confusion
         # Phone number is collected on page 2 (PhoneSetupPage) for account creation setup
@@ -805,11 +937,241 @@ class TelegramSetupPage(QWizardPage):
         self.registerField("api_hash*", self.api_hash_edit)
         # Phone field removed - collected on page 2 instead
 
-    def validatePage(self):
-        """Validate inputs."""
+    def _on_credentials_changed(self):
+        """Enable validate button when both fields have content."""
         api_id = self.api_id_edit.text().strip()
         api_hash = self.api_hash_edit.text().strip()
-        phone = self.phone_edit.text().strip()
+        has_both = bool(api_id and api_hash)
+        self.validate_btn.setEnabled(has_both and not self._validation_in_progress)
+        if not has_both:
+            self.validation_status.setText("")
+            self._validated = False
+        else:
+            # Reset validation state if credentials changed
+            # This ensures re-validation if user edits after validation
+            if self._validated:
+                # Check if values actually changed by comparing with saved values
+                try:
+                    from core.secrets_manager import get_secrets_manager
+                    secrets = get_secrets_manager()
+                    saved_api_id = secrets.get_secret("telegram_api_id", required=False)
+                    saved_api_hash = secrets.get_secret("telegram_api_hash", required=False)
+                    if saved_api_id != api_id or saved_api_hash != api_hash:
+                        self._validated = False
+                        self.validation_status.setText("⚠️ Credentials changed - please re-validate")
+                        self.validation_status.setStyleSheet("color: #faa61a; font-size: 13px; padding: 8px 0;")
+                except Exception:
+                    pass  # If we can't check, assume unchanged
+
+    def _validate_credentials(self):
+        """Validate Telegram credentials with actual login test."""
+        api_id = self.api_id_edit.text().strip()
+        api_hash = self.api_hash_edit.text().strip()
+
+        # Basic format validation first
+        errors = []
+        valid, msg = ValidationHelper.validate_api_id(api_id)
+        if not valid:
+            errors.append(msg)
+        valid, msg = ValidationHelper.validate_api_hash(api_hash)
+        if not valid:
+            errors.append(msg)
+        
+        if errors:
+            self.validation_status.setText(f"❌ Format error: {errors[0]}\n💡 Please correct the format and try again")
+            self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+            self.clear_btn.setVisible(True)
+            self.clear_btn.setEnabled(True)
+            return
+
+        # Get phone number from next page if available
+        wizard = self.wizard()
+        phone = ""
+        if wizard and wizard.page(2):
+            phone_page = wizard.page(2)
+            if hasattr(phone_page, 'phone_edit'):
+                phone = phone_page.phone_edit.text().strip()
+
+        if not phone:
+            # Test connectivity first, then prompt for phone if needed
+            self._test_connectivity(api_id, api_hash)
+            return
+
+        # Perform full validation with login
+        self._perform_validation(api_id, api_hash, phone)
+
+    def _test_connectivity(self, api_id: str, api_hash: str):
+        """Test basic connectivity without login."""
+        self._validation_in_progress = True
+        self.validate_btn.setEnabled(False)
+        self.validation_status.setText("🔄 Validating connectivity...")
+        self.validation_status.setStyleSheet("color: #5865f2; font-size: 13px; padding: 8px 0;")
+        
+        # Run async validation - test connectivity only
+        wizard = self.wizard()
+        if wizard:
+            # Create a minimal validation that just tests connectivity with retry logic
+            async def test_connectivity_only():
+                from pyrogram import Client
+                from pyrogram.raw.functions.help import GetNearestDc
+                from pathlib import Path
+                import asyncio
+                
+                session_dir = Path(".setup_sessions")
+                session_dir.mkdir(exist_ok=True)
+                
+                # Convert api_id to int (Pyrogram requires int)
+                try:
+                    api_id_int = int(api_id)
+                except (ValueError, TypeError):
+                    return False, {}, f"API ID must be a number, got: {api_id}"
+                
+                # Retry logic with exponential backoff
+                max_retries = 3
+                base_delay = 1.0
+                last_error = None
+                
+                for attempt in range(max_retries):
+                    client = None
+                    try:
+                        client = Client(
+                            name=f"connectivity_test_{attempt}",
+                            api_id=api_id_int,
+                            api_hash=api_hash,
+                            workdir=str(session_dir),
+                            in_memory=True,
+                            no_updates=True,
+                        )
+                        
+                        await client.connect()
+                        await client.invoke(GetNearestDc())
+                        await client.disconnect()
+                        
+                        # Success - cleanup session files
+                        try:
+                            for f in session_dir.glob("connectivity_test_*"):
+                                f.unlink(missing_ok=True)
+                        except Exception:
+                            pass
+                        
+                        return True, {}, ""
+                    except Exception as exc:
+                        last_error = exc
+                        if client:
+                            try:
+                                await client.disconnect()
+                            except Exception:
+                                pass
+                        
+                        # Don't retry on authentication/credential errors
+                        error_str = str(exc).lower()
+                        if any(keyword in error_str for keyword in ["api_id", "api_hash", "invalid", "unauthorized", "wrong"]):
+                            return False, {}, f"Invalid credentials: {exc}"
+                        
+                        # Retry on network errors
+                        if attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt)
+                            await asyncio.sleep(delay)
+                            continue
+                
+                # All retries failed
+                return False, {}, f"Connection failed after {max_retries} attempts: {last_error}"
+            
+            tg_ok, _, tg_error = wizard._run_async_task(test_connectivity_only())
+            
+            self._validation_in_progress = False
+            self._on_credentials_changed()
+            
+            if tg_ok:
+                self.validation_status.setText("✅ Connected (credentials valid)\n⚠️ Partial validation - enter phone on next page to complete login")
+                self.validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+                # Save credentials immediately (partial validation)
+                self._save_credentials(api_id, api_hash)
+                # Mark as partially validated - will complete on finish
+                self._validated = True
+                self.clear_btn.setVisible(False)
+            else:
+                self.validation_status.setText(f"❌ {tg_error}\n💡 Check your credentials and try again")
+                self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+                self._validated = False
+                self.clear_btn.setVisible(True)
+                self.clear_btn.setEnabled(True)
+
+    def _perform_validation(self, api_id: str, api_hash: str, phone: str):
+        """Perform full validation with login."""
+        self._validation_in_progress = True
+        self.validate_btn.setEnabled(False)
+        self.validation_status.setText("🔄 Validating & logging in...")
+        self.validation_status.setStyleSheet("color: #5865f2; font-size: 13px; padding: 8px 0;")
+        
+        # Run async validation
+        wizard = self.wizard()
+        if wizard:
+            tg_ok, tg_profile, tg_error = wizard._run_async_task(
+                wizard._validate_telegram_settings({
+                    "api_id": api_id,
+                    "api_hash": api_hash,
+                    "phone_number": phone
+                })
+            )
+            
+            self._validation_in_progress = False
+            self._on_credentials_changed()
+            
+            if tg_ok:
+                profile_name = tg_profile.get("display_name", phone) if tg_profile else phone
+                self.validation_status.setText(f"✅ Fully validated & logged in as {profile_name}")
+                self.validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+                self._validated = True
+                # Save credentials immediately
+                self._save_credentials(api_id, api_hash)
+                self.clear_btn.setVisible(False)
+            else:
+                self.validation_status.setText(f"❌ {tg_error}\n💡 Check your credentials and try again")
+                self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+                self._validated = False
+                self.clear_btn.setVisible(True)
+                self.clear_btn.setEnabled(True)
+
+    def _clear_credentials(self):
+        """Clear credentials and reset validation state."""
+        self.api_id_edit.clear()
+        self.api_hash_edit.clear()
+        self.validation_status.setText("")
+        self._validated = False
+        self.clear_btn.setVisible(False)
+        self.clear_btn.setEnabled(False)
+        self._on_credentials_changed()
+
+    def _save_credentials(self, api_id: str, api_hash: str):
+        """Save validated credentials immediately."""
+        try:
+            from core.secrets_manager import get_secrets_manager
+            from integrations.api_key_manager import APIKeyManager
+            from core.security_audit import audit_credential_modification
+
+            secrets_manager = get_secrets_manager()
+            secrets_manager.set_secret("telegram_api_id", api_id)
+            secrets_manager.set_secret("telegram_api_hash", api_hash)
+            
+            api_key_manager = APIKeyManager()
+            api_key_manager.add_api_key("telegram_api_id", api_id)
+            api_key_manager.add_api_key("telegram_api_hash", api_hash)
+            
+            audit_credential_modification("telegram_api_id", "wizard_validation", success=True)
+            audit_credential_modification("telegram_api_hash", "wizard_validation", success=True)
+            
+            logger.info("Telegram credentials validated and saved immediately")
+        except Exception as e:
+            logger.error(f"Failed to save validated credentials: {e}")
+
+    def validatePage(self):
+        """Validate inputs - check if already validated."""
+        if self._validated:
+            return True
+            
+        api_id = self.api_id_edit.text().strip()
+        api_hash = self.api_hash_edit.text().strip()
 
         errors = []
         valid, msg = ValidationHelper.validate_api_id(api_id)
@@ -820,13 +1182,24 @@ class TelegramSetupPage(QWizardPage):
         if not valid:
             errors.append(msg)
 
-        valid, msg = ValidationHelper.validate_phone_number(phone)
-        if not valid:
-            errors.append(msg)
-
         if errors:
             QMessageBox.warning(self, "Validation Error", "\n".join(errors))
             return False
+        
+        # If not validated yet, prompt user
+        if not self._validated:
+            reply = QMessageBox.question(
+                self,
+                "Validate Credentials",
+                "Would you like to validate and login now?\n\n"
+                "This will test your credentials and save them if valid.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._validate_credentials()
+                return self._validated
+        
         return True
 
 
@@ -885,9 +1258,27 @@ class PhoneSetupPage(QWizardPage):
         phone_label.setStyleSheet(f"font-weight: 600; color: {c['TEXT_BRIGHT']};")
         self.phone_edit = QLineEdit()
         self.phone_edit.setPlaceholderText("e.g. +1234567890")
+        self.phone_edit.textChanged.connect(self._on_phone_changed)
         phone_input_layout.addWidget(phone_label)
         phone_input_layout.addWidget(self.phone_edit)
         phone_layout.addLayout(phone_input_layout)
+
+        # Telegram validation status and button (if credentials were partially validated)
+        self.telegram_validation_layout = QVBoxLayout()
+        self.telegram_validation_layout.setSpacing(8)
+        
+        self.telegram_validation_status = QLabel("")
+        self.telegram_validation_status.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;")
+        self.telegram_validation_layout.addWidget(self.telegram_validation_status)
+        
+        self.complete_telegram_btn = QPushButton("Complete Telegram Login")
+        self.complete_telegram_btn.setObjectName("primary")
+        self.complete_telegram_btn.setEnabled(False)
+        self.complete_telegram_btn.clicked.connect(self._complete_telegram_validation)
+        self.complete_telegram_btn.setVisible(False)  # Hidden by default
+        self.telegram_validation_layout.addWidget(self.complete_telegram_btn)
+        
+        phone_layout.addLayout(self.telegram_validation_layout)
 
         layout.addWidget(phone_group)
 
@@ -955,6 +1346,68 @@ class PhoneSetupPage(QWizardPage):
         self.registerField("sms_provider", self.provider_combo)
         self.registerField("sms_api_key", self.api_key_edit)
 
+    def _on_phone_changed(self):
+        """Check if we should show complete Telegram validation button."""
+        phone = self.phone_edit.text().strip()
+        has_phone = bool(phone)
+        
+        # Check if Telegram credentials were partially validated (connectivity only)
+        wizard = self.wizard()
+        if wizard and wizard.page(1):
+            telegram_page = wizard.page(1)
+            if hasattr(telegram_page, '_validated') and telegram_page._validated:
+                # Check if it was full validation or just connectivity
+                status_text = telegram_page.validation_status.text() if hasattr(telegram_page, 'validation_status') else ""
+                if "connectivity confirmed" in status_text and "Enter phone" in status_text:
+                    # Partial validation - show complete button
+                    self.complete_telegram_btn.setVisible(True)
+                    self.complete_telegram_btn.setEnabled(has_phone)
+                    if has_phone:
+                        self.telegram_validation_status.setText("💡 Entered phone number - click to complete Telegram login")
+                        self.telegram_validation_status.setStyleSheet("color: #5865f2; font-size: 13px; padding: 8px 0;")
+                    else:
+                        self.telegram_validation_status.setText("")
+                else:
+                    # Full validation already done
+                    self.complete_telegram_btn.setVisible(False)
+                    self.telegram_validation_status.setText("")
+            else:
+                self.complete_telegram_btn.setVisible(False)
+                self.telegram_validation_status.setText("")
+
+    def _complete_telegram_validation(self):
+        """Complete Telegram validation with phone number."""
+        phone = self.phone_edit.text().strip()
+        if not phone:
+            QMessageBox.warning(self, "Phone Required", "Please enter a phone number first.")
+            return
+        
+        # Get credentials from Telegram page
+        wizard = self.wizard()
+        if not wizard or not wizard.page(1):
+            return
+        
+        telegram_page = wizard.page(1)
+        api_id = telegram_page.api_id_edit.text().strip() if hasattr(telegram_page, 'api_id_edit') else ""
+        api_hash = telegram_page.api_hash_edit.text().strip() if hasattr(telegram_page, 'api_hash_edit') else ""
+        
+        if not api_id or not api_hash:
+            QMessageBox.warning(self, "Credentials Missing", "Please enter Telegram API credentials on the previous page.")
+            return
+        
+        # Perform full validation
+        self.complete_telegram_btn.setEnabled(False)
+        self.telegram_validation_status.setText("🔄 Completing Telegram login...")
+        self.telegram_validation_status.setStyleSheet("color: #5865f2; font-size: 13px; padding: 8px 0;")
+        
+        # Trigger validation on Telegram page
+        if hasattr(telegram_page, '_perform_validation'):
+            telegram_page._perform_validation(api_id, api_hash, phone)
+            # Update status based on result (will be updated by Telegram page)
+            self.telegram_validation_status.setText("✅ Check previous page for validation status")
+            self.telegram_validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+            self.complete_telegram_btn.setVisible(False)
+
     def validatePage(self):
         """Validate inputs."""
         phone = self.phone_edit.text().strip()
@@ -984,6 +1437,8 @@ class GeminiSetupPage(QWizardPage):
         super().__init__()
         self.setTitle("")
         self.setSubTitle("")
+        self._validated = False
+        self._validation_in_progress = False
 
         c = ThemeManager.get_colors()
         layout = QVBoxLayout(self)
@@ -1044,6 +1499,7 @@ class GeminiSetupPage(QWizardPage):
         self.gemini_edit = QLineEdit()
         self.gemini_edit.setPlaceholderText("Starts with AIza...")
         self.gemini_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.gemini_edit.textChanged.connect(self._on_key_changed)
 
         show_check = QCheckBox("Show API Key")
         show_check.toggled.connect(
@@ -1056,18 +1512,144 @@ class GeminiSetupPage(QWizardPage):
         key_layout.addWidget(self.gemini_edit)
         key_layout.addWidget(show_check)
 
+        # Validation status and button
+        validation_layout = QVBoxLayout()
+        validation_layout.setSpacing(8)
+        
+        self.validation_status = QLabel("")
+        self.validation_status.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;")
+        validation_layout.addWidget(self.validation_status)
+        
+        # Button layout
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)
+        
+        self.validate_btn = QPushButton("Validate API Key")
+        self.validate_btn.setObjectName("primary")
+        self.validate_btn.setEnabled(False)
+        self.validate_btn.clicked.connect(self._validate_api_key)
+        button_layout.addWidget(self.validate_btn)
+        
+        self.clear_btn = QPushButton("Clear")
+        self.clear_btn.setObjectName("secondary")
+        self.clear_btn.setEnabled(False)
+        self.clear_btn.clicked.connect(self._clear_api_key)
+        self.clear_btn.setVisible(False)
+        button_layout.addWidget(self.clear_btn)
+        
+        validation_layout.addLayout(button_layout)
+        key_layout.addLayout(validation_layout)
+
         layout.addLayout(key_layout)
         layout.addStretch()
 
         self.registerField("gemini*", self.gemini_edit)
 
+    def _on_key_changed(self):
+        """Enable validate button when key has content."""
+        api_key = self.gemini_edit.text().strip()
+        has_key = bool(api_key)
+        self.validate_btn.setEnabled(has_key and not self._validation_in_progress)
+        if not has_key:
+            self.validation_status.setText("")
+            self._validated = False
+
+    def _validate_api_key(self):
+        """Validate Gemini API key with actual API test."""
+        api_key = self.gemini_edit.text().strip()
+        
+        # Basic format validation first
+        valid, msg = ValidationHelper.validate_gemini_api_key(api_key)
+        if not valid:
+            self.validation_status.setText(f"❌ {msg}\n💡 Please check the format and try again")
+            self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+            self.clear_btn.setVisible(True)
+            self.clear_btn.setEnabled(True)
+            return
+
+        # Perform actual API validation
+        self._validation_in_progress = True
+        self.validate_btn.setEnabled(False)
+        self.validation_status.setText("🔄 Validating API key...")
+        self.validation_status.setStyleSheet("color: #5865f2; font-size: 13px; padding: 8px 0;")
+        
+        # Run async validation
+        wizard = self.wizard()
+        if wizard:
+            gemini_ok, gemini_error = wizard._run_async_task(
+                wizard._validate_gemini_key(api_key)
+            )
+            
+            self._validation_in_progress = False
+            self._on_key_changed()
+            
+            if gemini_ok:
+                self.validation_status.setText("✅ API key validated and working")
+                self.validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+                self._validated = True
+                # Save credentials immediately
+                self._save_credentials(api_key)
+                self.clear_btn.setVisible(False)
+            else:
+                self.validation_status.setText(f"❌ {gemini_error or 'API key validation failed'}\n💡 Check your API key and try again")
+                self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+                self._validated = False
+                self.clear_btn.setVisible(True)
+                self.clear_btn.setEnabled(True)
+
+    def _clear_api_key(self):
+        """Clear API key and reset validation state."""
+        self.gemini_edit.clear()
+        self.validation_status.setText("")
+        self._validated = False
+        self.clear_btn.setVisible(False)
+        self.clear_btn.setEnabled(False)
+        self._on_key_changed()
+
+    def _save_credentials(self, api_key: str):
+        """Save validated credentials immediately."""
+        try:
+            from core.secrets_manager import get_secrets_manager
+            from integrations.api_key_manager import APIKeyManager
+            from core.security_audit import audit_credential_modification
+
+            secrets_manager = get_secrets_manager()
+            secrets_manager.set_secret("gemini_api_key", api_key)
+            
+            api_key_manager = APIKeyManager()
+            api_key_manager.add_api_key("gemini", api_key)
+            
+            audit_credential_modification("gemini_api_key", "wizard_validation", success=True)
+            
+            logger.info("Gemini API key validated and saved immediately")
+        except Exception as e:
+            logger.error(f"Failed to save validated Gemini credentials: {e}")
+
     def validatePage(self):
-        """Validate API key."""
+        """Validate API key - check if already validated."""
+        if self._validated:
+            return True
+            
         api_key = self.gemini_edit.text().strip()
         valid, msg = ValidationHelper.validate_gemini_api_key(api_key)
         if not valid:
             QMessageBox.warning(self, "Validation Error", msg)
             return False
+        
+        # If not validated yet, prompt user
+        if not self._validated:
+            reply = QMessageBox.question(
+                self,
+                "Validate API Key",
+                "Would you like to validate the API key now?\n\n"
+                "This will test your key and save it if valid.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._validate_api_key()
+                return self._validated
+        
         return True
 
 

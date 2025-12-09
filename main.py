@@ -787,6 +787,120 @@ class MainWindow(QMainWindow):
         # Set up background task executor for non-blocking UI operations
         self._setup_background_task_executor()
 
+        # Initialize member database and account manager early (needed for warmup service and UI)
+        # CRITICAL FIX: Initialize databases directly during startup, not in background task callback
+        self.member_db = None
+        self.account_manager = None
+        try:
+            # Initialize with standard database path
+            self.member_db = MemberDatabase("members.db")
+            # Database tables are automatically created in MemberDatabase.__init__
+            logger.info("Member database initialized successfully")
+            
+            self.account_manager = AccountManager(
+                self.member_db, performance_profile=self.performance_settings
+            )
+            # Account database tables are automatically created in AccountManager.__init__
+            logger.info("Account manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}", exc_info=True)
+            self.member_db = None
+            self.account_manager = None
+            # Show user-friendly error
+            ErrorHandler.safe_warning(
+                self,
+                "Database Initialization Error",
+                f"Failed to initialize databases:\n\n{e}\n\n"
+                "The application may not function correctly. Please check file permissions and disk space.",
+            )
+
+        # Load any existing validated profile details early
+        self.telegram_profile = self._load_primary_account_profile()
+
+        # Initialize Advanced Features Manager (automatic)
+        self.advanced_features = None
+        self.auto_integrator = None
+        if ADVANCED_FEATURES_AVAILABLE:
+            try:
+                self.advanced_features = get_features_manager()
+                logger.info("✅ Advanced features initialized and ready")
+                # Log available features
+                self.advanced_features.log_status()
+
+                # Initialize auto-integrator for seamless integration
+                from integrations.auto_integrator import get_auto_integrator
+
+                self.auto_integrator = get_auto_integrator(self.advanced_features)
+                logger.info(
+                    "🤖 Auto-Integrator enabled - features will apply automatically to campaigns"
+                )
+
+            except Exception as e:
+                logger.warning(f"Advanced features initialization failed: {e}")
+                self.advanced_features = None
+                self.auto_integrator = None
+
+        # Initialize DM campaign manager early (needed for UI setup)
+        self.campaign_manager = None
+        if self.account_manager:
+            try:
+                self.campaign_manager = DMCampaignManager(account_manager=self.account_manager)
+                logger.info("DM Campaign Manager initialized")
+            except Exception as e:
+                logger.error(f"Failed to initialize campaign manager: {e}")
+                self.campaign_manager = None
+
+        # Initialize proxy pool manager (starts async later)
+        self.proxy_pool_manager = None
+        try:
+            from proxy.proxy_pool_manager import get_proxy_pool_manager
+
+            self.proxy_pool_manager = get_proxy_pool_manager()
+            logger.info("Proxy Pool Manager reference obtained")
+        except ImportError:
+            logger.warning("Proxy Pool Manager not available")
+        except Exception as e:
+            logger.error(f"Failed to get proxy pool manager: {e}")
+
+        # Schedule async initialization for account manager services
+        try:
+            import threading
+
+            def init_async_services():
+                """Initialize async services in a background thread."""
+                # Start async services in background thread to avoid blocking UI
+                import threading
+
+                def start_async_services():
+                    """Start async services in background thread."""
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        # Start account manager services
+                        if self.account_manager:
+                            loop.run_until_complete(self.account_manager.start())
+                            logger.info("Account Manager services started")
+
+                        # Start proxy pool manager
+                        if self.proxy_pool_manager:
+                            loop.run_until_complete(self.proxy_pool_manager.start())
+                            logger.info("Proxy Pool Manager started with 15-endpoint feed")
+                    except Exception as e:
+                        logger.error(f"Failed to start async services: {e}")
+                    finally:
+                        loop.close()
+
+                # Start services in background thread
+                service_thread = threading.Thread(target=start_async_services, daemon=True)
+                service_thread.start()
+                logger.info("Async services starting in background thread")
+
+            # Run in background thread to not block UI
+            init_thread = threading.Thread(target=init_async_services, daemon=True)
+            init_thread.start()
+        except Exception as e:
+            logger.error(f"Failed to schedule async service initialization: {e}")
+
     def _setup_memory_management(self):
         """Set up memory management and garbage collection."""
 
@@ -890,217 +1004,8 @@ class MainWindow(QMainWindow):
             logger.error(f"Unexpected error in background task {task_id}: {e}")
             QTimer.singleShot(0, lambda: self._on_background_task_completed(task_id, None))
 
-    def _on_background_task_completed(self, task_id: str, result):
-        """Handle background task completion on main thread."""
-        # This method can be overridden by subclasses or connected to specific handlers
-        logger.debug(f"Background task {task_id} completed")
-
-        # Initialize member database and account manager early (needed for warmup service and UI)
-        self.member_db = None
-        self.account_manager = None
-        try:
-            self.member_db = MemberDatabase()
-            self.account_manager = AccountManager(
-                self.member_db, performance_profile=self.performance_settings
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize database: {e}")
-            self.member_db = None
-            self.account_manager = None
-
-        # Load any existing validated profile details early
-        self.telegram_profile = self._load_primary_account_profile()
-
-        # Initialize Advanced Features Manager (automatic)
-        self.advanced_features = None
-        self.auto_integrator = None
-        if ADVANCED_FEATURES_AVAILABLE:
-            try:
-                self.advanced_features = get_features_manager()
-                logger.info("✅ Advanced features initialized and ready")
-                # Log available features
-                self.advanced_features.log_status()
-
-                # Initialize auto-integrator for seamless integration
-                from integrations.auto_integrator import get_auto_integrator
-
-                self.auto_integrator = get_auto_integrator(self.advanced_features)
-                logger.info(
-                    "🤖 Auto-Integrator enabled - features will apply automatically to campaigns"
-                )
-
-            except Exception as e:
-                logger.warning(f"Advanced features initialization failed: {e}")
-                self.advanced_features = None
-                self.auto_integrator = None
-
-        # Initialize DM campaign manager early (needed for UI setup)
-        self.campaign_manager = None
-        if self.account_manager:
-            try:
-                self.campaign_manager = DMCampaignManager(account_manager=self.account_manager)
-                logger.info("DM Campaign Manager initialized")
-            except Exception as e:
-                logger.error(f"Failed to initialize campaign manager: {e}")
-                self.campaign_manager = None
-
-        # Initialize proxy pool manager (starts async later)
-        self.proxy_pool_manager = None
-        try:
-            from proxy_pool_manager import get_proxy_pool_manager
-
-            self.proxy_pool_manager = get_proxy_pool_manager()
-            logger.info("Proxy Pool Manager reference obtained")
-        except ImportError:
-            logger.warning("Proxy Pool Manager not available")
-        except Exception as e:
-            logger.error(f"Failed to get proxy pool manager: {e}")
-
-        # Schedule async initialization for account manager services
-        try:
-            import threading
-
-            def init_async_services():
-                """Initialize async services in a background thread."""
-                # Start async services in background thread to avoid blocking UI
-                import threading
-
-                def start_async_services():
-                    """Start async services in background thread."""
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    try:
-                        # Start account manager services
-                        if self.account_manager:
-                            loop.run_until_complete(self.account_manager.start())
-                            logger.info("Account Manager services started")
-
-                        # Start proxy pool manager
-                        if self.proxy_pool_manager:
-                            loop.run_until_complete(self.proxy_pool_manager.start())
-                            logger.info("Proxy Pool Manager started with 15-endpoint feed")
-                    except Exception as e:
-                        logger.error(f"Failed to start async services: {e}")
-                    finally:
-                        loop.close()
-
-                # Start services in background thread
-                service_thread = threading.Thread(target=start_async_services, daemon=True)
-                service_thread.start()
-                logger.info("Async services starting in background thread")
-
-            # Run in background thread to not block UI
-            init_thread = threading.Thread(target=init_async_services, daemon=True)
-            init_thread.start()
-        except Exception as e:
-            logger.error(f"Failed to schedule async service initialization: {e}")
-
-        # Initialize Account Creator (will be re-initialized after services are ready)
-        # Note: gemini_service is not available yet, so we initialize it later
-        self.account_creator = None
-
-        self.setWindowTitle("Telegram Auto-Reply Bot")
-        self.setGeometry(100, 100, 1366, 768)  # Laptop-friendly baseline
-
-        # Initialize counters for metrics
-        self.message_count = 0
-        self.ai_responses = 0
-        self.error_count = 0
-        self.start_time = time.time()
-
-        # Track async tasks for proper cleanup
-        self._active_tasks = set()
-        self._task_lock = threading.Lock()  # Thread-safe task management
-
-        # Initialize component managers
-        self.navigation_manager = NavigationManager(self)
-        self.dashboard_widget = None  # Will be created in setup_ui
-
-        # Prevent app exit when dialogs are closed
-        try:
-            from PyQt6.QtWidgets import QApplication
-
-            app = QApplication.instance()
-            if app:
-                app.setQuitOnLastWindowClosed(False)
-        except Exception as e:
-            logger.debug(f"Could not set quitOnLastWindowClosed: {e}")
-
-        # Initialize UI controller for clean separation of concerns
-        self.ui_controller = UIController()
-
-        # Connect thread-safe signals
-        self.update_status_signal.connect(self._safe_update_status)
-        self.update_metrics_signal.connect(self._safe_update_metrics)
-        self.show_error_signal.connect(self._safe_show_error)
-        self.show_success_signal.connect(self._safe_show_success)
-
-        # Connect UI controller signals
-        self.ui_controller.campaign_created.connect(self._on_campaign_created)
-        self.ui_controller.campaign_updated.connect(self._on_campaign_updated)
-        self.ui_controller.account_status_changed.connect(self._on_account_status_changed)
-        self.ui_controller.system_health_updated.connect(self._on_system_health_updated)
-        self.ui_controller.error_occurred.connect(self._on_controller_error)
-
-        self.setup_ui()
-        self._refresh_validation_chips()
-        self.setup_tray_icon()
-        self.setup_keyboard_shortcuts()
-
-        # Handle application close - but don't auto-delete on close to prevent dialog issues
-        # We'll handle cleanup manually in closeEvent
-        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
-
-        # Check if first-time setup wizard is needed
-        QTimer.singleShot(500, self._check_first_time_setup)
-
-        # Set up cleanup on application exit
-        import atexit
-
-        atexit.register(self._cleanup_resources)
-
-        # Initialize service container with concrete implementations
-        # This must be called before AccountCreator initialization
-        self._initialize_services()
-
-        # Initialize Account Creator now that services are ready
-        # Fixed: Initialize AccountCreator AFTER gemini_service is available
-        if self.member_db and self.account_manager:
-            try:
-                self.account_creator = AccountCreator(
-                    db=self.member_db,
-                    gemini_service=self.gemini_service,  # Now available after _initialize_services()
-                    account_manager=self.account_manager,
-                )
-                logger.info("Account Creator initialized with services")
-            except Exception as e:
-                logger.error(f"Failed to initialize AccountCreator: {e}")
-                self.account_creator = None
-
-        # Initialize API key manager and warmup service
-        self.api_key_manager = APIKeyManager()
-
-        # Only initialize warmup service if account_manager is available
-        if self.account_manager:
-            try:
-                self.warmup_service = AccountWarmupService(
-                    self.account_manager,
-                    self.gemini_service,
-                    performance_profile=self.performance_settings,
-                )
-                self.warmup_service.add_status_callback(self._on_warmup_status_update)
-                # Link warmup service to account manager for auto-queueing
-                self.account_manager.warmup_service = self.warmup_service
-
-                # Add account manager status callback for UI updates
-
-                self.account_manager.add_status_callback(self._on_account_status_changed)
-            except Exception as e:
-                self.warmup_service = None
-                logger.warning(f"Warmup service not initialized: {e}")
-        else:
-            self.warmup_service = None
-            logger.warning("Warmup service not initialized - account manager unavailable")
+    # NOTE: _on_background_task_completed is defined later in the file (line ~1821) with the actual implementation
+    # This first definition would be overwritten, so it's removed to avoid confusion
 
     def _initialize_services(self):
         """Initialize and register all services with the container."""
@@ -3114,8 +3019,33 @@ class MainWindow(QMainWindow):
         self.tray_icon.show()
 
     def _check_first_time_setup(self):
-        """Check if first-time setup is needed and show wizard if necessary."""
+        """Check if first-time setup is needed and show wizard if necessary.
+        
+        This is a secondary check that runs after app_launcher has already handled
+        the welcome wizard. It only triggers if:
+        1. The wizard was skipped but config is still incomplete
+        2. Critical settings are missing after wizard completion
+        """
         try:
+            # Skip if .setup_complete exists (wizard was completed)
+            setup_complete = Path(".setup_complete")
+            if setup_complete.exists():
+                # Verify that critical credentials actually exist
+                try:
+                    from core.secrets_manager import get_secrets_manager
+                    secrets = get_secrets_manager()
+                    api_id = secrets.get_secret("telegram_api_id", required=False)
+                    api_hash = secrets.get_secret("telegram_api_hash", required=False)
+                    
+                    if not api_id or not api_hash:
+                        logger.warning("Setup marked complete but credentials missing - showing settings")
+                        # Credentials missing, show settings dialog
+                        self._open_settings_dialog()
+                    # Otherwise, setup is complete, no action needed
+                except Exception as secrets_error:
+                    logger.debug(f"Could not verify secrets (non-critical): {secrets_error}")
+                return
+
             # Load current settings
             config_path = Path("config.json")
             settings_data = {}
@@ -3130,46 +3060,28 @@ class MainWindow(QMainWindow):
             wizard_manager = SetupWizardManager(settings_data)
 
             if wizard_manager.is_wizard_needed():
-                logger.info("First-time setup needed, showing wizard...")
+                logger.info("First-time setup needed (wizard was skipped), showing settings...")
 
                 # Show info message
                 msg_box = QMessageBox(self)
-                msg_box.setWindowTitle("Welcome!")
-                msg_box.setText("Welcome to Telegram Auto-Reply Bot!")
+                msg_box.setWindowTitle("Configuration Needed")
+                msg_box.setText("Configuration Required")
                 msg_box.setInformativeText(
-                    "It looks like this is your first time running the bot, or some "
-                    "critical settings are missing.\n\n"
-                    "We'll guide you through a quick setup to get everything configured."
+                    "Some critical settings are missing.\n\n"
+                    "Please configure your API credentials in the settings dialog."
                 )
                 msg_box.setIcon(QMessageBox.Icon.Information)
                 msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
                 msg_box.exec()
 
-                # Open settings in wizard mode
-                dialog = SettingsWindow(self, force_wizard=True)
-                result = dialog.exec()
-
-                if result == QDialog.DialogCode.Accepted:
-                    logger.info("First-time setup completed successfully")
-                    # Reload configuration after setup
-                    if hasattr(self, "config_manager"):
-                        self.config_manager.reload_config()
-                    # Refresh dashboard profile with newly validated data
-                    self._refresh_dashboard_profile()
-                    self._refresh_validation_chips()
-                else:
-                    logger.warning("First-time setup was cancelled")
+                # Open settings dialog (not wizard, since wizard was already skipped)
+                self._open_settings_dialog()
 
         except (ImportError, AttributeError, RuntimeError, ConnectionError) as e:
             logger.error(f"Error during first-time setup check: {e}")
         except Exception as e:
             logger.error(f"Critical error during first-time setup: {e}", exc_info=True)
-            # Show user-friendly error message
-            QMessageBox.critical(
-                self,
-                "Setup Error",
-                "There was a critical error during setup. Please restart the application.",
-            )
+            # Don't show error dialog here - it's non-critical and might be annoying
 
     def _open_settings_dialog(self):
         """Open the settings dialog."""

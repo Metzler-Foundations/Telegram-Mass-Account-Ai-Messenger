@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class MemberDatabase:
     """Database manager for scraped member data."""
 
-    def __init__(self, db_path: str = "data/members.db"):
+    def __init__(self, db_path: str = "members.db"):
         """
         Initialize database connection.
 

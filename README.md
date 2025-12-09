@@ -20,7 +20,13 @@ This platform provides a complete solution for managing multiple Telegram accoun
 - **Proxy Management:** Manual proxy entry/testing, auto mode with proxy pool manager
 - **Warmup Service:** Account warmup with progress tracking and configurable settings
 - **Health & Risk Monitoring:** Anti-detection integration, account health tracking
-- **Welcome Wizard:** First-time setup guide for easy onboarding
+- **Welcome Wizard:** First-time setup guide with **real-time credential validation**
+  - **Real-time Validation:** Validates Telegram and Gemini API keys immediately as you enter them
+  - **Visual Feedback:** Shows "Validating..." status with color-coded success/error indicators
+  - **Network Resilience:** Automatic retry with exponential backoff (3 attempts) for network failures
+  - **Error Recovery:** Clear buttons and helpful error messages for easy retry
+  - **Secure Storage:** Credentials saved immediately to encrypted secrets manager after validation
+  - **Smart Validation:** Skips re-validation if credentials already validated on their pages
 
 ### ⚠️ Requires Configuration/Testing
 
@@ -66,16 +72,24 @@ pip install -r requirements.txt
 
 ### Configuration
 
-Set required environment variables:
+**Recommended:** Use the Welcome Wizard on first launch for guided setup with real-time validation.
+
+The wizard will:
+- ✅ Validate Telegram credentials with actual login test
+- ✅ Validate Gemini API key against Google's API
+- ✅ Save credentials securely to encrypted storage
+- ✅ Provide immediate feedback on validation status
+
+**Alternative:** Set environment variables manually:
 
 ```bash
-export TELEGRAM_API_ID=your_api_id
-export TELEGRAM_API_HASH=your_api_hash
-export GEMINI_API_KEY=your_gemini_key
-export SMS_PROVIDER_API_KEY=your_sms_provider_key
+export SECRET_TELEGRAM_API_ID=your_api_id
+export SECRET_TELEGRAM_API_HASH=your_api_hash
+export SECRET_GEMINI_API_KEY=your_gemini_key
+export SECRET_SMS_PROVIDER_API_KEY=your_sms_provider_key
 ```
 
-Alternatively, use the Settings UI in the application to configure API keys securely.
+Or use the Settings UI in the application to configure API keys securely.
 
 ### Running the Application
 
@@ -83,7 +97,36 @@ Alternatively, use the Settings UI in the application to configure API keys secu
 python main.py
 ```
 
-On first launch, the Welcome Wizard will guide you through initial setup.
+On first launch, the Welcome Wizard will guide you through initial setup with **real-time credential validation**:
+
+1. **Telegram Setup Page:**
+   - Enter API ID and API Hash
+   - Click "Validate & Login" to test credentials immediately
+   - Shows connectivity status or full login validation
+   - Credentials saved automatically on successful validation
+
+2. **Phone & SMS Setup Page:**
+   - Enter phone number for primary account
+   - Optionally configure SMS provider for bulk account creation
+   - Can complete Telegram login if credentials were partially validated
+
+3. **Gemini Setup Page:**
+   - Enter Gemini API key
+   - Click "Validate API Key" to test against Google's API
+   - Shows validation status immediately
+   - Key saved automatically on successful validation
+
+4. **Features & Complete Pages:**
+   - Overview of system capabilities
+   - Final validation check (skips if already validated)
+   - Setup completion confirmation
+
+**Features:**
+- ✅ Real-time validation with visual feedback
+- ✅ Network retry logic (handles temporary failures)
+- ✅ Error recovery with clear buttons
+- ✅ Secure credential storage (encrypted)
+- ✅ Smart validation (no duplicate checks)
 
 ## Features
 

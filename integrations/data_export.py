@@ -319,7 +319,7 @@ class DataExporter:
         from member_scraper import MemberDatabase
 
         try:
-            member_db = MemberDatabase()
+            member_db = MemberDatabase("members.db")
             conn = sqlite3.connect(member_db.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
@@ -408,7 +408,7 @@ class DataExporter:
         from member_scraper import MemberDatabase
 
         try:
-            member_db = MemberDatabase()
+            member_db = MemberDatabase("members.db")
             conn = sqlite3.connect(member_db.db_path)
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()

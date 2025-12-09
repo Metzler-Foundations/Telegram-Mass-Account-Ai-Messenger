@@ -973,7 +973,7 @@ class DMCampaignManager:
             # Get member data from database
             from scraping.member_scraper import MemberDatabase
 
-            member_db = MemberDatabase()
+            member_db = MemberDatabase("members.db")
 
             # Get account clients - ensure accounts are started
             account_clients = {}
@@ -1623,7 +1623,7 @@ class DMCampaignManager:
             # Update member database to mark as messaged
             from scraping.member_scraper import MemberDatabase
 
-            member_db = MemberDatabase()
+            member_db = MemberDatabase("members.db")
 
             # Get member efficiently
             member = member_db.get_member_by_id(user_id)

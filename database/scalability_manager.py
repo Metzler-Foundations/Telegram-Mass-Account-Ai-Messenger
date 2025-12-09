@@ -66,7 +66,7 @@ class DatabaseScalabilityManager:
         """Initialize SQLite with optimizations."""
         from .connection_pool import ConnectionPool
 
-        db_path = self.config.get("sqlite_path", "data/members.db")
+        db_path = self.config.get("sqlite_path", "members.db")
         self.connection_manager = ConnectionPool(
             database=db_path,
             min_connections=self.config.get("min_connections", 2),
@@ -288,7 +288,7 @@ def get_scalability_manager(config: Dict[str, Any] = None) -> DatabaseScalabilit
             # Default SQLite configuration
             config = {
                 "backend": "sqlite",
-                "sqlite_path": "data/members.db",
+                "sqlite_path": "members.db",
                 "min_connections": 2,
                 "max_connections": 20,
             }

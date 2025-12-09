@@ -289,7 +289,7 @@ class MemberFilterDialog(QDialog):
         try:
             from member_scraper import MemberDatabase
 
-            member_db = MemberDatabase()
+            member_db = MemberDatabase("members.db")
 
             # Build actual SQL query
             actual_count = self.get_actual_filtered_count(member_db, criteria)

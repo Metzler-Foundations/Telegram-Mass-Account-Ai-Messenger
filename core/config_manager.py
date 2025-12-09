@@ -220,11 +220,19 @@ class ConfigurationManager:
             return None
 
     def get_telegram_api_id(self) -> Optional[str]:
-        """Get Telegram API ID from secrets manager."""
+        """Get Telegram API ID from secrets manager.
+        
+        Note: This method uses required=True, so it will raise ValueError if not found.
+        Callers should handle this exception gracefully for first-time setup scenarios.
+        """
         return self.get_secret("telegram_api_id", required=True)
 
     def get_telegram_api_hash(self) -> Optional[str]:
-        """Get Telegram API hash from secrets manager."""
+        """Get Telegram API hash from secrets manager.
+        
+        Note: This method uses required=True, so it will raise ValueError if not found.
+        Callers should handle this exception gracefully for first-time setup scenarios.
+        """
         return self.get_secret("telegram_api_hash", required=True)
 
     def get_gemini_api_key(self) -> Optional[str]:
