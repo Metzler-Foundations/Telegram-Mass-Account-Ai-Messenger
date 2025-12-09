@@ -19,6 +19,7 @@ try:
         QApplication,
     )
     from PyQt6.QtCore import Qt
+
     PYQT6_AVAILABLE = True
 except ImportError:
     # PyQt6 not available (headless environment)
@@ -66,6 +67,7 @@ except ImportError:
         class Qt:
             class WindowModality:
                 ApplicationModal = 1
+
 
 logger = logging.getLogger(__name__)
 
