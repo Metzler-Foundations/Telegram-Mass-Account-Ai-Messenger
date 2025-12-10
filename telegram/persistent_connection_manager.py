@@ -127,7 +127,8 @@ class PersistentConnectionManager:
 
         if reconnect_attempts >= self.max_reconnect_attempts:
             logger.error(
-                f"❌ Max reconnect attempts reached for {phone_number}. Manual intervention required."
+                f"❌ Max reconnect attempts reached for {phone_number}. "
+                f"Manual intervention required."
             )
             client_info["is_reconnecting"] = False
             return
@@ -136,7 +137,9 @@ class PersistentConnectionManager:
         delay = self.reconnect_delays[min(reconnect_attempts, len(self.reconnect_delays) - 1)]
 
         logger.info(
-            f"🔄 Reconnecting {phone_number} (attempt {reconnect_attempts + 1}/{self.max_reconnect_attempts}) in {delay}s..."
+            f"🔄 Reconnecting {phone_number} "
+            f"(attempt {reconnect_attempts + 1}/{self.max_reconnect_attempts}) "
+            f"in {delay}s..."
         )
 
         # Wait before reconnecting
@@ -185,7 +188,9 @@ class PersistentConnectionManager:
                 self.reconnect_tasks[phone_number] = reconnect_task
             else:
                 logger.error(
-                    f"❌ CRITICAL: {phone_number} failed to reconnect after {self.max_reconnect_attempts} attempts. Account may be lost!"
+                    f"❌ CRITICAL: {phone_number} failed to reconnect after "
+                    f"{self.max_reconnect_attempts} attempts. "
+                    f"Account may be lost!"
                 )
 
     def get_connection_status(self, phone_number: str) -> Optional[Dict]:
