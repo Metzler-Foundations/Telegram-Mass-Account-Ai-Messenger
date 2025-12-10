@@ -362,7 +362,10 @@ class RelationshipMapper:
         now = datetime.now()
         cursor.execute(
             """
-            INSERT INTO community_clusters (cluster_id, density, avg_connections, topics, created_at, updated_at)
+            INSERT INTO community_clusters (
+                cluster_id, density, avg_connections, topics,
+                created_at, updated_at
+            )
             VALUES (?, ?, ?, ?, ?, ?)
             ON CONFLICT(cluster_id) DO UPDATE SET
                 density = excluded.density,
@@ -450,7 +453,8 @@ class RelationshipMapper:
 
         conn.close()
         logger.info(
-            f"Rebuilt graph with {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges"
+            f"Rebuilt graph with {self.graph.number_of_nodes()} nodes and "
+            f"{self.graph.number_of_edges()} edges"
         )
 
     def analyze_message_for_relationships(self, message: Message):

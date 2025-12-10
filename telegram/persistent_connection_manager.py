@@ -69,7 +69,8 @@ class PersistentConnectionManager:
 
                     if not is_connected:
                         logger.warning(
-                            f"⚠️ Account {phone_number} disconnected! Attempting immediate reconnect..."
+                            f"⚠️ Account {phone_number} disconnected! "
+                            f"Attempting immediate reconnect..."
                         )
                         await self._reconnect_client(phone_number, client_info)
                     else:

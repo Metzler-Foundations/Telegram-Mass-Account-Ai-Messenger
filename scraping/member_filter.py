@@ -306,7 +306,8 @@ class MemberFilterDialog(QDialog):
             logger.error(f"Failed to get actual count: {e}")
             # Fallback to estimated if database unavailable
             self.results_label.setText(
-                "⚠️ <b>Cannot query database.</b> Select criteria and click Preview for actual count."
+                "⚠️ <b>Cannot query database.</b> Select criteria and click "
+                "Preview for actual count."
             )
             self.results_label.setTextFormat(Qt.TextFormat.RichText)
 

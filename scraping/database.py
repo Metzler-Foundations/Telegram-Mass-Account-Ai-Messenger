@@ -159,7 +159,8 @@ class MemberDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_groups_group_id ON groups(group_id)",
                 "CREATE INDEX IF NOT EXISTS idx_groups_type ON groups(type)",
                 "CREATE INDEX IF NOT EXISTS idx_error_log_session_id ON error_log(session_id)",
-                "CREATE INDEX IF NOT EXISTS idx_scraping_sessions_account_id ON scraping_sessions(account_id)",
+                "CREATE INDEX IF NOT EXISTS idx_scraping_sessions_account_id "
+                "ON scraping_sessions(account_id)",
             ]
 
             for index_sql in indexes:

@@ -842,7 +842,8 @@ class CampaignAnalyticsWidget(QWidget):
             }
 
             risk_html = f"""
-            <p style="color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])}; font-size: 14px; font-weight: bold;">
+            <p style="color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])}; """
+            """font-size: 14px; font-weight: bold;">
                 Overall Risk: {risk_level.upper()}
             </p>
             <p style="color: {c['TEXT_SECONDARY']}; font-size: 12px;">
@@ -907,7 +908,10 @@ class CampaignAnalyticsWidget(QWidget):
                 filter_str = "JSON Files (*.json)"
 
             # Get save path
-            default_name = f"campaign_{self.selected_campaign_id}_analytics_{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
+            default_name = (
+                f"campaign_{self.selected_campaign_id}_analytics_"
+                f"{datetime.now().strftime('%Y%m%d_%H%M%S')}{ext}"
+            )
             file_path, _ = QFileDialog.getSaveFileName(
                 self, "Export Campaign Analytics", default_name, filter_str
             )

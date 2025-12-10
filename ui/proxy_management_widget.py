@@ -136,7 +136,8 @@ class ProxyStatsWidget(QWidget):
         # Title
         title_label = QLabel(title)
         title_label.setStyleSheet(
-            f"font-size: 12px; font-weight: 600; color: {c['TEXT_SECONDARY']}; text-transform: uppercase;"
+            f"font-size: 12px; font-weight: 600; color: {c['TEXT_SECONDARY']}; "
+            f"text-transform: uppercase;"
         )
         layout.addWidget(title_label)
 

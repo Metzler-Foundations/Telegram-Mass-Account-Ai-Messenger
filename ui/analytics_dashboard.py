@@ -51,7 +51,8 @@ class MetricCard(QFrame):
 
         title_label = QLabel(title)
         title_label.setStyleSheet(
-            f"font-size: 12px; color: {c['TEXT_SECONDARY']}; font-weight: 600; text-transform: uppercase;"
+            f"font-size: 12px; color: {c['TEXT_SECONDARY']}; "
+            f"font-weight: 600; text-transform: uppercase;"
         )
         header_layout.addWidget(title_label)
         header_layout.addStretch()
