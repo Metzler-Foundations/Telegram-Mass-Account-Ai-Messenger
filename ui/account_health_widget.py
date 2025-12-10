@@ -267,7 +267,8 @@ class AccountHealthCard(QFrame):
         risk_level = self.account_data.get("risk_level", "safe")
         risk_value = QLabel(risk_level.upper())
         risk_value.setStyleSheet(
-            f"color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])}; font-size: 12px; font-weight: bold;"
+            f"color: {risk_colors.get(risk_level, c['TEXT_SECONDARY'])}; "
+            f"font-size: 12px; font-weight: bold;"
         )
         risk_layout.addWidget(risk_value)
 
