@@ -560,7 +560,8 @@ class AdvancedFeaturesManager:
         if self.network:
             stats = self.network.get_network_stats()
             logger.info(
-                f"Network: {stats.get('total_nodes', 0)} nodes, {stats.get('total_connections', 0)} connections"
+                f"Network: {stats.get('total_nodes', 0)} nodes, "
+                f"{stats.get('total_connections', 0)} connections"
             )
 
         logger.info("================================")

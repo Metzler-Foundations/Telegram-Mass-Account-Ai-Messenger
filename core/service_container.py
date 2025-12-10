@@ -404,7 +404,8 @@ class ServiceFactory:
         if not api_id or not api_hash:
             logger.warning(
                 "Telegram API credentials not configured. "
-                "Please set them in Settings > API & Auth or environment variables (TELEGRAM_API_ID, TELEGRAM_API_HASH)."
+                "Please set them in Settings > API & Auth or environment variables "
+                "(TELEGRAM_API_ID, TELEGRAM_API_HASH)."
             )
             # Create a fallback client
             if TelegramClient:

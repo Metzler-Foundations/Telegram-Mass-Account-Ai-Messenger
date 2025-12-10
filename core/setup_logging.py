@@ -2,7 +2,8 @@
 """
 Centralized logging configuration with rotation.
 
-This module provides a single function to configure logging with rotation for the entire application.
+This module provides a single function to configure logging with rotation
+for the entire application.
 """
 
 import logging

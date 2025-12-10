@@ -166,7 +166,10 @@ class CostAlertSystem:
                         threshold=threshold,
                         current_cost=current_cost,
                         provider=None,
-                        message=f"{period.value.title()} cost ${current_cost:.2f} exceeded {level.value} threshold ${threshold:.2f}",
+                        message=(
+                            f"{period.value.title()} cost ${current_cost:.2f} "
+                            f"exceeded {level.value} threshold ${threshold:.2f}"
+                        ),
                         timestamp=datetime.now(),
                     )
 
@@ -193,7 +196,10 @@ class CostAlertSystem:
                         threshold=threshold,
                         current_cost=cost,
                         provider=provider,
-                        message=f"Provider {provider} total cost ${cost:.2f} exceeded limit ${threshold:.2f}",
+                        message=(
+                            f"Provider {provider} total cost ${cost:.2f} "
+                            f"exceeded limit ${threshold:.2f}"
+                        ),
                         timestamp=datetime.now(),
                     )
 

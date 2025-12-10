@@ -79,7 +79,8 @@ class PooledConnection:
                 if "locked" in str(e).lower() and attempt < max_retries - 1:
                     wait_time = 0.5 * (2**attempt)
                     logger.warning(
-                        f"Database locked on commit, retry {attempt + 1}/{max_retries} after {wait_time}s"
+                        f"Database locked on commit, retry {attempt + 1}/"
+                        f"{max_retries} after {wait_time}s"
                     )
                     time.sleep(wait_time)
                 else:

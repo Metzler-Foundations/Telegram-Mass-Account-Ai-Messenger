@@ -26,7 +26,10 @@ class AccountCreatorIntegration:
         from resume_manager import clear_operation_checkpoint, save_operation_checkpoint
         from user_helpers import translate_error
 
-        operation_id = f"account_creation_{config.get('phone_provider', 'unknown')}_{int(datetime.now().timestamp())}"
+        operation_id = (
+            f"account_creation_{config.get('phone_provider', 'unknown')}_"
+            f"{int(datetime.now().timestamp())}"
+        )
 
         try:
             # Save checkpoint at start

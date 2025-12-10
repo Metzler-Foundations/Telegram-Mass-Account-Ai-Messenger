@@ -167,7 +167,8 @@ class DatabaseLockHandler:
                         total_wait = time.time() - start_time
                         self._lock_statistics["total_wait_time"] += total_wait
                         logger.error(
-                            f"Database lock could not be acquired after {self.max_retry_attempts} attempts "
+                            f"Database lock could not be acquired after "
+                            f"{self.max_retry_attempts} attempts "
                             f"({total_wait:.2f}s total wait time)"
                         )
                         raise DatabaseLockError(

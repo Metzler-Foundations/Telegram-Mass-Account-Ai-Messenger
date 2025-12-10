@@ -235,7 +235,9 @@ class ResourceManager:
                                 3, self.max_concurrent_operations - 1
                             )
                             logger.info(
-                                f"Reduced concurrent operations to {self.max_concurrent_operations} due to high memory usage"
+                                f"Reduced concurrent operations to "
+                                f"{self.max_concurrent_operations} "
+                                f"due to high memory usage"
                             )
 
                     elif memory_mb < (self.memory_limit_mb * 0.5):  # 50% of limit
@@ -245,13 +247,17 @@ class ResourceManager:
                                 20, self.max_concurrent_operations + 1
                             )
                             logger.info(
-                                f"Increased concurrent operations to {self.max_concurrent_operations} due to available memory"
+                                f"Increased concurrent operations to "
+                                f"{self.max_concurrent_operations} "
+                                f"due to available memory"
                             )
 
                     # Log resource usage periodically
                     if int(time.time()) % 300 == 0:  # Every 5 minutes
                         logger.info(
-                            f"Resource usage - Memory: {memory_mb:.1f}MB, CPU: {cpu_percent:.1f}%, Active operations: {self.active_operations}"
+                            f"Resource usage - Memory: {memory_mb:.1f}MB, "
+                            f"CPU: {cpu_percent:.1f}%, "
+                            f"Active operations: {self.active_operations}"
                         )
 
                 await asyncio.sleep(self.resource_check_interval)

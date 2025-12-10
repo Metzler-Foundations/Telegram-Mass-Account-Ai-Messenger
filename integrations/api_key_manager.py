@@ -40,7 +40,10 @@ class APIKeyManager:
         # Service configurations
         self.service_configs = {
             "gemini": {
-                "validation_url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+                "validation_url": (
+                    "https://generativelanguage.googleapis.com/v1beta/models/"
+                    "gemini-1.5-flash-latest:generateContent"
+                ),
                 "test_prompt": 'Say "Hello" in exactly 5 words.',
                 "headers": {"Content-Type": "application/json"},
                 "rate_limit": 60,  # requests per minute

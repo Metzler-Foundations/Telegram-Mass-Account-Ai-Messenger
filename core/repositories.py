@@ -187,7 +187,16 @@ class AccountRepository(BaseRepository):
             self.execute_update(
                 """
                 INSERT OR REPLACE INTO accounts
-                (phone_number, username, first_name, last_name, status, config, created_at, updated_at)
+                (
+                    phone_number,
+                    username,
+                    first_name,
+                    last_name,
+                    status,
+                    config,
+                    created_at,
+                    updated_at,
+                )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (

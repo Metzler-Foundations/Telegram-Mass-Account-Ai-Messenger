@@ -357,7 +357,8 @@ class ExportManager:
                 # Format active hours
                 if campaign.get("active_hours_start") is not None:
                     row["active_hours"] = (
-                        f"{campaign.get('active_hours_start', '')}-{campaign.get('active_hours_end', '')}"
+                        f"{campaign.get('active_hours_start', '')}-"
+                        f"{campaign.get('active_hours_end', '')}"
                     )
                 writer.writerow(row)
 

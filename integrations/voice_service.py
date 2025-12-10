@@ -408,7 +408,8 @@ class VoiceService:
             if len(self.voice_timestamps_by_chat[chat_id]) >= MAX_VOICE_MESSAGES_PER_CHAT_PER_HOUR:
                 return (
                     False,
-                    f"Chat rate limit reached ({MAX_VOICE_MESSAGES_PER_CHAT_PER_HOUR}/hour per chat)",
+                    f"Chat rate limit reached "
+                    f"({MAX_VOICE_MESSAGES_PER_CHAT_PER_HOUR}/hour per chat)",
                 )
 
         return True, "OK"
@@ -610,7 +611,8 @@ class VoiceService:
         # Check minimum messages requirement
         if depth < config.min_messages_before_voice:
             logger.debug(
-                f"Skipping voice - conversation too new ({depth}/{config.min_messages_before_voice})"
+                f"Skipping voice - conversation too new "
+                f"({depth}/{config.min_messages_before_voice})"
             )
             return False
 

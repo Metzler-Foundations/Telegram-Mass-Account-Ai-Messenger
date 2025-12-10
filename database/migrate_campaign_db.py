@@ -36,19 +36,23 @@ def migrate_campaign_database(db_path: str = "campaigns.db"):
             indexes_to_create = [
                 (
                     "idx_campaign_messages_campaign_id",
-                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign_id ON campaign_messages(campaign_id)",
+                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign_id "
+                    "ON campaign_messages(campaign_id)",
                 ),
                 (
                     "idx_campaign_messages_sent_at",
-                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_sent_at ON campaign_messages(sent_at DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_sent_at "
+                    "ON campaign_messages(sent_at DESC)",
                 ),
                 (
                     "idx_campaign_messages_status",
-                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_status ON campaign_messages(status)",
+                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_status "
+                    "ON campaign_messages(status)",
                 ),
                 (
                     "idx_campaign_messages_campaign_sent",
-                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign_sent ON campaign_messages(campaign_id, sent_at DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_campaign_messages_campaign_sent "
+                    "ON campaign_messages(campaign_id, sent_at DESC)",
                 ),
                 (
                     "idx_campaigns_status",
