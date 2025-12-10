@@ -400,7 +400,8 @@ class IntelligenceEngine:
             )
 
             logger.info(
-                f"Gathered intelligence on user {user_id}: {intel.value_tier.value} tier, score {intel.value_score:.2f}"
+                f"Gathered intelligence on user {user_id}: "
+                f"{intel.value_tier.value} tier, score {intel.value_score:.2f}"
             )
             return intel
 
@@ -695,7 +696,10 @@ class IntelligenceEngine:
             cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO activity_log (user_id, activity_type, timestamp, hour_of_day, day_of_week, metadata)
+            INSERT INTO activity_log (
+                user_id, activity_type, timestamp, hour_of_day,
+                day_of_week, metadata
+            )
             VALUES (?, ?, ?, ?, ?, ?)
         """,
             (
@@ -730,7 +734,10 @@ class IntelligenceEngine:
             cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO interactions (user_id, interaction_type, target_id, message_id, timestamp, metadata)
+            INSERT INTO interactions (
+                user_id, interaction_type, target_id, message_id,
+                timestamp, metadata
+            )
             VALUES (?, ?, ?, ?, ?, ?)
         """,
             (

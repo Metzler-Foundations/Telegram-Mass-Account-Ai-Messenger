@@ -208,7 +208,10 @@ class ErrorTranslator:
         "PhoneCodeInvalid": {
             "title": "Invalid Verification Code",
             "message": "The verification code you entered is incorrect.",
-            "solution": "Check the code Telegram sent you and try again. The code usually has 5 digits.",
+            "solution": (
+                "Check the code Telegram sent you and try again. "
+                "The code usually has 5 digits."
+            ),
         },
         "PhoneCodeExpired": {
             "title": "Verification Code Expired",
@@ -234,7 +237,10 @@ class ErrorTranslator:
         "UserDeactivated": {
             "title": "Account Deactivated",
             "message": "This Telegram account has been deactivated or banned.",
-            "solution": "You cannot use this account. Create a new one or contact Telegram support.",
+            "solution": (
+                "You cannot use this account. Create a new one or "
+                "contact Telegram support."
+            ),
         },
         "ApiIdInvalid": {
             "title": "Invalid API Credentials",
@@ -296,13 +302,19 @@ class ErrorTranslator:
         "database is locked": {
             "title": "Database Locked",
             "message": "The database is locked by another process.",
-            "solution": "Close any other instances of this application. If problem persists, restart the app.",
+            "solution": (
+                "Close any other instances of this application. "
+                "If problem persists, restart the app."
+            ),
         },
         # Proxy errors
         "Proxy": {
             "title": "Proxy Connection Failed",
             "message": "Could not connect through the proxy.",
-            "solution": "Check: 1) Proxy IP and port are correct 2) Proxy is online 3) Username/password if required",
+            "solution": (
+                "Check: 1) Proxy IP and port are correct "
+                "2) Proxy is online 3) Username/password if required"
+            ),
         },
     }
 
@@ -419,7 +431,10 @@ class TooltipHelper:
 
     TOOLTIPS = {
         # API Settings
-        "telegram_api_id": "Your Telegram API ID from https://my.telegram.org/apps\nExample: 12345678",
+        "telegram_api_id": (
+            "Your Telegram API ID from https://my.telegram.org/apps\n"
+            "Example: 12345678"
+        ),
         "telegram_api_hash": (
             "Your Telegram API Hash from https://my.telegram.org/apps\n"
             "Example: 0123456789abcdef0123456789abcdef"
@@ -430,34 +445,75 @@ class TooltipHelper:
             "Required for AI responses and profile cloning"
         ),
         # Anti-Detection
-        "min_delay": "Minimum seconds to wait between actions\nLower = faster but riskier\nRecommended: 2-5 seconds",
-        "max_delay": "Maximum seconds to wait between actions\nHigher = safer but slower\nRecommended: 20-60 seconds",
+        "min_delay": (
+            "Minimum seconds to wait between actions\n"
+            "Lower = faster but riskier\nRecommended: 2-5 seconds"
+        ),
+        "max_delay": (
+            "Maximum seconds to wait between actions\n"
+            "Higher = safer but slower\nRecommended: 20-60 seconds"
+        ),
         "messages_per_hour": (
             "How many messages to send per hour\nTelegram limit: ~200/hour\n"
             "Safe rate: 30-50/hour\nAggressive: 80-100/hour"
         ),
-        "burst_limit": "Max messages to send in quick succession\nRecommended: 2-3 messages\nLower is safer",
-        "online_simulation": "Simulate realistic online/offline patterns\nMakes your bot appear more human",
+        "burst_limit": (
+            "Max messages to send in quick succession\n"
+            "Recommended: 2-3 messages\nLower is safer"
+        ),
+        "online_simulation": (
+            "Simulate realistic online/offline patterns\n"
+            "Makes your bot appear more human"
+        ),
         # Phone Provider
         "phone_provider": (
             "Service to get phone numbers for verification\n"
             "Popular: SMS-Activate, SMSPool\nCost: $0.08-0.15 per number"
         ),
-        "provider_api_key": "API key from your phone number provider\nGet it from your provider's dashboard",
-        "country": "Country for phone numbers\nUS numbers are most stable\nOther countries may be cheaper",
+        "provider_api_key": (
+            "API key from your phone number provider\n"
+            "Get it from your provider's dashboard"
+        ),
+        "country": (
+            "Country for phone numbers\n"
+            "US numbers are most stable\nOther countries may be cheaper"
+        ),
         # Proxy
         "proxy_format": "Format: ip:port or ip:port:username:password\nExample: 192.168.1.1:8080",
-        "use_proxy": "Use proxy for account creation\nRecommended: Yes, especially for bulk creation\nHelps avoid IP bans",
+        "use_proxy": (
+            "Use proxy for account creation\n"
+            "Recommended: Yes, especially for bulk creation\n"
+            "Helps avoid IP bans"
+        ),
         # Warmup
-        "warmup_enabled": "Automatically warm up new accounts\nMakes accounts look legitimate to Telegram\nHighly recommended for new accounts",
-        "warmup_duration": "How many days to warm up account\nRecommended: 3-7 days\nLonger = safer",
+        "warmup_enabled": (
+            "Automatically warm up new accounts\n"
+            "Makes accounts look legitimate to Telegram\n"
+            "Highly recommended for new accounts"
+        ),
+        "warmup_duration": (
+            "How many days to warm up account\n"
+            "Recommended: 3-7 days\nLonger = safer"
+        ),
         # Campaign
-        "campaign_schedule": "When to send messages\nNow: Start immediately\nScheduled: Set a specific time",
-        "campaign_delay": "Delay between messages to same user\nRecommended: 24-48 hours\nAvoid seeming spammy",
+        "campaign_schedule": (
+            "When to send messages\n"
+            "Now: Start immediately\nScheduled: Set a specific time"
+        ),
+        "campaign_delay": (
+            "Delay between messages to same user\n"
+            "Recommended: 24-48 hours\nAvoid seeming spammy"
+        ),
         # Advanced
-        "realistic_typing": "Simulate human typing speed\nAdds delays proportional to message length",
+        "realistic_typing": (
+            "Simulate human typing speed\n"
+            "Adds delays proportional to message length"
+        ),
         "random_skip": "Randomly skip some messages\nMakes pattern less predictable",
-        "session_recovery": "Automatically reconnect on network errors\nKeeps your bots running reliably",
+        "session_recovery": (
+            "Automatically reconnect on network errors\n"
+            "Keeps your bots running reliably"
+        ),
     }
 
     @staticmethod

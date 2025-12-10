@@ -1163,7 +1163,8 @@ class DMCampaignManager:
             self.running_campaigns.discard(campaign_id)
 
             logger.info(
-                f"Campaign {campaign_id} completed: {campaign.sent_count} sent, {campaign.failed_count} failed"
+                f"Campaign {campaign_id} completed: "
+                f"{campaign.sent_count} sent, {campaign.failed_count} failed"
             )
 
         except Exception as e:
@@ -1572,7 +1573,8 @@ class DMCampaignManager:
         try:
             with self._get_connection() as conn:
                 cursor = conn.execute(
-                    "SELECT 1 FROM campaign_messages WHERE campaign_id = ? AND user_id = ? AND status = ? LIMIT 1",
+                    "SELECT 1 FROM campaign_messages WHERE campaign_id = ? "
+                    "AND user_id = ? AND status = ? LIMIT 1",
                     (campaign_id, user_id, MessageStatus.SENT.value),
                 )
                 return cursor.fetchone() is not None
@@ -1631,7 +1633,10 @@ class DMCampaignManager:
                 conn.execute(
                     """
                     INSERT INTO campaign_messages
-                    (campaign_id, user_id, account_phone, message_text, status, sent_at, error_message)
+                    (
+                        campaign_id, user_id, account_phone, message_text,
+                        status, sent_at, error_message
+                    )
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(campaign_id, user_id) DO UPDATE SET
                         account_phone = excluded.account_phone,

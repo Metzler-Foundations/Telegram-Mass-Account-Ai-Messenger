@@ -544,19 +544,31 @@ class WelcomeWizard(QWizard):
                 
                 # Don't retry on authentication/credential errors
                 error_str = str(exc).lower()
-                if any(keyword in error_str for keyword in ["api_id", "api_hash", "invalid", "unauthorized", "wrong"]):
+                if any(keyword in error_str for keyword in [
+                    "api_id", "api_hash", "invalid", "unauthorized", "wrong"
+                ]):
                     logger.error(f"Telegram credential error: {exc}")
                     return False, profile, f"Invalid credentials: {exc}"
                 
                 # Retry on network errors
                 if attempt < max_retries - 1:
                     delay = base_delay * (2 ** attempt)
-                    logger.debug(f"Telegram connectivity attempt {attempt + 1} failed, retrying in {delay}s: {exc}")
+                    logger.debug(
+                        f"Telegram connectivity attempt {attempt + 1} "
+                        f"failed, retrying in {delay}s: {exc}"
+                    )
                     await asyncio.sleep(delay)
                     continue
                 else:
-                    logger.error(f"Telegram connectivity failed after {max_retries} attempts: {exc}")
-                    return False, profile, f"Could not reach Telegram after {max_retries} attempts: {exc}"
+                    logger.error(
+                        f"Telegram connectivity failed after {max_retries} "
+                        f"attempts: {exc}"
+                    )
+                    return (
+                        False, profile,
+                        f"Could not reach Telegram after {max_retries} "
+                        f"attempts: {exc}"
+                    )
 
         try:
             # Ensure account is signed in; prompt user for code/password if needed
@@ -639,7 +651,10 @@ class WelcomeWizard(QWizard):
                         except Exception:
                             pass
             except Exception as cleanup_exc:
-                logger.debug(f"Skipping cleanup of temporary validation session files: {cleanup_exc}")
+                logger.debug(
+                    f"Skipping cleanup of temporary validation session "
+                    f"files: {cleanup_exc}"
+                )
 
         return True, profile, ""
 
@@ -682,7 +697,8 @@ def create_header(title: str, subtitle: str) -> QWidget:
     c = ThemeManager.get_colors()
     title_label = QLabel(title)
     title_label.setStyleSheet(
-        f"font-size: 26px; font-weight: 700; color: {c['TEXT_BRIGHT']}; letter-spacing: -0.2px; line-height: 1.25em;"
+        f"font-size: 26px; font-weight: 700; color: {c['TEXT_BRIGHT']}; "
+        f"letter-spacing: -0.2px; line-height: 1.25em;"
     )
     layout.addWidget(title_label)
 
@@ -759,13 +775,15 @@ class IntroPage(QWizardPage):
         left_col.addWidget(
             create_info_card(
                 "Intelligent Automation",
-                "AI-powered response system using Google Gemini for natural, context-aware communication.",
+                "AI-powered response system using Google Gemini for "
+                "natural, context-aware communication.",
             )
         )
         left_col.addWidget(
             create_info_card(
                 "Safety & Protection",
-                "Sophisticated anti-detection algorithms with human behavior simulation and rate limiting.",
+                "Sophisticated anti-detection algorithms with human "
+                "behavior simulation and rate limiting.",
             )
         )
         grid_layout.addLayout(left_col)
@@ -774,7 +792,8 @@ class IntroPage(QWizardPage):
         right_col.addWidget(
             create_info_card(
                 "Targeted Outreach",
-                "Advanced member extraction and filtering to build precise audiences from communities.",
+                "Advanced member extraction and filtering to build "
+                "precise audiences from communities.",
             )
         )
         right_col.addWidget(
@@ -907,7 +926,9 @@ class TelegramSetupPage(QWizardPage):
         validation_layout.setSpacing(8)
         
         self.validation_status = QLabel("")
-        self.validation_status.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;")
+        self.validation_status.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;"
+        )
         validation_layout.addWidget(self.validation_status)
         
         # Button layout
@@ -963,8 +984,12 @@ class TelegramSetupPage(QWizardPage):
                     saved_api_hash = secrets.get_secret("telegram_api_hash", required=False)
                     if saved_api_id != api_id or saved_api_hash != api_hash:
                         self._validated = False
-                        self.validation_status.setText("⚠️ Credentials changed - please re-validate")
-                        self.validation_status.setStyleSheet("color: #faa61a; font-size: 13px; padding: 8px 0;")
+                        self.validation_status.setText(
+                            "⚠️ Credentials changed - please re-validate"
+                        )
+                        self.validation_status.setStyleSheet(
+                            "color: #faa61a; font-size: 13px; padding: 8px 0;"
+                        )
                 except Exception:
                     pass  # If we can't check, assume unchanged
 
@@ -983,8 +1008,13 @@ class TelegramSetupPage(QWizardPage):
             errors.append(msg)
         
         if errors:
-            self.validation_status.setText(f"❌ Format error: {errors[0]}\n💡 Please correct the format and try again")
-            self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+            self.validation_status.setText(
+                f"❌ Format error: {errors[0]}\n"
+                f"💡 Please correct the format and try again"
+            )
+            self.validation_status.setStyleSheet(
+                "color: #ed4245; font-size: 13px; padding: 8px 0;"
+            )
             self.clear_btn.setVisible(True)
             self.clear_btn.setEnabled(True)
             return
@@ -1070,7 +1100,10 @@ class TelegramSetupPage(QWizardPage):
                         
                         # Don't retry on authentication/credential errors
                         error_str = str(exc).lower()
-                        if any(keyword in error_str for keyword in ["api_id", "api_hash", "invalid", "unauthorized", "wrong"]):
+                        if any(keyword in error_str for keyword in [
+                            "api_id", "api_hash", "invalid",
+                            "unauthorized", "wrong"
+                        ]):
                             return False, {}, f"Invalid credentials: {exc}"
                         
                         # Retry on network errors
@@ -1088,16 +1121,26 @@ class TelegramSetupPage(QWizardPage):
             self._on_credentials_changed()
             
             if tg_ok:
-                self.validation_status.setText("✅ Connected (credentials valid)\n⚠️ Partial validation - enter phone on next page to complete login")
-                self.validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+                self.validation_status.setText(
+                    "✅ Connected (credentials valid)\n"
+                    "⚠️ Partial validation - enter phone on next page "
+                    "to complete login"
+                )
+                self.validation_status.setStyleSheet(
+                    "color: #23a55a; font-size: 13px; padding: 8px 0;"
+                )
                 # Save credentials immediately (partial validation)
                 self._save_credentials(api_id, api_hash)
                 # Mark as partially validated - will complete on finish
                 self._validated = True
                 self.clear_btn.setVisible(False)
             else:
-                self.validation_status.setText(f"❌ {tg_error}\n💡 Check your credentials and try again")
-                self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+                self.validation_status.setText(
+                    f"❌ {tg_error}\n💡 Check your credentials and try again"
+                )
+                self.validation_status.setStyleSheet(
+                    "color: #ed4245; font-size: 13px; padding: 8px 0;"
+                )
                 self._validated = False
                 self.clear_btn.setVisible(True)
                 self.clear_btn.setEnabled(True)
@@ -1126,14 +1169,20 @@ class TelegramSetupPage(QWizardPage):
             if tg_ok:
                 profile_name = tg_profile.get("display_name", phone) if tg_profile else phone
                 self.validation_status.setText(f"✅ Fully validated & logged in as {profile_name}")
-                self.validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+                self.validation_status.setStyleSheet(
+                    "color: #23a55a; font-size: 13px; padding: 8px 0;"
+                )
                 self._validated = True
                 # Save credentials immediately
                 self._save_credentials(api_id, api_hash)
                 self.clear_btn.setVisible(False)
             else:
-                self.validation_status.setText(f"❌ {tg_error}\n💡 Check your credentials and try again")
-                self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+                self.validation_status.setText(
+                    f"❌ {tg_error}\n💡 Check your credentials and try again"
+                )
+                self.validation_status.setStyleSheet(
+                    "color: #ed4245; font-size: 13px; padding: 8px 0;"
+                )
                 self._validated = False
                 self.clear_btn.setVisible(True)
                 self.clear_btn.setEnabled(True)
@@ -1273,7 +1322,9 @@ class PhoneSetupPage(QWizardPage):
         self.telegram_validation_layout.setSpacing(8)
         
         self.telegram_validation_status = QLabel("")
-        self.telegram_validation_status.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;")
+        self.telegram_validation_status.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;"
+        )
         self.telegram_validation_layout.addWidget(self.telegram_validation_status)
         
         self.complete_telegram_btn = QPushButton("Complete Telegram Login")
@@ -1362,14 +1413,23 @@ class PhoneSetupPage(QWizardPage):
             telegram_page = wizard.page(1)
             if hasattr(telegram_page, '_validated') and telegram_page._validated:
                 # Check if it was full validation or just connectivity
-                status_text = telegram_page.validation_status.text() if hasattr(telegram_page, 'validation_status') else ""
+                status_text = (
+                    telegram_page.validation_status.text()
+                    if hasattr(telegram_page, 'validation_status')
+                    else ""
+                )
                 if "connectivity confirmed" in status_text and "Enter phone" in status_text:
                     # Partial validation - show complete button
                     self.complete_telegram_btn.setVisible(True)
                     self.complete_telegram_btn.setEnabled(has_phone)
                     if has_phone:
-                        self.telegram_validation_status.setText("💡 Entered phone number - click to complete Telegram login")
-                        self.telegram_validation_status.setStyleSheet("color: #5865f2; font-size: 13px; padding: 8px 0;")
+                        self.telegram_validation_status.setText(
+                            "💡 Entered phone number - click to complete "
+                            "Telegram login"
+                        )
+                        self.telegram_validation_status.setStyleSheet(
+                            "color: #5865f2; font-size: 13px; padding: 8px 0;"
+                        )
                     else:
                         self.telegram_validation_status.setText("")
                 else:
@@ -1393,24 +1453,41 @@ class PhoneSetupPage(QWizardPage):
             return
         
         telegram_page = wizard.page(1)
-        api_id = telegram_page.api_id_edit.text().strip() if hasattr(telegram_page, 'api_id_edit') else ""
-        api_hash = telegram_page.api_hash_edit.text().strip() if hasattr(telegram_page, 'api_hash_edit') else ""
+        api_id = (
+            telegram_page.api_id_edit.text().strip()
+            if hasattr(telegram_page, 'api_id_edit')
+            else ""
+        )
+        api_hash = (
+            telegram_page.api_hash_edit.text().strip()
+            if hasattr(telegram_page, 'api_hash_edit')
+            else ""
+        )
         
         if not api_id or not api_hash:
-            QMessageBox.warning(self, "Credentials Missing", "Please enter Telegram API credentials on the previous page.")
+            QMessageBox.warning(
+                self, "Credentials Missing",
+                "Please enter Telegram API credentials on the previous page."
+            )
             return
         
         # Perform full validation
         self.complete_telegram_btn.setEnabled(False)
         self.telegram_validation_status.setText("🔄 Completing Telegram login...")
-        self.telegram_validation_status.setStyleSheet("color: #5865f2; font-size: 13px; padding: 8px 0;")
+        self.telegram_validation_status.setStyleSheet(
+            "color: #5865f2; font-size: 13px; padding: 8px 0;"
+        )
         
         # Trigger validation on Telegram page
         if hasattr(telegram_page, '_perform_validation'):
             telegram_page._perform_validation(api_id, api_hash, phone)
             # Update status based on result (will be updated by Telegram page)
-            self.telegram_validation_status.setText("✅ Check previous page for validation status")
-            self.telegram_validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+            self.telegram_validation_status.setText(
+                "✅ Check previous page for validation status"
+            )
+            self.telegram_validation_status.setStyleSheet(
+                "color: #23a55a; font-size: 13px; padding: 8px 0;"
+            )
             self.complete_telegram_btn.setVisible(False)
 
     def validatePage(self):
@@ -1522,7 +1599,9 @@ class GeminiSetupPage(QWizardPage):
         validation_layout.setSpacing(8)
         
         self.validation_status = QLabel("")
-        self.validation_status.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;")
+        self.validation_status.setStyleSheet(
+            f"color: {c['TEXT_SECONDARY']}; font-size: 13px; padding: 8px 0;"
+        )
         validation_layout.addWidget(self.validation_status)
         
         # Button layout
@@ -1567,7 +1646,9 @@ class GeminiSetupPage(QWizardPage):
         valid, msg = ValidationHelper.validate_gemini_api_key(api_key)
         if not valid:
             self.validation_status.setText(f"❌ {msg}\n💡 Please check the format and try again")
-            self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+            self.validation_status.setStyleSheet(
+                "color: #ed4245; font-size: 13px; padding: 8px 0;"
+            )
             self.clear_btn.setVisible(True)
             self.clear_btn.setEnabled(True)
             return
@@ -1590,14 +1671,21 @@ class GeminiSetupPage(QWizardPage):
             
             if gemini_ok:
                 self.validation_status.setText("✅ API key validated and working")
-                self.validation_status.setStyleSheet("color: #23a55a; font-size: 13px; padding: 8px 0;")
+                self.validation_status.setStyleSheet(
+                    "color: #23a55a; font-size: 13px; padding: 8px 0;"
+                )
                 self._validated = True
                 # Save credentials immediately
                 self._save_credentials(api_key)
                 self.clear_btn.setVisible(False)
             else:
-                self.validation_status.setText(f"❌ {gemini_error or 'API key validation failed'}\n💡 Check your API key and try again")
-                self.validation_status.setStyleSheet("color: #ed4245; font-size: 13px; padding: 8px 0;")
+                self.validation_status.setText(
+                    f"❌ {gemini_error or 'API key validation failed'}\n"
+                    f"💡 Check your API key and try again"
+                )
+                self.validation_status.setStyleSheet(
+                    "color: #ed4245; font-size: 13px; padding: 8px 0;"
+                )
                 self._validated = False
                 self.clear_btn.setVisible(True)
                 self.clear_btn.setEnabled(True)

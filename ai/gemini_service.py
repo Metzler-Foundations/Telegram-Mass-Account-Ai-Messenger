@@ -463,7 +463,8 @@ class GeminiService:
                         continue
                     else:
                         logger.error(
-                            f"Gemini API server error after {max_retries} attempts for chat {chat_id}"
+                            f"Gemini API server error after {max_retries} "
+                            f"attempts for chat {chat_id}"
                         )
                         raise Exception(
                             "AI service is temporarily unavailable. Please try again later."

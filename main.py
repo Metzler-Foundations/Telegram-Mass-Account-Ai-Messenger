@@ -3047,7 +3047,10 @@ class MainWindow(QMainWindow):
                     api_hash = secrets.get_secret("telegram_api_hash", required=False)
                     
                     if not api_id or not api_hash:
-                        logger.warning("Setup marked complete but credentials missing - showing settings")
+                        logger.warning(
+                            "Setup marked complete but credentials missing - "
+                            "showing settings"
+                        )
                         # Credentials missing, show settings dialog
                         self._open_settings_dialog()
                     # Otherwise, setup is complete, no action needed
@@ -3408,7 +3411,8 @@ class MainWindow(QMainWindow):
             self.gemini_service = None
 
     def _run_async_task(self, coro):
-        """Run an async task (helper for campaign operations) with proper tracking and thread safety."""
+        """Run an async task (helper for campaign operations) with proper
+        tracking and thread safety."""
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
@@ -3576,7 +3580,8 @@ class MainWindow(QMainWindow):
                     ErrorHandler.safe_warning(
                         self,
                         "Invalid Channel",
-                        "Could not parse the channel. Use formats like:\n• https://t.me/channelname\n• @channelname\n• channelname",
+                        "Could not parse the channel. Use formats like:\n"
+                        "• https://t.me/channelname\n• @channelname\n• channelname",
                     )
                     return
                 channel_identifier = parsed
@@ -3749,7 +3754,8 @@ class MainWindow(QMainWindow):
             ErrorHandler.safe_information(
                 self,
                 "Elite Scraping Complete",
-                f"🎉 Successfully scraped {final_count} members from {channel_info.get('title', 'channel')}!\n\n"
+                f"🎉 Successfully scraped {final_count} members from "
+                f"{channel_info.get('title', 'channel')}!\n\n"
                 f"📊 Data Quality: {stats.get('average_data_completeness', 0):.1%}\n"
                 f"🛡️  Risk Assessment: All members analyzed for safety\n"
                 f"🎯 Messaging Potential: Calculated for all members\n\n"

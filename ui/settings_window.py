@@ -1880,7 +1880,8 @@ class SettingsWindow(QDialog):
                 <li><b>Safety Features:</b> Auto-retry and session recovery (default: enabled)</li>
             </ul>
 
-            <p><b>💡 Recommendation:</b> Skip this step now, use defaults, and adjust later if needed.</p>
+            <p><b>💡 Recommendation:</b> Skip this step now, use defaults, "
+            "and adjust later if needed.</p>
             """,
             help_url=None,
         )
@@ -1912,7 +1913,8 @@ class SettingsWindow(QDialog):
         desc_label = QLabel(description)
         desc_label.setWordWrap(True)
         desc_label.setStyleSheet(
-            f"color: {c['TEXT_SECONDARY']}; font-size: 15px; line-height: 1.55em; letter-spacing: -0.05px;"
+            f"color: {c['TEXT_SECONDARY']}; font-size: 15px; "
+            f"line-height: 1.55em; letter-spacing: -0.05px;"
         )
         step_layout.addWidget(desc_label)
 
@@ -2220,7 +2222,8 @@ class SettingsWindow(QDialog):
         layout.setSpacing(16)
 
         description = QLabel(
-            "Scrape members from public channels, monitor activity, and queue prospects for campaigns."
+            "Scrape members from public channels, monitor activity, "
+            "and queue prospects for campaigns."
         )
         description.setWordWrap(True)
         layout.addWidget(description)
@@ -2248,7 +2251,8 @@ class SettingsWindow(QDialog):
         self.scrape_button.setObjectName("secondary")
         self.scrape_button.setFixedHeight(32)
         self.scrape_button.setToolTip(
-            "Start scraping members from the specified channel.\nThis may take several minutes for large channels."
+            "Start scraping members from the specified channel.\n"
+            "This may take several minutes for large channels."
         )
         button_layout.addWidget(self.scrape_button)
 
@@ -2359,8 +2363,9 @@ class SettingsWindow(QDialog):
         layout.setSpacing(16)
 
         info_label = QLabel(
-            "Connect a phone-number API provider once and let the automation engine purchase numbers, "
-            "verify OTPs, and warm up each account with safe anti-detection pacing."
+            "Connect a phone-number API provider once and let the "
+            "automation engine purchase numbers, verify OTPs, and warm "
+            "up each account with safe anti-detection pacing."
         )
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
@@ -2479,7 +2484,9 @@ class SettingsWindow(QDialog):
         accent_g = int(accent_hex[2:4], 16)
         accent_b = int(accent_hex[4:6], 16)
         help_label.setStyleSheet(
-            f"color: {c['ACCENT_PRIMARY']}; padding: 8px; background: rgba({accent_r}, {accent_g}, {accent_b}, 0.1); border-radius: 4px;"
+            f"color: {c['ACCENT_PRIMARY']}; padding: 8px; "
+            f"background: rgba({accent_r}, {accent_g}, {accent_b}, 0.1); "
+            f"border-radius: 4px;"
         )
         bulk_layout.addWidget(help_label)
 
@@ -2532,7 +2539,8 @@ class SettingsWindow(QDialog):
 
         # Info label
         config_info = QLabel(
-            "Configure default settings for new accounts. Each account can have its own type, brain, and voice settings."
+            "Configure default settings for new accounts. Each account "
+            "can have its own type, brain, and voice settings."
         )
         config_info.setWordWrap(True)
         config_info.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; margin-bottom: 8px;")
@@ -2886,7 +2894,8 @@ class SettingsWindow(QDialog):
         return self._wrap_tab(
             scroll_area,
             "Account Factory",
-            "Provision new Telegram identities via SMS providers, smart proxies, and hardened safety rails.",
+            "Provision new Telegram identities via SMS providers, "
+            "smart proxies, and hardened safety rails.",
         )
 
     def create_advanced_tab(self) -> QWidget:
@@ -3225,7 +3234,8 @@ class SettingsWindow(QDialog):
                     self,
                     "Voice Test Failed",
                     f"Could not generate voice message.\n\nError: {info}\n\n"
-                    "Please check:\n• ElevenLabs API key is correct\n• You have available credits\n• Internet connection",
+                    "Please check:\n• ElevenLabs API key is correct\n"
+                    "• You have available credits\n• Internet connection",
                 )
 
         # Run async test
@@ -3355,7 +3365,8 @@ class SettingsWindow(QDialog):
                     ErrorHandler.safe_warning(
                         self,
                         "Invalid Location",
-                        "Proxy file must reside inside the application working directory to prevent path traversal.",
+                        "Proxy file must reside inside the application "
+                        "working directory to prevent path traversal.",
                     )
                     return
 
@@ -3447,7 +3458,8 @@ class SettingsWindow(QDialog):
                 ErrorHandler.safe_warning(
                     self,
                     "Proxies Required",
-                    f"For {count} accounts, proxies are required but no proxy pool manager is available.\n\n"
+                    f"For {count} accounts, proxies are required but "
+                    f"no proxy pool manager is available.\n\n"
                     "Please configure proxies in the Proxy Pool tab first.",
                 )
                 return
@@ -3461,7 +3473,8 @@ class SettingsWindow(QDialog):
                         ErrorHandler.safe_warning(
                             self,
                             "Insufficient Proxies",
-                            f"You have {proxy_count} proxies but need at least {count} for {count} accounts.\n\n"
+                            f"You have {proxy_count} proxies but need at "
+                            f"least {count} for {count} accounts.\n\n"
                             "Add more proxies in the Proxy Pool tab.",
                         )
                         return
@@ -3649,7 +3662,8 @@ class SettingsWindow(QDialog):
                     ErrorHandler.safe_warning(
                         self,
                         "Insufficient Balance",
-                        f"Your {provider} balance is {balance:.2f}, but you need approximately {count * 1.2:.1f} "
+                        f"Your {provider} balance is {balance:.2f}, but "
+                        f"you need approximately {count * 1.2:.1f} "
                         f"to create {count} accounts (with safety buffer).\n\n"
                         "Please top up your account or reduce the number of accounts.",
                     )
@@ -3690,7 +3704,8 @@ class SettingsWindow(QDialog):
                 ErrorHandler.safe_warning(
                     self,
                     "Unsupported Country",
-                    f"{provider} does not support {country}. Supported countries: {', '.join(supported)}",
+                    f"{provider} does not support {country}. "
+                    f"Supported countries: {', '.join(supported)}",
                 )
                 return False
         except Exception as exc:
@@ -3796,7 +3811,8 @@ class SettingsWindow(QDialog):
             ErrorHandler.safe_warning(
                 self,
                 "No Accounts",
-                "You need at least one account to clone from.\n\nCreate an account first in the Accounts tab.",
+                "You need at least one account to clone from.\n\n"
+                "Create an account first in the Accounts tab.",
             )
             return
 
@@ -3835,7 +3851,8 @@ class SettingsWindow(QDialog):
             ErrorHandler.safe_warning(
                 self,
                 "Missing Channel",
-                "Please enter a channel URL or username.\n\nExamples:\n• https://t.me/channelname\n• @channelname\n• channelname",
+                "Please enter a channel URL or username.\n\n"
+                "Examples:\n• https://t.me/channelname\n• @channelname\n• channelname",
             )
             return
 
@@ -3845,7 +3862,8 @@ class SettingsWindow(QDialog):
             ErrorHandler.safe_warning(
                 self,
                 "Cannot Scrape",
-                "Settings dialog must be opened from the main window.\n\nAlternatively, use the Members tab in the main window.",
+                "Settings dialog must be opened from the main window.\n\n"
+                "Alternatively, use the Members tab in the main window.",
             )
             return
 
@@ -4062,7 +4080,8 @@ class SettingsWindow(QDialog):
             ErrorHandler.safe_information(
                 self,
                 "Feature Available in Campaigns",
-                f"💡 Direct messaging is available through the Campaigns tab for proper rate limiting.\n\n"
+                f"💡 Direct messaging is available through the Campaigns "
+                f"tab for proper rate limiting.\n\n"
                 f'Your message: "{message[:50]}..."\n\n'
                 f"Go to Campaigns → Create Campaign → Select members → Send safely",
             )
@@ -4329,7 +4348,8 @@ class SettingsWindow(QDialog):
         self.anti_detection_widget.save_settings(settings)
         self.sms_provider_widget.save_settings(settings)
 
-        # Also collect SMS provider from Account Factory tab if it exists (for backward compatibility)
+        # Also collect SMS provider from Account Factory tab if it exists
+        # (for backward compatibility)
         if hasattr(self, "phone_provider_combo") and hasattr(self, "provider_api_edit"):
             sms_provider = self.phone_provider_combo.currentText()
             sms_key = self.provider_api_edit.text()
@@ -4634,7 +4654,8 @@ class SettingsWindow(QDialog):
                 ErrorHandler.safe_information(
                     self,
                     "Success",
-                    "Settings saved successfully!\n\nYou may need to restart for some changes to take effect.",
+                    "Settings saved successfully!\n\n"
+                    "You may need to restart for some changes to take effect.",
                 )
 
         except Exception as e:
@@ -4815,7 +4836,10 @@ class SettingsWindow(QDialog):
             test_results.append(f"{self.proxy_list.count()} proxy(ies) configured")
 
         success_msg = "Configuration Test Passed!\n\n" + "\n".join(test_results)
-        success_msg += "\n\nNote: This validates format only. Actual connectivity will be tested when you connect."
+        success_msg += (
+            "\n\nNote: This validates format only. "
+            "Actual connectivity will be tested when you connect."
+        )
 
         ErrorHandler.safe_information(self, "Configuration Test Passed", success_msg)
 
