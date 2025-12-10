@@ -112,7 +112,8 @@ class TelegramClient:
         self._setup_resilience_strategies()
 
     async def initialize(self, max_retries: int = 3) -> bool:
-        """Initialize and authenticate the Telegram client with anti-detection measures and retry logic.
+        """Initialize and authenticate the Telegram client with
+        anti-detection measures and retry logic.
 
         Args:
             max_retries: Maximum number of initialization attempts
@@ -152,7 +153,9 @@ class TelegramClient:
                 if self.proxy:
                     client_kwargs["proxy"] = self.proxy
                     logger.info(
-                        f"Using permanent proxy for {self.phone_number}: {self.proxy.get('hostname', 'unknown')}:{self.proxy.get('port', 'unknown')}"
+                        f"Using permanent proxy for {self.phone_number}: "
+                        f"{self.proxy.get('hostname', 'unknown')}:"
+                        f"{self.proxy.get('port', 'unknown')}"
                     )
 
                 self.client = Client(**client_kwargs)
@@ -190,7 +193,8 @@ class TelegramClient:
 
             except asyncio.TimeoutError as e:
                 logger.warning(
-                    f"Telegram client initialization timed out (attempt {attempt + 1}/{max_retries}): {e}"
+                    f"Telegram client initialization timed out "
+                    f"(attempt {attempt + 1}/{max_retries}): {e}"
                 )
                 await self._cleanup_client_on_failure()
                 if attempt < max_retries - 1:
@@ -200,13 +204,15 @@ class TelegramClient:
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(
-                        f"Failed to initialize Telegram client after {max_retries} attempts: timeout"
+                        f"Failed to initialize Telegram client after "
+                        f"{max_retries} attempts: timeout"
                     )
                     return False
 
             except ConnectionError as e:
                 logger.warning(
-                    f"Connection error during initialization (attempt {attempt + 1}/{max_retries}): {e}"
+                    f"Connection error during initialization "
+                    f"(attempt {attempt + 1}/{max_retries}): {e}"
                 )
                 await self._cleanup_client_on_failure()
                 if attempt < max_retries - 1:
@@ -215,13 +221,15 @@ class TelegramClient:
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(
-                        f"Failed to initialize Telegram client after {max_retries} attempts: connection error"
+                        f"Failed to initialize Telegram client after "
+                        f"{max_retries} attempts: connection error"
                     )
                     return False
 
             except Exception as e:
                 logger.error(
-                    f"Unexpected error during Telegram client initialization (attempt {attempt + 1}/{max_retries}): {e}"
+                    f"Unexpected error during Telegram client initialization "
+                    f"(attempt {attempt + 1}/{max_retries}): {e}"
                 )
                 await self._cleanup_client_on_failure()
                 if attempt < max_retries - 1:
@@ -230,7 +238,8 @@ class TelegramClient:
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(
-                        f"Failed to initialize Telegram client after {max_retries} attempts: {type(e).__name__}"
+                        f"Failed to initialize Telegram client after "
+                        f"{max_retries} attempts: {type(e).__name__}"
                     )
                     # Anti-detection: Don't reveal specific errors that could help detection
                     return False
@@ -421,7 +430,8 @@ class TelegramClient:
         """Start auto-reply functionality.
 
         Args:
-            reply_callback: Function that takes (message_text, chat_id) and returns reply text (sync or async)
+            reply_callback: Function that takes (message_text, chat_id) and
+            returns reply text (sync or async)
         """
         self.reply_callback = reply_callback
         self.auto_reply_enabled = True
@@ -517,7 +527,8 @@ class TelegramClient:
 
                     reply_type = "voice" if sent_as_voice else "text"
                     logger.info(
-                        f"Replied ({reply_type}) to message in chat {message.chat.id} (score: {message_score:.2f})"
+                        f"Replied ({reply_type}) to message in chat "
+                        f"{message.chat.id} (score: {message_score:.2f})"
                     )
 
             except Exception as e:
@@ -758,8 +769,10 @@ class TelegramClient:
         for cache_name in ["message_count", "conversation_states"]:
             cache = getattr(self, cache_name)
             if len(cache) > self._max_cached_chats:
-                # For these caches, we don't have timestamps, so just keep the most recently accessed
-                # This is a simple LRU approximation - in practice, you might want to track access times
+                # For these caches, we don't have timestamps, so just keep
+                # the most recently accessed
+                # This is a simple LRU approximation - in practice, you might
+                # want to track access times
                 items_to_keep = list(cache.keys())[: self._max_cached_chats]
                 setattr(self, cache_name, {k: cache[k] for k in items_to_keep})
 
@@ -1252,7 +1265,8 @@ class TelegramClient:
         """
         self.voice_config = voice_config
         logger.info(
-            f"Voice config set for {self.phone_number}: enabled={voice_config.enabled if voice_config else False}"
+            f"Voice config set for {self.phone_number}: "
+            f"enabled={voice_config.enabled if voice_config else False}"
         )
 
     def set_voice_service(self, voice_service) -> None:

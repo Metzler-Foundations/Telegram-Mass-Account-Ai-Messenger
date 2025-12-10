@@ -325,7 +325,8 @@ class PhoneNumberProvider:
                 "success": True,
                 "available": None,
                 "warning": (
-                    f"{provider} does not expose a safe availability endpoint; proceeding without a guaranteed "
+                    f"{provider} does not expose a safe availability "
+                    f"endpoint; proceeding without a guaranteed "
                     f"inventory check for {requested} requested numbers."
                 ),
             }
@@ -481,7 +482,10 @@ class PhoneNumberProvider:
         }
 
         provider_config = self.providers.get("5sim", {})
-        url = f"{provider_config.get('api_url')}/guest/products/{country.lower()}/{provider_config.get('service_code')}"
+        url = (
+            f"{provider_config.get('api_url')}/guest/products/"
+            f"{country.lower()}/{provider_config.get('service_code')}"
+        )
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
 
@@ -659,7 +663,8 @@ class PhoneNumberProvider:
             response = requests.get(config["api_url"], params=params, timeout=30)
 
             if response.status_code == 200:
-                # Handle text response format (ACCESS_NUMBER:ID:NUMBER) which is common for Russia-based APIs
+                # Handle text response format (ACCESS_NUMBER:ID:NUMBER)
+                # which is common for Russia-based APIs
                 text_response = response.text
                 if text_response.startswith("ACCESS_NUMBER"):
                     parts = text_response.split(":")
@@ -731,11 +736,16 @@ class PhoneNumberProvider:
 
                     if not product_name:
                         logger.warning(
-                            f"5SIM returned no purchasable products for {country} and service {config['service_code']}"
+                            f"5SIM returned no purchasable products for "
+                            f"{country} and service {config['service_code']}"
                         )
                         return None
 
-                    buy_url = f"{config['api_url']}/user/buy/activation/{country.lower()}/{product_name}/{config['service_code']}"
+                    buy_url = (
+                        f"{config['api_url']}/user/buy/activation/"
+                        f"{country.lower()}/{product_name}/"
+                        f"{config['service_code']}"
+                    )
 
                     buy_response = requests.get(
                         buy_url, headers=headers, timeout=30
@@ -952,7 +962,8 @@ class PhoneNumberProvider:
         # All attempts exhausted
         logger.warning(
             f"❌ SMS code not received from {provider} after {max_attempts} attempts "
-            f"(total wait time: ~{sum(min(base_delay * (2 ** i), max_delay) for i in range(max_attempts))/60:.1f}m)"
+            f"(total wait time: ~"
+            f"{sum(min(base_delay * (2 ** i), max_delay) for i in range(max_attempts))/60:.1f}m)"
         )
         return None
 
@@ -1372,13 +1383,15 @@ class AccountCreator:
                 if progress_callback:
                     progress_callback(
                         f"Starting account creation "
-                        f"(slot {self._max_concurrent_creations - self._creation_semaphore._value + 1}/"
+                        f"(slot "
+                        f"{self._max_concurrent_creations - self._creation_semaphore._value + 1}/"
                         f"{self._max_concurrent_creations})"
                     )
 
                 logger.info(
                     f"Account creation started with concurrency control "
-                    f"({self.get_active_creation_count()}/{self._max_concurrent_creations} slots used)"
+                    f"({self.get_active_creation_count()}/"
+                    f"{self._max_concurrent_creations} slots used)"
                 )
 
                 # Store progress callback for use in create_new_account
@@ -1524,7 +1537,8 @@ class AccountCreator:
         new_proxy = await self.get_proxy_for_account(phone_number)
         if new_proxy:
             logger.info(
-                f"Auto-reassigned proxy for {phone_number}: {new_proxy.get('ip')}:{new_proxy.get('port')}"
+                f"Auto-reassigned proxy for {phone_number}: "
+                f"{new_proxy.get('ip')}:{new_proxy.get('port')}"
             )
         else:
             logger.error(f"Failed to reassign proxy for {phone_number}")
@@ -1638,13 +1652,19 @@ class AccountCreator:
         if supported_countries and country not in supported_countries:
             return {
                 "success": False,
-                "error": f"Country '{country}' not supported by {provider}. Try one of: {', '.join(supported_countries)}",
+                "error": (
+                    f"Country '{country}' not supported by {provider}. "
+                    f"Try one of: {', '.join(supported_countries)}"
+                ),
             }
 
         if not api_key:
             return {
                 "success": False,
-                "error": f"Phone provider API key is required. Get it from your {provider} account dashboard.",
+                "error": (
+                    f"Phone provider API key is required. Get it from your "
+                    f"{provider} account dashboard."
+                ),
             }
 
         return None
@@ -1804,7 +1824,11 @@ class AccountCreator:
             if not api_id or not api_hash:
                 return {
                     "success": False,
-                    "error": "Telegram API credentials (api_id and api_hash) are required. Get them from https://my.telegram.org/apps",
+                    "error": (
+                        "Telegram API credentials (api_id and api_hash) "
+                        "are required. Get them from "
+                        "https://my.telegram.org/apps"
+                    ),
                 }
 
             # Update config with found credentials
@@ -1853,12 +1877,17 @@ class AccountCreator:
                         proxy_dict["password"] = assigned_proxy["password"]
 
                     logger.info(
-                        f"Using proxy {assigned_proxy.get('ip')}:{assigned_proxy.get('port')} (source: {assigned_proxy.get('source', 'unknown')})"
+                        f"Using proxy {assigned_proxy.get('ip')}:"
+                        f"{assigned_proxy.get('port')} "
+                        f"(source: {assigned_proxy.get('source', 'unknown')})"
                     )
                 elif config.get("require_proxy", False):
                     return {
                         "success": False,
-                        "error": 'No proxies available. Add proxies in Settings or disable "require_proxy".',
+                        "error": (
+                            'No proxies available. Add proxies in Settings '
+                            'or disable "require_proxy".'
+                        ),
                     }
 
             # 2. Get Phone Number
@@ -2540,7 +2569,8 @@ class AccountCreator:
                     await client.set_username(candidate)
                     logger.info(
                         f"✓ Username set to {candidate} "
-                        f"(strategy: word+num+base, attempt {attempt}, collisions: {collision_count})"
+                        f"(strategy: word+num+base, attempt {attempt}, "
+                        f"collisions: {collision_count})"
                     )
                     return
                 except (UsernameOccupied, UsernameInvalid) as exc:
