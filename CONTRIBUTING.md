@@ -115,14 +115,14 @@ Example:
 def validate_phone_number(phone: str, normalize: bool = True) -> str:
     """
     Validate and normalize phone number.
-    
+
     Args:
         phone: Phone number string
         normalize: Whether to normalize format
-        
+
     Returns:
         Normalized phone number
-        
+
     Raises:
         ValidationError: If phone number is invalid
     """
@@ -265,8 +265,3 @@ Update relevant documentation when adding features:
 - Email: support@example.com
 
 Thank you for contributing!
-
-
-
-
-

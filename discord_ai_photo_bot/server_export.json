@@ -1,0 +1,559 @@
+{
+  "server_info": {
+    "id": 1448262639707754536,
+    "name": "LoLLy LLama",
+    "description": "Enterprise-grade professional network platform. Invitation required.",
+    "member_count": 9,
+    "owner_id": 1361199123407179848,
+    "created_at": "2025-12-10T10:38:40.725000+00:00",
+    "icon_url": "https://cdn.discordapp.com/icons/1448262639707754536/6b39f53dc488d4d0876fb8e92ae59c25.png?size=1024",
+    "banner_url": null,
+    "boost_level": 0,
+    "boost_count": 0,
+    "features": [
+      "GUILD_ONBOARDING_EVER_ENABLED",
+      "SOUNDBOARD",
+      "COMMUNITY",
+      "NEWS",
+      "AUTO_MODERATION"
+    ],
+    "verification_level": "medium",
+    "channels": {
+      "text": 31,
+      "voice": 4,
+      "categories": 10
+    },
+    "roles_count": 21,
+    "emojis_count": 24
+  },
+  "channels": [
+    {
+      "id": 1448726817874907260,
+      "name": "General-Chat",
+      "type": "voice",
+      "position": 0,
+      "category": "VOICE CHANNELS"
+    },
+    {
+      "id": 1448801027313635420,
+      "name": "\ud83c\udfc1\u30fbWELCOME",
+      "type": "category",
+      "position": 0
+    },
+    {
+      "id": 1448801031860523201,
+      "name": "\ud83d\udcac\u30fbCOMMUNITY",
+      "type": "category",
+      "position": 1
+    },
+    {
+      "id": 1448815942435078355,
+      "name": "\ud83e\udd99\u30fbLLAMA LLAMA CLUB",
+      "type": "category",
+      "position": 2
+    },
+    {
+      "id": 1448801037430423726,
+      "name": "\ud83d\udcc8\u30fbGROWTH HACKING",
+      "type": "category",
+      "position": 3
+    },
+    {
+      "id": 1448801042564255804,
+      "name": "\ud83d\udcb8\u30fbBUSINESS",
+      "type": "category",
+      "position": 4
+    },
+    {
+      "id": 1448801048201269248,
+      "name": "\ud83c\udfa8\u30fbCREATIVE LAB",
+      "type": "category",
+      "position": 5
+    },
+    {
+      "id": 1448801052978843689,
+      "name": "\ud83d\udd0a\u30fbAUDIO/VISUAL",
+      "type": "category",
+      "position": 6
+    },
+    {
+      "id": 1448801076588580936,
+      "name": "\ud83c\udd98\u30fbSUPPORT",
+      "type": "category",
+      "position": 7
+    },
+    {
+      "id": 1448801158121394288,
+      "name": "\ud83c\udf99\ufe0f\u30fbgeneral-voice",
+      "type": "voice",
+      "position": 7,
+      "category": "\ud83d\udd0a\u30fbAUDIO/VISUAL"
+    },
+    {
+      "id": 1448801081822937108,
+      "name": "\ud83d\udd12\u30fbVIP",
+      "type": "category",
+      "position": 8
+    },
+    {
+      "id": 1448801161649066116,
+      "name": "\ud83e\udde0\u30fbstrategy-room",
+      "type": "voice",
+      "position": 8,
+      "category": "\ud83d\udd0a\u30fbAUDIO/VISUAL"
+    },
+    {
+      "id": 1448801165004505158,
+      "name": "\ud83d\udcbb\u30fbcoworking",
+      "type": "voice",
+      "position": 9,
+      "category": "\ud83d\udd0a\u30fbAUDIO/VISUAL"
+    },
+    {
+      "id": 1448708074943680695,
+      "name": "VOICE CHANNELS",
+      "type": "category",
+      "position": 9
+    },
+    {
+      "id": 1448708218032361572,
+      "name": "rules-community",
+      "type": "text",
+      "position": 29,
+      "category": "\ud83c\udfc1\u30fbWELCOME",
+      "topic": null
+    },
+    {
+      "id": 1448708221610102938,
+      "name": "announcements",
+      "type": "text",
+      "position": 31,
+      "category": "\ud83c\udfc1\u30fbWELCOME",
+      "topic": "\ud83d\udce2 Important updates and news from the community."
+    },
+    {
+      "id": 1448800891921764424,
+      "name": "\ud83d\udc7d\u30fbreddit-ops",
+      "type": "text",
+      "position": 85,
+      "category": "\ud83d\udcc8\u30fbGROWTH HACKING",
+      "topic": "Reddit growth, automation, karma building, subreddit strategy."
+    },
+    {
+      "id": 1448800917330591744,
+      "name": "\ud83c\udfa5\u30fbtok-shorts",
+      "type": "text",
+      "position": 86,
+      "category": "\ud83d\udcc8\u30fbGROWTH HACKING",
+      "topic": "TikTok, Reels, Shorts - all short-form video strategy."
+    },
+    {
+      "id": 1448800930970734737,
+      "name": "\ud83d\udcf8\u30fbgram-strategy",
+      "type": "text",
+      "position": 87,
+      "category": "\ud83d\udcc8\u30fbGROWTH HACKING",
+      "topic": "Instagram Reels, aesthetic, growth strategies, business accounts."
+    },
+    {
+      "id": 1448800944572862608,
+      "name": "\ud83e\udde0\u30fbbrainstorming",
+      "type": "text",
+      "position": 88,
+      "category": "\ud83d\udcac\u30fbCOMMUNITY",
+      "topic": "Content brainstorming, creative collaboration, idea sharing."
+    },
+    {
+      "id": 1448800960049713326,
+      "name": "\ud83d\udcb0\u30fbmonetization",
+      "type": "text",
+      "position": 89,
+      "category": "\ud83d\udcb8\u30fbBUSINESS",
+      "topic": "Pricing, scaling, analytics, taxes, financial planning."
+    },
+    {
+      "id": 1448800982271000686,
+      "name": "\u2753\u30fbserver-feedback",
+      "type": "text",
+      "position": 90,
+      "category": "\ud83c\udd98\u30fbSUPPORT",
+      "topic": "Bug reports, feature suggestions, community feedback."
+    },
+    {
+      "id": 1448801003481862401,
+      "name": "\ud83d\udc8e\u30fbwins",
+      "type": "text",
+      "position": 91,
+      "category": "\ud83d\udcac\u30fbCOMMUNITY",
+      "topic": "Share your wins, big and small. Celebrate together!"
+    },
+    {
+      "id": 1448801015527637003,
+      "name": "\ud83d\udc98\u30fbdating-app-game",
+      "type": "text",
+      "position": 92,
+      "category": "\ud83d\udcc8\u30fbGROWTH HACKING",
+      "topic": "Dating app optimization, conversation strategies, safety."
+    },
+    {
+      "id": 1448801019613020221,
+      "name": "\ud83d\udc26\u30fbx-threads",
+      "type": "text",
+      "position": 93,
+      "category": "\ud83d\udcc8\u30fbGROWTH HACKING",
+      "topic": "Twitter/X algorithm, threads, analytics, monetization."
+    },
+    {
+      "id": 1448801087871127622,
+      "name": "\ud83d\udc4b\u30fbstart-here",
+      "type": "text",
+      "position": 94,
+      "category": "\ud83c\udfc1\u30fbWELCOME",
+      "topic": "Welcome! Read this first to get started and understand our community."
+    },
+    {
+      "id": 1448801090316533872,
+      "name": "\ud83d\udcdc\u30fbthe-code",
+      "type": "text",
+      "position": 95,
+      "category": "\ud83c\udfc1\u30fbWELCOME",
+      "topic": "Our mission, values, and community code. The rules."
+    },
+    {
+      "id": 1448801093516656673,
+      "name": "\ud83d\udcf0\u30fbintel",
+      "type": "text",
+      "position": 96,
+      "category": "\ud83c\udfc1\u30fbWELCOME",
+      "topic": "Important updates and server announcements."
+    },
+    {
+      "id": 1448801097027420180,
+      "name": "\ud83d\udcda\u30fbresources-index",
+      "type": "text",
+      "position": 97,
+      "category": "\ud83c\udfc1\u30fbWELCOME",
+      "topic": "Curated resources, tools, and templates. Convert to Forum Channel for better organization."
+    },
+    {
+      "id": 1448801100676333709,
+      "name": "\u2615\u30fbthe-lounge",
+      "type": "text",
+      "position": 98,
+      "category": "\ud83d\udcac\u30fbCOMMUNITY",
+      "topic": "General community chat. Keep it friendly and constructive."
+    },
+    {
+      "id": 1448801126374707343,
+      "name": "\ud83e\udd16\u30fbautomation",
+      "type": "text",
+      "position": 99,
+      "category": "\ud83d\udcb8\u30fbBUSINESS",
+      "topic": "Automation tools, scripts, and efficiency strategies."
+    },
+    {
+      "id": 1448801130938368153,
+      "name": "\ud83e\udd1d\u30fbnetworking",
+      "type": "text",
+      "position": 100,
+      "category": "\ud83d\udcb8\u30fbBUSINESS",
+      "topic": "Networking, collaborations, partnerships, and connections."
+    },
+    {
+      "id": 1448801134176243835,
+      "name": "\ud83d\udca1\u30fbcreative-lab",
+      "type": "text",
+      "position": 101,
+      "category": "\ud83c\udfa8\u30fbCREATIVE LAB",
+      "topic": "Content brainstorming, copywriting, creative collaboration."
+    },
+    {
+      "id": 1448801139381371033,
+      "name": "\ud83d\udcf7\u30fbproduction-tips",
+      "type": "text",
+      "position": 102,
+      "category": "\ud83c\udfa8\u30fbCREATIVE LAB",
+      "topic": "Photo shoots, video production, equipment, editing."
+    },
+    {
+      "id": 1448801144850878473,
+      "name": "\ud83c\udfab\u30fbticket-support",
+      "type": "text",
+      "position": 103,
+      "category": "\ud83c\udd98\u30fbSUPPORT",
+      "topic": "Create a private support ticket. Click the button below."
+    },
+    {
+      "id": 1448801148856438828,
+      "name": "\ud83e\udd42\u30fbinner-circle",
+      "type": "text",
+      "position": 104,
+      "category": "\ud83d\udd12\u30fbVIP",
+      "topic": "Premium members only - exclusive networking and discussions."
+    },
+    {
+      "id": 1448801152362741811,
+      "name": "\ud83c\udfab\u30fbconsultations",
+      "type": "text",
+      "position": 105,
+      "category": "\ud83d\udd12\u30fbVIP",
+      "topic": "Book VIP consultations. Private channel opens automatically."
+    },
+    {
+      "id": 1448801154929791171,
+      "name": "\ud83e\uddea\u30fbbeta-access",
+      "type": "text",
+      "position": 106,
+      "category": "\ud83d\udd12\u30fbVIP",
+      "topic": "Early access to new features, tools, and beta testing."
+    },
+    {
+      "id": 1448812938574954639,
+      "name": "\ud83d\udcc5\u30fbevents",
+      "type": "text",
+      "position": 108,
+      "category": "\ud83c\udfc1\u30fbWELCOME",
+      "topic": "\ud83d\udcc5 Upcoming community events, AMAs, workshops, and meetups."
+    },
+    {
+      "id": 1448815945563902063,
+      "name": "\ud83e\udd16\u30fbai-model-creation",
+      "type": "text",
+      "position": 109,
+      "category": "\ud83e\udd99\u30fbLLAMA LLAMA CLUB",
+      "topic": "Learn to create and train AI models. Advanced techniques for building custom AI solutions that give you a competitive edge."
+    },
+    {
+      "id": 1448815949628309586,
+      "name": "\ud83d\udc8e\u30fbonlyfans-mastery",
+      "type": "text",
+      "position": 110,
+      "category": "\ud83e\udd99\u30fbLLAMA LLAMA CLUB",
+      "topic": "OnlyFans growth strategies, automation tools, and advanced monetization techniques. Scale faster with proven methods."
+    },
+    {
+      "id": 1448815954971857047,
+      "name": "\u2699\ufe0f\u30fbautomation-bots",
+      "type": "text",
+      "position": 111,
+      "category": "\ud83e\udd99\u30fbLLAMA LLAMA CLUB",
+      "topic": "Advanced bot creation and automation tools. Build custom solutions to automate workflows and maximize efficiency."
+    },
+    {
+      "id": 1448815959824404638,
+      "name": "\ud83d\ude80\u30fbewhore-automation",
+      "type": "text",
+      "position": 112,
+      "category": "\ud83e\udd99\u30fbLLAMA LLAMA CLUB",
+      "topic": "Advanced automation tools and strategies for content creation and distribution. Learn cutting-edge techniques."
+    },
+    {
+      "id": 1448815963683295272,
+      "name": "\ud83d\udc98\u30fbdating-app-automation",
+      "type": "text",
+      "position": 113,
+      "category": "\ud83e\udd99\u30fbLLAMA LLAMA CLUB",
+      "topic": "Dating app automation tools and advanced optimization strategies. Scale your approach with powerful automation."
+    },
+    {
+      "id": 1448815967302975601,
+      "name": "\ud83d\udccb\u30fbclub-info",
+      "type": "text",
+      "position": 114,
+      "category": "\ud83e\udd99\u30fbLLAMA LLAMA CLUB",
+      "topic": "Information about Llama Llama Club premium membership."
+    }
+  ],
+  "roles": [
+    {
+      "id": 1448295316590690334,
+      "name": "Observer",
+      "color": "#000000",
+      "position": 7,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 65536
+    },
+    {
+      "id": 1448295642962329641,
+      "name": "Field Researcher",
+      "color": "#000000",
+      "position": 6,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 377957173312
+    },
+    {
+      "id": 1448296057124687954,
+      "name": "Senior Fellow",
+      "color": "#000000",
+      "position": 5,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 2252177770858560
+    },
+    {
+      "id": 1448296388038492230,
+      "name": "Ethics Committee",
+      "color": "#000000",
+      "position": 4,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 1116691505152
+    },
+    {
+      "id": 1448296405926936596,
+      "name": "System Admin",
+      "color": "#000000",
+      "position": 3,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 8
+    },
+    {
+      "id": 1448296963740008539,
+      "name": "Archivist",
+      "color": "#11806a",
+      "position": 2,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 515396126784
+    },
+    {
+      "id": 1448817672073515180,
+      "name": "\ud83d\udc98 Dating Llama",
+      "color": "#e91e63",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 0
+    },
+    {
+      "id": 1448817667254521986,
+      "name": "\ud83d\udc8e Content Llama",
+      "color": "#ffe66d",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 0
+    },
+    {
+      "id": 1448817663026663525,
+      "name": "\ud83c\udfa5 Short-Form Llama",
+      "color": "#4ecdc4",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 0
+    },
+    {
+      "id": 1448817659675279510,
+      "name": "\ud83d\udc7d Reddit Llama",
+      "color": "#ff4500",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 0
+    },
+    {
+      "id": 1448817656265314386,
+      "name": "\ud83e\udd16 Llama Bot",
+      "color": "#9b59b6",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 0
+    },
+    {
+      "id": 1448817652746162186,
+      "name": "\ud83c\udf31 Llama Member",
+      "color": "#3498db",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 0
+    },
+    {
+      "id": 1448817649026072586,
+      "name": "\u2b50 Verified Llama",
+      "color": "#1a535c",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": true,
+      "permissions": 0
+    },
+    {
+      "id": 1448817645087494186,
+      "name": "\ud83d\udc8e Premium Llama",
+      "color": "#ffe66d",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": true,
+      "permissions": 0
+    },
+    {
+      "id": 1448817641069351053,
+      "name": "\ud83d\udee1\ufe0f Llama Guardians",
+      "color": "#4ecdc4",
+      "position": 1,
+      "mentionable": true,
+      "hoisted": true,
+      "permissions": 8214
+    },
+    {
+      "id": 1448817636463869953,
+      "name": "\ud83d\udc51 Llama Leaders",
+      "color": "#ff6b6b",
+      "position": 1,
+      "mentionable": true,
+      "hoisted": true,
+      "permissions": 8
+    },
+    {
+      "id": 1448817631800070187,
+      "name": "\ud83e\udd99 Head Llama",
+      "color": "#ff6b6b",
+      "position": 1,
+      "mentionable": true,
+      "hoisted": true,
+      "permissions": 8
+    },
+    {
+      "id": 1448569630963667018,
+      "name": "StartIT",
+      "color": "#000000",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 8
+    },
+    {
+      "id": 1448451213409652760,
+      "name": "CashCord",
+      "color": "#000000",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 8
+    },
+    {
+      "id": 1448336568548069489,
+      "name": "Exclusive Content Manager",
+      "color": "#000000",
+      "position": 1,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 17448428624
+    },
+    {
+      "id": 1448262639707754536,
+      "name": "@everyone",
+      "color": "#000000",
+      "position": 0,
+      "mentionable": false,
+      "hoisted": false,
+      "permissions": 2222085186637377
+    }
+  ],
+  "exported_at": "2025-12-12T00:14:17.113348"
+}

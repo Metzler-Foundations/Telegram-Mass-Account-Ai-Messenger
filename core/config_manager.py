@@ -221,7 +221,7 @@ class ConfigurationManager:
 
     def get_telegram_api_id(self) -> Optional[str]:
         """Get Telegram API ID from secrets manager.
-        
+
         Note: This method uses required=True, so it will raise ValueError if not found.
         Callers should handle this exception gracefully for first-time setup scenarios.
         """
@@ -229,7 +229,7 @@ class ConfigurationManager:
 
     def get_telegram_api_hash(self) -> Optional[str]:
         """Get Telegram API hash from secrets manager.
-        
+
         Note: This method uses required=True, so it will raise ValueError if not found.
         Callers should handle this exception gracefully for first-time setup scenarios.
         """

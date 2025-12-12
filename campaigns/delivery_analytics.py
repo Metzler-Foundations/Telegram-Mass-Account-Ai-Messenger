@@ -372,11 +372,11 @@ class DeliveryAnalytics:
                     SELECT
                         COUNT(*) as total_sent,
                         SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) """
-                        """as total_delivered,
+                    """as total_delivered,
                         SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) """
-                        """as total_read,
+                    """as total_read,
                         SUM(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) """
-                        """as total_replied,
+                    """as total_replied,
                         AVG(delivery_time_seconds) as avg_delivery,
                         AVG(read_time_seconds) as avg_read,
                         AVG(response_time_seconds) as avg_response
@@ -509,11 +509,11 @@ class DeliveryAnalytics:
                     SELECT
                         COUNT(*) as total_sent,
                         SUM(CASE WHEN delivered_at IS NOT NULL THEN 1 ELSE 0 END) """
-                        """as total_delivered,
+                    """as total_delivered,
                         SUM(CASE WHEN read_at IS NOT NULL THEN 1 ELSE 0 END) """
-                        """as total_read,
+                    """as total_read,
                         SUM(CASE WHEN replied_at IS NOT NULL THEN 1 ELSE 0 END) """
-                        """as total_replied,
+                    """as total_replied,
                         AVG(delivery_time_seconds) as avg_delivery,
                         AVG(read_time_seconds) as avg_read,
                         AVG(response_time_seconds) as avg_response

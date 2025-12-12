@@ -61,10 +61,7 @@ except ImportError:
 # Try to import enhanced anti-detection
 try:
     from anti_detection.anti_detection_system import (
-        AccountRiskMetrics,  # noqa: F401
-        BanRiskLevel,  # noqa: F401
         EnhancedAntiDetectionSystem,
-        QuarantineReason,  # noqa: F401
     )
 
     ANTI_DETECTION_AVAILABLE = True

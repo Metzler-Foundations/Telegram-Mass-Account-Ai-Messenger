@@ -936,7 +936,6 @@ class TelegramClient:
 
         # Time of day simulation (people are slower at night)
         if self.anti_detection["time_based_delays"]:
-
             hour = time.localtime().tm_hour
             if hour >= 22 or hour <= 6:  # Night time
                 base_delay *= random.uniform(1.2, 1.8)

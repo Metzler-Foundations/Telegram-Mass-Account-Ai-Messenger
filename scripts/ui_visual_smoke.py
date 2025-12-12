@@ -4,7 +4,8 @@ Minimal headless-friendly UI smoke that boots MainWindow and captures a screensh
 
 Usage (headless example):
   cd /home/metzlerdalton3/bot
-  xvfb-run -s "-screen 0 1280x720x24" ./venv/bin/python scripts/ui_visual_smoke.py --width 1280 --height 720
+  xvfb-run -s "-screen 0 1280x720x24" ./venv/bin/python scripts/ui_visual_smoke.py
+  --width 1280 --height 720
 """
 
 import argparse

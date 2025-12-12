@@ -136,7 +136,8 @@ def retry_on_exception(
                     if attempt < max_attempts - 1:
                         delay = config.get_delay(attempt)
                         logger.warning(
-                            f"Attempt {attempt + 1}/{max_attempts} failed for {func.__name__}: {e}. "
+                            f"Attempt {attempt + 1}/{max_attempts} failed "
+                            f"for {func.__name__}: {e}. "
                             f"Retrying in {delay:.2f}s..."
                         )
                         await asyncio.sleep(delay)
@@ -161,7 +162,8 @@ def retry_on_exception(
                     if attempt < max_attempts - 1:
                         delay = config.get_delay(attempt)
                         logger.warning(
-                            f"Attempt {attempt + 1}/{max_attempts} failed for {func.__name__}: {e}. "
+                            f"Attempt {attempt + 1}/{max_attempts} failed "
+                            f"for {func.__name__}: {e}. "
                             f"Retrying in {delay:.2f}s..."
                         )
                         time.sleep(delay)

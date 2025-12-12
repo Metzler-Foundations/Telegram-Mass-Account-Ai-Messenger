@@ -138,7 +138,8 @@ class DatabaseLockHandler:
                         wait_time = time.time() - start_time
                         self._lock_statistics["total_wait_time"] += wait_time
                         logger.info(
-                            f"Database operation succeeded after {attempt + 1} attempts ({wait_time:.2f}s)"
+                            f"Database operation succeeded after {attempt + 1} attempts "
+                            f"({wait_time:.2f}s)"
                         )
 
                     return result

@@ -1,0 +1,11 @@
+discord.py>=2.3.2
+replicate>=0.25.1
+httpx>=0.26.0
+pillow>=10.0.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-dotenv>=1.0.0
+openai>=1.0.0
+opencv-python>=4.8.0
+sentry-sdk>=1.30.0
+

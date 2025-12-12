@@ -222,7 +222,10 @@ class MessageHistoryWidget(QWidget):
                 continue
 
             if search_text:
-                text_content = f"{msg.get('account', '')} {msg.get('contact', '')} {msg.get('message', '')}".lower()
+                text_content = (
+                    f"{msg.get('account', '')} {msg.get('contact', '')} "
+                    f"{msg.get('message', '')}"
+                ).lower()
                 if search_text not in text_content:
                     continue
 
@@ -295,7 +298,8 @@ class CreateCampaignDialog(QDialog):
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g., Welcome Series Q1 2024")
         self.name_input.setToolTip(
-            "Enter a descriptive name for this campaign.\nThis will help you identify it in analytics and reports."
+            "Enter a descriptive name for this campaign.\n"
+            "This will help you identify it in analytics and reports."
         )
 
         name_label = QLabel("Campaign Name")
@@ -569,7 +573,8 @@ class MemberProfileViewer(QDialog):
         self.comprehensive_data = None
 
         self.setWindowTitle(
-            f"Member Profile: {member_data.get('first_name', '')} {member_data.get('last_name', '')}".strip()
+            f"Member Profile: {member_data.get('first_name', '')} "
+            f"{member_data.get('last_name', '')}".strip()
             or member_data.get("username", "Unknown")
         )
         self.resize(800, 600)
@@ -608,7 +613,8 @@ class MemberProfileViewer(QDialog):
         # Basic info
         info_layout = QVBoxLayout()
         name_label = QLabel(
-            f"{self.member_data.get('first_name', '')} {self.member_data.get('last_name', '')}".strip()
+            f"{self.member_data.get('first_name', '')} "
+            f"{self.member_data.get('last_name', '')}".strip()
         )
         name_label.setStyleSheet(f"font-size: 18px; font-weight: bold; color: {c['TEXT_BRIGHT']};")
         info_layout.addWidget(name_label)
@@ -627,7 +633,9 @@ class MemberProfileViewer(QDialog):
             success_g = int(success_hex[2:4], 16)
             success_b = int(success_hex[4:6], 16)
             verified_badge.setStyleSheet(
-                f"color: {c['ACCENT_SUCCESS']}; font-size: 12px; background: rgba({success_r}, {success_g}, {success_b}, 0.1); padding: 4px 8px; border-radius: 4px;"
+                f"color: {c['ACCENT_SUCCESS']}; font-size: 12px; "
+                f"background: rgba({success_r}, {success_g}, {success_b}, 0.1); "
+                f"padding: 4px 8px; border-radius: 4px;"
             )
             badges_layout.addWidget(verified_badge)
 
@@ -638,7 +646,9 @@ class MemberProfileViewer(QDialog):
             warn_g = int(warn_hex[2:4], 16)
             warn_b = int(warn_hex[4:6], 16)
             premium_badge.setStyleSheet(
-                f"color: {c['ACCENT_WARNING']}; font-size: 12px; background: rgba({warn_r}, {warn_g}, {warn_b}, 0.1); padding: 4px 8px; border-radius: 4px;"
+                f"color: {c['ACCENT_WARNING']}; font-size: 12px; "
+                f"background: rgba({warn_r}, {warn_g}, {warn_b}, 0.1); "
+                f"padding: 4px 8px; border-radius: 4px;"
             )
             badges_layout.addWidget(premium_badge)
 
@@ -847,7 +857,8 @@ class MemberProfileViewer(QDialog):
 
                 for group in memberships[:10]:  # Limit display
                     group_label = QLabel(
-                        f"{group.get('title', 'Unknown Group')} ({group.get('member_count', 0)} members)"
+                        f"{group.get('title', 'Unknown Group')} "
+                        f"({group.get('member_count', 0)} members)"
                     )
                     membership_layout.addWidget(group_label)
 
@@ -1163,7 +1174,9 @@ class CampaignManagerWidget(QWidget):
                     else (
                         "warn"
                         if campaign.status.value == "paused"
-                        else "bad" if campaign.status.value == "error" else "warn"
+                        else "bad"
+                        if campaign.status.value == "error"
+                        else "warn"
                     )
                 )
                 status_pill.setProperty("state", state)
@@ -1282,7 +1295,8 @@ class CampaignManagerWidget(QWidget):
                 ErrorHandler.safe_information(
                     self,
                     "Success",
-                    f"Campaign '{data['name']}' created with {len(target_ids)} targets{variant_msg}.",
+                    f"Campaign '{data['name']}' created with {len(target_ids)} targets"
+                    f"{variant_msg}.",
                 )
             except Exception as e:
                 ErrorHandler.safe_critical(self, "Error", f"Failed to create campaign: {e}")
@@ -1330,7 +1344,8 @@ class CampaignManagerWidget(QWidget):
                 main_window = self.window()
                 if hasattr(main_window, "_run_async_task"):
                     main_window._run_async_task(self.campaign_manager.cancel_campaign(cid))
-                # Note: Actual deletion from DB might not be implemented in manager, but cancellation stops it.
+                # Note: Actual deletion from DB might not be implemented in manager,
+                # but cancellation stops it.
                 self.refresh_campaigns()
                 ErrorHandler.safe_information(self, "Success", "Campaign deleted successfully")
 
@@ -1394,7 +1409,8 @@ class CampaignManagerWidget(QWidget):
 <br>
 <b>Name:</b> {campaign.name}<br>
 <b>Status:</b> {campaign.status.value.title()}<br>
-<b>Created:</b> {campaign.created_at.strftime("%Y-%m-%d %H:%M") if campaign.created_at else 'Unknown'}<br>
+<b>Created:</b> {campaign.created_at.strftime("%Y-%m-%d %H:%M")
+if campaign.created_at else 'Unknown'}<br>
 <br>
 <b>Progress:</b><br>
 • Total Targets: {campaign.total_targets}<br>

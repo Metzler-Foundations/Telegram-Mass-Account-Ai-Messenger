@@ -91,7 +91,8 @@ class AccountCreationFailSafe:
         if len(ip_creations) >= self.rate_limits["per_ip"]:
             return (
                 False,
-                f"IP limit exceeded: {len(ip_creations)}/{self.rate_limits['per_ip']} for {ip_address}",
+                f"IP limit exceeded: {len(ip_creations)}/"
+                f"{self.rate_limits['per_ip']} for {ip_address}",
             )
 
         return True, None
@@ -167,7 +168,8 @@ class AccountCreationFailSafe:
             if failure_rate > 0.8:  # 80% failure rate
                 self.blocked_phone_providers.add(provider)
                 logger.warning(
-                    f"Blocked phone provider {provider} due to high failure rate: {failure_rate:.1%}"
+                    f"Blocked phone provider {provider} due to high failure rate: "
+                    f"{failure_rate:.1%}"
                 )
 
     async def pre_creation_check(

@@ -161,7 +161,10 @@ class EliteAntiDetectionSystem:
                 country_code="DE",
                 timezone="UTC+1",
                 language="de_DE",
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0",
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) "
+                    "Gecko/20100101 Firefox/91.0"
+                ),
             ),
             "eu_west": GeographicProfile(
                 country_code="GB",
@@ -173,7 +176,11 @@ class EliteAntiDetectionSystem:
                 country_code="JP",
                 timezone="UTC+9",
                 language="ja_JP",
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/91.0.4472.124 Safari/537.36"
+                ),
             ),
             "asia_south": GeographicProfile(
                 country_code="IN",
@@ -320,7 +327,8 @@ class EliteAntiDetectionSystem:
                 conn.execute(
                     """
                     INSERT INTO request_history
-                    (account_id, request_type, response_time, success, error_type, ip_address, user_agent)
+                    (account_id, request_type, response_time, success, error_type,
+                     ip_address, user_agent)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                     (
@@ -1201,7 +1209,8 @@ class ComprehensiveDataExtractor:
         analysis["mentions"] = re.findall(r"@\w+", bio)
         analysis["urls"] = re.findall(r"https?://[^\s]+", bio)
         analysis["emojis"] = re.findall(
-            r"[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF]",
+            r"[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF"
+            r"\U0001F1E0-\U0001F1FF]",
             bio,
         )
 
@@ -2501,7 +2510,8 @@ class EliteDataAccessLayer:
                 INSERT OR REPLACE INTO member_behavioral_insights
                 (user_id, account_type_prediction, activity_level, engagement_style,
                  communication_preferences, behavioral_score, messaging_potential_score,
-                 messaging_potential_category, best_contact_time, timezone_estimate, language_prediction)
+                       messaging_potential_category, best_contact_time,
+                       timezone_estimate, language_prediction)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
@@ -2528,7 +2538,8 @@ class EliteDataAccessLayer:
                 """
                 SELECT account_type_prediction, activity_level, engagement_style,
                        communication_preferences, behavioral_score, messaging_potential_score,
-                       messaging_potential_category, best_contact_time, timezone_estimate, language_prediction
+                       messaging_potential_category, best_contact_time,
+                       timezone_estimate, language_prediction
                 FROM member_behavioral_insights
                 WHERE user_id = ?
             """,
@@ -2554,7 +2565,8 @@ class EliteDataAccessLayer:
     def get_members_for_messaging(
         self, channel_id: str, criteria: Dict = None, limit: int = None, offset: int = 0
     ) -> List[Dict]:
-        """Get members optimized for messaging based on comprehensive data. Supports pagination for large datasets."""
+        """Get members optimized for messaging based on comprehensive data.
+        Supports pagination for large datasets."""
         criteria = criteria or {}
 
         min_quality = criteria.get("min_profile_quality", 0.3)
@@ -2624,7 +2636,8 @@ class EliteDataAccessLayer:
                     COUNT(*) as total_members,
                     AVG(mp.profile_quality_score) as avg_quality,
                     AVG(bi.messaging_potential_score) as avg_messaging_potential,
-                    COUNT(CASE WHEN bi.messaging_potential_category = 'high' THEN 1 END) as high_potential_count,
+                    COUNT(CASE WHEN bi.messaging_potential_category = 'high' THEN 1 END)
+                    as high_potential_count,
                     AVG(m.threat_score) as avg_threat_score,
                     COUNT(CASE WHEN m.is_safe_target = 1 THEN 1 END) as safe_targets
                 FROM members m
@@ -3111,8 +3124,11 @@ class EliteMemberScraper:
 
                                     if user_id not in members:
                                         # Extract comprehensive data
-                                        member_data = await self.data_extractor.extract_comprehensive_member_data(
-                                            client, user, channel_info
+                                        extractor = self.data_extractor
+                                        member_data = (
+                                            await extractor.extract_comprehensive_member_data(
+                                                client, user, channel_info
+                                            )
                                         )
                                         member_data["channel_id"] = channel_info["id"]
                                         member_data["discovered_via"] = "reactions"
@@ -3154,8 +3170,11 @@ class EliteMemberScraper:
                                 if hasattr(voter, "user") and voter.user:
                                     user_id = voter.user.id
                                     if user_id not in members:
-                                        member_data = await self.data_extractor.extract_comprehensive_member_data(
-                                            client, voter.user, channel_info
+                                        extractor = self.data_extractor
+                                        member_data = (
+                                            await extractor.extract_comprehensive_member_data(
+                                                client, voter.user, channel_info
+                                            )
                                         )
                                         member_data["channel_id"] = channel_info["id"]
                                         member_data["discovered_via"] = "polls"
@@ -3398,7 +3417,8 @@ class EliteMemberScraper:
                             existing["last_message_date"] = member["last_message_date"]
 
         logger.info(
-            f"Consolidated {len(all_members)} unique members from {len(technique_results)} techniques"
+            f"Consolidated {len(all_members)} unique members "
+            f"from {len(technique_results)} techniques"
         )
         return list(all_members.values())
 
@@ -3501,7 +3521,8 @@ class EliteMemberScraper:
 
 
 class MemberScraper:
-    """Advanced Telegram member scraper with comprehensive threat detection and elite anti-detection."""
+    """Advanced Telegram member scraper with comprehensive threat detection
+    and elite anti-detection."""
 
     def __init__(
         self,
@@ -3594,7 +3615,8 @@ class MemberScraper:
             progress_callback: Optional callback for progress updates
             analyze_messages: Whether to analyze message history to find hidden members
             max_messages: Maximum messages to analyze (for performance)
-            use_elite_scraping: Whether to use elite comprehensive scraping with zero-risk guarantees
+            use_elite_scraping: Whether to use elite comprehensive scraping
+            with zero-risk guarantees
 
         Returns:
             Dict with scraping results
@@ -3724,7 +3746,8 @@ class MemberScraper:
             except Exception as e:
                 logger.warning(f"Member list access limited: {e}")
 
-            # METHOD 3: Analyze message history to find ALL users who posted (including hidden members)
+            # METHOD 3: Analyze message history to find ALL users who posted
+            # (including hidden members)
             if analyze_messages:
                 logger.info("🔍 Method 3: Analyzing message history to find hidden members...")
                 try:

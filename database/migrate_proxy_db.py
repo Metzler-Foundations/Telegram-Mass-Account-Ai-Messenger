@@ -44,7 +44,8 @@ def migrate_proxy_database(db_path: str = "proxy_pool.db"):
                 ),
                 (
                     "idx_proxy_status_score",
-                    "CREATE INDEX IF NOT EXISTS idx_proxy_status_score ON proxies(status, score DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_proxy_status_score "
+                    "ON proxies(status, score DESC)",
                 ),
             ]
 

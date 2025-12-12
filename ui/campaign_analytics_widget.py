@@ -869,7 +869,7 @@ class CampaignAnalyticsWidget(QWidget):
             if recommendations:
                 rec_html = f"<ul style='color: {c['TEXT_SECONDARY']};'>"
                 for rec in recommendations:
-                    rec_html += f"<li>{rec}</li>"
+                    rec_html += f"<li style='color: {c['TEXT_SECONDARY']};'>{rec}</li>"
                 rec_html += "</ul>"
                 self.recommendations_text.setText(rec_html)
             else:

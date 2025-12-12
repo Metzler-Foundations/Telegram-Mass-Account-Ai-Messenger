@@ -1549,10 +1549,7 @@ class DMCampaignManager:
         if limiter["messages_this_hour"] >= limiter["max_per_hour"]:
             # Wait until next hour
             wait_time = 3600 - (now - limiter["hour_start"]).total_seconds()
-            logger.info(
-                f"Hourly limit reached for {account_phone}, "
-                f"waiting {wait_time:.0f}s"
-            )
+            logger.info(f"Hourly limit reached for {account_phone}, " f"waiting {wait_time:.0f}s")
             await asyncio.sleep(wait_time)
             limiter["hour_start"] = datetime.now()
             limiter["messages_this_hour"] = 0

@@ -1850,7 +1850,7 @@ class WarmupIntelligence:
 
         prompt = f"""
         Based on the phone number {phone_number}, analyze what type of account """
-        f"""this might be and suggest profile characteristics:
+        """this might be and suggest profile characteristics:
 
         Consider:
         - Geographic region (from phone number patterns)
@@ -1892,7 +1892,7 @@ class WarmupIntelligence:
         analysis_str = json.dumps(account_analysis) if account_analysis else "general account"
 
         # Use Gemini to generate realistic profile content
-        prompt = f"""
+        prompt = """
         Generate a realistic Telegram profile for a new account based on """
         f"""this analysis: {analysis_str}
 
@@ -1960,7 +1960,7 @@ class WarmupIntelligence:
         if not self.gemini_service:
             return None
 
-        prompt = f"""
+        prompt = """
         Create a natural, engaging bio for a Telegram account with this """
         f"""profile: {json.dumps(profile_data)}
 

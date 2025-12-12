@@ -365,7 +365,8 @@ class CircuitBreaker:
                 self.state = self.State.OPEN
                 self.next_attempt_time = time.time() + self.recovery_timeout
                 logger.warning(
-                    f"Circuit breaker '{self.name}' tripped to OPEN after {self.failure_count} failures"
+                    f"Circuit breaker '{self.name}' tripped to OPEN "
+                    f"after {self.failure_count} failures"
                 )
 
     def get_status(self) -> Dict[str, Any]:

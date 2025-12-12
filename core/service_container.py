@@ -394,7 +394,7 @@ class ServiceFactory:
         except ValueError:
             # Secret not found, try environment variable
             api_id = os.getenv("TELEGRAM_API_ID", "")
-        
+
         try:
             api_hash = config_manager.get_telegram_api_hash() or os.getenv("TELEGRAM_API_HASH", "")
         except ValueError:

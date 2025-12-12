@@ -103,16 +103,26 @@ class QuickStartDialog(QDialog):
         title.setFont(title_font)
         layout.addWidget(title)
 
-        # Content
+        # Content - with explicit colors for HTML elements
+        c = ThemeManager.get_colors()
         content = QLabel(
-            "<h3>Welcome! Here's how to get started:</h3>"
+            f"<style>"
+            f"h3, h4 {{ color: {c['TEXT_BRIGHT']}; }}"
+            f"ol, ul {{ color: {c['TEXT_SECONDARY']}; }}"
+            f"li {{ color: {c['TEXT_SECONDARY']}; }}"
+            f"b {{ color: {c['TEXT_BRIGHT']}; }}"
+            f"a {{ color: #5865f2; }}"
+            f"</style>"
+            f"<h3>Welcome! Here's how to get started:</h3>"
             "<br>"
             "<h4>Step 1: Configure API Credentials</h4>"
             "<ol>"
             "<li>Click <b>Settings</b> (gear icon or menu)</li>"
             "<li>Go to <b>API & Auth</b> tab</li>"
-            "<li>Get your <b>Telegram API credentials</b> from <a href='https://my.telegram.org/apps'>my.telegram.org/apps</a></li>"
-            "<li>Get your <b>Gemini API key</b> from <a href='https://makersuite.google.com/app/apikey'>Google AI Studio</a></li>"
+            "<li>Get your <b>Telegram API credentials</b> from "
+            "<a href='https://my.telegram.org/apps'>my.telegram.org/apps</a></li>"
+            "<li>Get your <b>Gemini API key</b> from "
+            "<a href='https://makersuite.google.com/app/apikey'>Google AI Studio</a></li>"
             "<li>Fill in all fields and click <b>Save</b></li>"
             "</ol>"
             "<br>"
@@ -149,7 +159,9 @@ class QuickStartDialog(QDialog):
             "<li>Hover over any option for helpful tooltips</li>"
             "</ul>"
             "<br>"
-            f"<p style='color: {ThemeManager.get_color('ACCENT_WARNING')};'><b>Remember:</b> This is a powerful tool. Use it responsibly and ethically!</p>"
+            f"<p style='color: {c['ACCENT_WARNING']};'>"
+            f"<b>Remember:</b> This is a powerful tool. "
+            f"Use it responsibly and ethically!</p>"
         )
         content.setWordWrap(True)
         content.setTextFormat(Qt.TextFormat.RichText)
@@ -322,7 +334,8 @@ class ConfirmationDialog(QDialog):
 
         # Details
         if details:
-            details_label = QLabel("<ul>" + "".join(f"<li>{d}</li>" for d in details) + "</ul>")
+            details_html = f"<ul style='color: {c['TEXT_SECONDARY']};'>" + "".join(f"<li style='color: {c['TEXT_SECONDARY']};'>{d}</li>" for d in details) + "</ul>"
+            details_label = QLabel(details_html)
             details_label.setWordWrap(True)
             details_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']};")
             layout.addWidget(details_label)
@@ -335,7 +348,9 @@ class ConfirmationDialog(QDialog):
             warn_g = int(warn_hex[2:4], 16)
             warn_b = int(warn_hex[4:6], 16)
             warning_frame.setStyleSheet(
-                f"background-color: rgba({warn_r}, {warn_g}, {warn_b}, 0.15); border: 2px solid {c['ACCENT_WARNING']}; border-radius: 4px; padding: 12px;"
+                f"background-color: rgba({warn_r}, {warn_g}, {warn_b}, 0.15); "
+                f"border: 2px solid {c['ACCENT_WARNING']}; "
+                f"border-radius: 4px; padding: 12px;"
             )
             warning_layout = QVBoxLayout(warning_frame)
             warning_label = QLabel(f"{warning}")
@@ -435,7 +450,8 @@ class FeatureCard(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         c = ThemeManager.get_colors()
         self.setStyleSheet(
-            f"FeatureCard {{ background-color: {c['BG_TERTIARY']}; border-radius: 8px; padding: 15px; }} "
+            f"FeatureCard {{ background-color: {c['BG_TERTIARY']}; "
+            f"border-radius: 8px; padding: 15px; }} "
             f"FeatureCard:hover {{ background-color: {c['BG_SECONDARY']}; }}"
         )
 

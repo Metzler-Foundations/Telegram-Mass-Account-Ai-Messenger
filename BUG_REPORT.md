@@ -8,9 +8,9 @@ This document identifies bugs found in the codebase from application startup thr
 ## 🔴 Critical Bugs
 
 ### 1. Missing API Credentials in Account Creation Dialog
-**File:** `ui/account_creation_dialog.py`  
-**Lines:** 223-231  
-**Severity:** Critical  
+**File:** `ui/account_creation_dialog.py`
+**Lines:** 223-231
+**Severity:** Critical
 **Issue:** The account creation dialog prepares a config dictionary but does NOT include `api_id` and `api_hash`, which are required by `AccountCreator.create_new_account()` (line 1727 in `account_creator.py`).
 
 **Current Code:**
@@ -39,9 +39,9 @@ config['api_hash'] = secrets.get_secret('telegram_api_hash', required=True)
 ---
 
 ### 2. Wrong Config Key Names in Account Creation Dialog
-**File:** `ui/account_creation_dialog.py`  
-**Lines:** 227-228  
-**Severity:** Critical  
+**File:** `ui/account_creation_dialog.py`
+**Lines:** 227-228
+**Severity:** Critical
 **Issue:** The dialog uses `sms_provider` and `api_key`, but `AccountCreator` expects `phone_provider` and `provider_api_key`.
 
 **Current Code:**
@@ -67,9 +67,9 @@ api_key = config.get('provider_api_key')
 ---
 
 ### 3. AccountCreator Missing API Credentials Fallback
-**File:** `accounts/account_creator.py`  
-**Lines:** 1727-1731, 2007-2012  
-**Severity:** High  
+**File:** `accounts/account_creator.py`
+**Lines:** 1727-1731, 2007-2012
+**Severity:** High
 **Issue:** `create_new_account()` requires `api_id` and `api_hash` in the config dict, but doesn't fall back to loading from secrets_manager or environment variables like `_create_client_without_start()` does.
 
 **Current Code (line 1727):**
@@ -110,9 +110,9 @@ if not api_id or not api_hash:
 ## 🟡 Medium Severity Bugs
 
 ### 4. KeyError Risk in Welcome Wizard SMS Provider Handling
-**File:** `ui/welcome_wizard.py`  
-**Lines:** 234, 254  
-**Severity:** Medium  
+**File:** `ui/welcome_wizard.py`
+**Lines:** 234, 254
+**Severity:** Medium
 **Issue:** Code accesses `config["sms_providers"]["api_key"]` and `config["sms_providers"]["provider"]` without checking if the keys exist first.
 
 **Current Code (line 234):**
@@ -140,9 +140,9 @@ provider_name = config.get("sms_providers", {}).get("provider", "unknown").lower
 ---
 
 ### 5. Duplicate Phone Number Field in Welcome Wizard
-**File:** `ui/welcome_wizard.py`  
-**Lines:** 707, 794  
-**Severity:** Medium  
+**File:** `ui/welcome_wizard.py`
+**Lines:** 707, 794
+**Severity:** Medium
 **Issue:** Phone number is collected on both page 1 (TelegramSetupPage) and page 2 (PhoneSetupPage), but only page 2's value is used (line 127).
 
 **Impact:** User confusion - they might enter phone number on page 1, but it gets ignored. The field on page 1 should either be removed or the logic should use page 1's value.
@@ -154,9 +154,9 @@ provider_name = config.get("sms_providers", {}).get("provider", "unknown").lower
 ---
 
 ### 6. AccountCreator Missing Dependencies
-**File:** `accounts/account_manager.py`  
-**Line:** 1619  
-**Severity:** Medium  
+**File:** `accounts/account_manager.py`
+**Line:** 1619
+**Severity:** Medium
 **Issue:** Creates `AccountCreator` without passing `gemini_service` and `account_manager` references, even though they're available.
 
 **Current Code:**
@@ -178,9 +178,9 @@ creator = AccountCreator(
 ---
 
 ### 7. Proxy Release Race Condition
-**File:** `accounts/account_manager.py`  
-**Lines:** 1644-1646  
-**Severity:** Medium  
+**File:** `accounts/account_manager.py`
+**Lines:** 1644-1646
+**Severity:** Medium
 **Issue:** Releases proxy for `temp_phone` after account creation, but the proxy may have already been transferred/released in `AccountCreator.create_new_account()` (lines 1806-1808).
 
 **Current Code:**
@@ -207,9 +207,9 @@ if proxy_pool and config.get('proxy_key'):
 ---
 
 ### 8. Incomplete Account Creation Dialog Implementation
-**File:** `ui/account_creation_dialog.py`  
-**Lines:** 241-257  
-**Severity:** Medium  
+**File:** `ui/account_creation_dialog.py`
+**Lines:** 241-257
+**Severity:** Medium
 **Issue:** `_do_async_creation()` method is a stub that simulates account creation instead of actually calling the real account creation flow.
 
 **Current Code:**
@@ -233,7 +233,7 @@ async def _do_async_creation(self, config: Dict[str, Any]):
         main_window = self.parent()
         if not main_window or not hasattr(main_window, 'account_manager'):
             raise Exception("Account manager not available")
-        
+
         result = await main_window.account_manager.create_account(config)
         if result.get('success'):
             self._complete_creation(result['account'])
@@ -249,9 +249,9 @@ async def _do_async_creation(self, config: Dict[str, Any]):
 ## 🟢 Low Severity / Code Quality Issues
 
 ### 9. Inconsistent Error Handling in Welcome Wizard
-**File:** `ui/welcome_wizard.py`  
-**Line:** 260  
-**Severity:** Low  
+**File:** `ui/welcome_wizard.py`
+**Line:** 260
+**Severity:** Low
 **Issue:** If secrets_manager fails, the error is logged but the wizard continues anyway. This might lead to credentials not being saved securely.
 
 **Impact:** User might think credentials are saved securely when they're not.
@@ -259,9 +259,9 @@ async def _do_async_creation(self, config: Dict[str, Any]):
 ---
 
 ### 10. Missing Validation for Optional SMS Provider
-**File:** `ui/welcome_wizard.py`  
-**Line:** 199-212  
-**Severity:** Low  
+**File:** `ui/welcome_wizard.py`
+**Line:** 199-212
+**Severity:** Low
 **Issue:** SMS provider validation is attempted even when API key is empty, but the validation might not handle empty keys gracefully.
 
 **Impact:** Unclear error messages if validation fails on empty input.
@@ -272,7 +272,7 @@ async def _do_async_creation(self, config: Dict[str, Any]):
 
 **Total Bugs Found:** 10
 - **Critical:** 3
-- **Medium:** 5  
+- **Medium:** 5
 - **Low:** 2
 
 **Most Critical Issues:**
@@ -285,4 +285,3 @@ async def _do_async_creation(self, config: Dict[str, Any]):
 2. Fix Bug #8 (incomplete implementation)
 3. Fix Bugs #4, #5, #6, #7 (improve robustness)
 4. Address Bugs #9, #10 (code quality)
-

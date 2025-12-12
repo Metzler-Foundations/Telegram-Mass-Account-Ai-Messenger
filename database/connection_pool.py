@@ -204,7 +204,8 @@ class ConnectionPool:
         self._maintenance_thread.start()
 
         logger.info(
-            f"Connection pool initialized for {database} (min={min_connections}, max={max_connections})"
+            f"Connection pool initialized for {database} "
+            f"(min={min_connections}, max={max_connections})"
         )
 
     def _create_connection(self) -> PooledConnection:

@@ -351,11 +351,11 @@ class SystemTester:
             return False
 
     def test_gui_instantiation(self) -> bool:
-        """Test GUI class imports and basic structure (no actual instantiation to avoid display issues)"""
+        """Test GUI class imports and basic structure
+        (no actual instantiation to avoid display issues)"""
         try:
             # Test that all GUI classes can be imported without instantiation
             try:
-
                 self.log_success("GUI classes imported successfully")
             except Exception as e:
                 self.log_error(f"GUI class import failed: {e}")

@@ -399,7 +399,10 @@ class ProxyPoolManager:
     PRIMARY_ENDPOINTS = [
         ProxyEndpoint(
             name="proxifly_us",
-            url="https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/countries/US/data.txt",
+            url=(
+                "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/"
+                "proxies/countries/US/data.txt"
+            ),
             feed_type="primary",
             poll_interval=300,  # 5 min
             parser="text",
@@ -407,7 +410,10 @@ class ProxyPoolManager:
         ),
         ProxyEndpoint(
             name="proxifly_socks5",
-            url="https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/socks5/data.txt",
+            url=(
+                "https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/"
+                "proxies/protocols/socks5/data.txt"
+            ),
             feed_type="primary",
             poll_interval=300,
             parser="text",
@@ -415,7 +421,10 @@ class ProxyPoolManager:
         ),
         ProxyEndpoint(
             name="clearproxy",
-            url="https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt",
+            url=(
+                "https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/"
+                "main/socks5/raw/all.txt"
+            ),
             feed_type="primary",
             poll_interval=420,  # 7 min
             parser="text",
@@ -479,7 +488,10 @@ class ProxyPoolManager:
         ),
         ProxyEndpoint(
             name="breakingtechfr",
-            url="https://raw.githubusercontent.com/BreakingTechFr/Proxy_Free/main/proxies/socks5.txt",
+            url=(
+                "https://raw.githubusercontent.com/BreakingTechFr/Proxy_Free/"
+                "main/proxies/socks5.txt"
+            ),
             feed_type="obscure",
             poll_interval=1200,
             parser="text",
@@ -635,7 +647,8 @@ class ProxyPoolManager:
         self._load_proxies()
 
         logger.info(
-            f"ProxyPoolManager initialized with {len(self.endpoints)} endpoints, {len(self.proxies)} proxies loaded"
+            f"ProxyPoolManager initialized with {len(self.endpoints)} endpoints, "
+            f"{len(self.proxies)} proxies loaded"
         )
 
     def _load_config_from_file(self):
@@ -890,7 +903,9 @@ class ProxyPoolManager:
             with self._get_connection() as conn:
                 conn.execute(
                     """
-                        INSERT INTO proxy_pool_stats (id, total_fetched, total_validated, total_failed, endpoints_polled, last_full_poll)
+                        INSERT INTO proxy_pool_stats
+                        (id, total_fetched, total_validated, total_failed,
+                         endpoints_polled, last_full_poll)
                         VALUES (1, ?, ?, ?, ?, ?)
                         ON CONFLICT(id) DO UPDATE SET
                             total_fetched=excluded.total_fetched,
@@ -985,7 +1000,8 @@ class ProxyPoolManager:
                         self.assigned_proxies[proxy.assigned_account] = proxy.proxy_key
 
                 logger.info(
-                    f"Loaded {len(self.proxies)} proxies from database ({len(self.available_proxies)} available)"
+                    f"Loaded {len(self.proxies)} proxies from database "
+                    f"({len(self.available_proxies)} available)"
                 )
 
         except Exception as e:
@@ -1011,9 +1027,14 @@ class ProxyPoolManager:
                     """
                     INSERT OR REPLACE INTO proxies
                     (proxy_key, ip, port, protocol, username, password, country, city, isp,
-                     latency_ms, uptime_percent, success_count, failure_count, last_check, last_used,
-                     score, tier, fraud_score, status, assigned_account, cooldown_until, source_endpoint, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                     latency_ms, uptime_percent, success_count, failure_count,
+                     last_check, last_used,
+                     score, tier, fraud_score, status, assigned_account, cooldown_until,
+                     source_endpoint, updated_at)
+                    VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        CURRENT_TIMESTAMP
+                    )
                 """,
                     (
                         proxy.proxy_key,
@@ -1050,7 +1071,8 @@ class ProxyPoolManager:
             with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
-                    "SELECT proxy_key, username, password FROM proxies WHERE username IS NOT NULL OR password IS NOT NULL"
+                    "SELECT proxy_key, username, password FROM proxies "
+                    "WHERE username IS NOT NULL OR password IS NOT NULL"
                 )
 
                 credentials_to_update = []
@@ -1106,7 +1128,8 @@ class ProxyPoolManager:
                     conn.commit()
 
                     logger.info(
-                        f"Successfully migrated {len(credentials_to_update)} proxy credential sets to encrypted storage"
+                        f"Successfully migrated {len(credentials_to_update)} "
+                        f"proxy credential sets to encrypted storage"
                     )
                 else:
                     logger.debug("No proxy credentials needed migration")
@@ -1801,7 +1824,8 @@ class ProxyPoolManager:
                 with self._get_connection() as conn:
                     conn.execute("BEGIN EXCLUSIVE")  # Exclusive lock on database
                     try:
-                        # Check one more time if proxy is already assigned (race condition check at DB level)
+                        # Check one more time if proxy is already assigned
+                        # (race condition check at DB level)
                         cursor = conn.execute(
                             "SELECT account_phone FROM proxy_assignments WHERE proxy_key = ?",
                             (proxy.proxy_key,),
@@ -1810,7 +1834,8 @@ class ProxyPoolManager:
                         if existing and existing[0] != account_phone:
                             # Proxy was assigned to someone else between our check and now
                             logger.warning(
-                                f"Proxy {proxy.proxy_key} was assigned to {existing[0]} during assignment"
+                                f"Proxy {proxy.proxy_key} was assigned to {existing[0]} "
+                                f"during assignment"
                             )
                             conn.rollback()
                             return None
@@ -1835,9 +1860,14 @@ class ProxyPoolManager:
                             """
                             INSERT OR REPLACE INTO proxies
                             (proxy_key, ip, port, protocol, username, password, country, city, isp,
-                             latency_ms, uptime_percent, success_count, failure_count, last_check, last_used,
-                             score, tier, fraud_score, status, assigned_account, cooldown_until, source_endpoint, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                             latency_ms, uptime_percent, success_count, failure_count,
+                     last_check, last_used,
+                             score, tier, fraud_score, status, assigned_account, cooldown_until,
+                             source_endpoint, updated_at)
+                            VALUES (
+                                ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                                CURRENT_TIMESTAMP
+                            )
                         """,
                             (
                                 proxy.proxy_key,
@@ -1868,7 +1898,8 @@ class ProxyPoolManager:
                         # Save assignment
                         conn.execute(
                             """
-                            INSERT OR REPLACE INTO proxy_assignments (account_phone, proxy_key, is_permanent, is_locked)
+                            INSERT OR REPLACE INTO proxy_assignments
+                            (account_phone, proxy_key, is_permanent, is_locked)
                             VALUES (?, ?, 1, 0)
                         """,
                             (account_phone, proxy.proxy_key),
@@ -1889,7 +1920,8 @@ class ProxyPoolManager:
                 return None
 
         logger.info(
-            f"✅ Assigned proxy {proxy.proxy_key} (score: {proxy.score:.1f}) to account {account_phone}"
+            f"✅ Assigned proxy {proxy.proxy_key} (score: {proxy.score:.1f}) "
+            f"to account {account_phone}"
         )
 
         return proxy
@@ -1936,7 +1968,8 @@ class ProxyPoolManager:
 
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO proxy_assignments (account_phone, proxy_key, is_permanent, is_locked)
+                    INSERT OR REPLACE INTO proxy_assignments
+                    (account_phone, proxy_key, is_permanent, is_locked)
                     VALUES (?, ?, 1, ?)
                 """,
                     (account_phone, proxy_key, 1 if is_locked else 0),

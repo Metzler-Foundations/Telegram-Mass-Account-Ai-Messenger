@@ -21,7 +21,7 @@ This document reviews the startup and first-time initialization process of the T
 - Confusion about which wizard to use
 - Race conditions
 
-**Fix:** 
+**Fix:**
 - `app_launcher.py` handles the primary welcome wizard before MainWindow is created
 - `main.py` now only checks if wizard was skipped but config is incomplete (secondary check)
 - Added delay (2000ms) to avoid immediate duplicate checks
@@ -30,7 +30,7 @@ This document reviews the startup and first-time initialization process of the T
 ### 3. ✅ Fixed: Database Initialization
 **Location:** `main.py` - `_on_background_task_completed()`
 
-**Issue:** 
+**Issue:**
 - `MemberDatabase()` was called without explicit path, using default "data/members.db"
 - No explicit error handling or user feedback if database initialization fails
 - No logging to confirm successful initialization
@@ -105,7 +105,7 @@ All databases initialize automatically when their classes are instantiated:
 
 Services are initialized via `ServiceFactory` pattern:
 
-1. **Telegram Service:** 
+1. **Telegram Service:**
    - Gets credentials from secrets manager or environment
    - Falls back to empty credentials if missing (graceful degradation)
    - Logs warnings for missing credentials
@@ -218,4 +218,3 @@ The startup process is now robust and handles edge cases gracefully:
 - No production code uses mock data
 
 The application is ready for first-time use testing.
-

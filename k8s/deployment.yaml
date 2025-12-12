@@ -18,7 +18,7 @@ spec:
       - name: telegram-bot
         image: telegram-automation:latest
         imagePullPolicy: IfNotPresent
-        
+
         env:
         - name: SECRET_TELEGRAM_API_ID
           valueFrom:
@@ -40,12 +40,12 @@ spec:
             secretKeyRef:
               name: telegram-secrets
               key: sms_key
-        
+
         ports:
         - containerPort: 8080
           name: http
           protocol: TCP
-        
+
         resources:
           requests:
             cpu: 500m
@@ -53,7 +53,7 @@ spec:
           limits:
             cpu: 2000m
             memory: 2Gi
-        
+
         livenessProbe:
           httpGet:
             path: /health
@@ -62,7 +62,7 @@ spec:
           periodSeconds: 30
           timeoutSeconds: 10
           failureThreshold: 3
-        
+
         readinessProbe:
           httpGet:
             path: /ready
@@ -71,18 +71,18 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
-        
+
         volumeMounts:
         - name: data
           mountPath: /app/data
         - name: logs
           mountPath: /app/logs
-      
+
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
-      
+
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -90,46 +90,3 @@ spec:
       - name: logs
         persistentVolumeClaim:
           claimName: telegram-logs
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: telegram-automation
-spec:
-  selector:
-    app: telegram-automation
-  ports:
-  - protocol: TCP
-    port: 8080
-    targetPort: 8080
-  type: ClusterIP
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: telegram-data
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: telegram-logs
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-
-
-
-
-

@@ -401,7 +401,7 @@ def get_proxy_timeout() -> float:
 
 if __name__ == "__main__":
     # Example usage
-    import asyncio  # noqa: E402
+    import asyncio  # noqa: F811
 
     logging.basicConfig(level=logging.INFO)
 

@@ -35,35 +35,30 @@ def test_imports():
             return False
 
     try:
-
         print("✅ telegram.telegram_client imports successful")
     except Exception as e:
         print(f"❌ telegram.telegram_client import failed: {e}")
         return False
 
     try:
-
         print("✅ ai.gemini_service imports successful")
     except Exception as e:
         print(f"❌ ai.gemini_service import failed: {e}")
         return False
 
     try:
-
         print("✅ accounts.account_creator imports successful")
     except Exception as e:
         print(f"❌ accounts.account_creator import failed: {e}")
         return False
 
     try:
-
         print("✅ scraping.member_scraper imports successful")
     except Exception as e:
         print(f"❌ scraping.member_scraper import failed: {e}")
         return False
 
     try:
-
         print("✅ anti_detection.anti_detection_system imports successful")
     except Exception as e:
         print(f"❌ anti_detection.anti_detection_system import failed: {e}")

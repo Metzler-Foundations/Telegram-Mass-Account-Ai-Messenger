@@ -59,8 +59,3 @@ VOLUME ["/app/data", "/app/logs", "/app/backups"]
 # Entry point
 ENTRYPOINT ["python3"]
 CMD ["main.py"]
-
-
-
-
-

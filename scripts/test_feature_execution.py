@@ -9,8 +9,8 @@ import sys
 # Add the parent directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import traceback
-from typing import Any, Dict, List
+import traceback  # noqa: E402
+from typing import Any, Dict, List  # noqa: E402
 
 
 class FeatureTestResult:
@@ -88,7 +88,8 @@ def test_configuration_management() -> FeatureTestResult:
         telegram_config = config.get("telegram", {})
         gemini_config = config.get("gemini", {})
         result.add_note(
-            f"Config sections loaded: telegram({len(telegram_config)}), gemini({len(gemini_config)})"
+            f"Config sections loaded: telegram({len(telegram_config)}), "
+            f"gemini({len(gemini_config)})"
         )
 
         # Check for required fields

@@ -270,9 +270,7 @@ def update_warmup_progress(
         with open(warmup_file, "w") as f:
             json.dump(warmup_jobs, f, indent=2)
 
-        logger.info(
-            f"✅ Updated REAL warmup progress for {phone_number}: {stage} ({progress:.0f}%)"
-        )
+        logger.info(f"✅ Updated REAL warmup progress for {phone_number}: {stage} ({progress:.0f}%)")
 
     except Exception as e:
         logger.error(f"Failed to update warmup progress: {e}")

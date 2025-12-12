@@ -1164,13 +1164,14 @@ class SMSProviderSetupWidget(QWidget):
         instructions_group = QGroupBox("Setup Instructions")
         instructions_layout = QVBoxLayout()
 
+        c = ThemeManager.get_colors()
         instructions_text = QLabel(
-            "<ol style='line-height: 1.6;'>"
-            "<li>Choose a provider from the dropdown above</li>"
-            "<li>Click <b>'Sign Up'</b> if you don't have an account yet</li>"
-            "<li>After logging in, click <b>'Get API Key'</b> to find your API key</li>"
-            "<li>Copy the API key and paste it in the field above</li>"
-            "<li>Click <b>'Test API Key'</b> to verify it works</li>"
+            f"<ol style='line-height: 1.6; color: {c['TEXT_SECONDARY']};'>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'>Choose a provider from the dropdown above</li>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'>Click <b style='color: {c['TEXT_BRIGHT']};'>'Sign Up'</b> if you don't have an account yet</li>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'>After logging in, click <b style='color: {c['TEXT_BRIGHT']};'>'Get API Key'</b> to find your API key</li>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'>Copy the API key and paste it in the field above</li>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'>Click <b style='color: {c['TEXT_BRIGHT']};'>'Test API Key'</b> to verify it works</li>"
             "</ol>"
         )
         instructions_text.setWordWrap(True)
@@ -1875,7 +1876,7 @@ class SettingsWindow(QDialog):
             <p><b>What you can configure here (optional):</b></p>
             <ul>
                 <li><b>Anti-Detection:</b> Rate limiting and behavior """
-                """simulation (default: 50 msg/hour)</li>
+            """simulation (default: 50 msg/hour)</li>
                 <li><b>Timing:</b> Message delays and response patterns (default: 2-30 seconds)</li>
                 <li><b>Safety Features:</b> Auto-retry and session recovery (default: enabled)</li>
             </ul>
@@ -1923,7 +1924,19 @@ class SettingsWindow(QDialog):
             instructions_group = QGroupBox("Instructions")
             instructions_layout = QVBoxLayout()
 
-            instructions_label = QLabel(instructions)
+            # Wrap HTML content with proper colors for list items
+            # This ensures HTML elements inherit the correct text color
+            styled_instructions = f"""
+                <style>
+                    ol, ul {{ color: {c['TEXT_SECONDARY']}; }}
+                    li {{ color: {c['TEXT_SECONDARY']}; }}
+                    p {{ color: {c['TEXT_SECONDARY']}; }}
+                    b {{ color: {c['TEXT_BRIGHT']}; }}
+                    a {{ color: #5865f2; }}
+                </style>
+                {instructions}
+            """
+            instructions_label = QLabel(styled_instructions)
             instructions_label.setWordWrap(True)
             instructions_label.setTextFormat(Qt.TextFormat.RichText)
             instructions_label.setOpenExternalLinks(True)

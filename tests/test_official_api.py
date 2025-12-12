@@ -10,7 +10,7 @@ import sys
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from telegram.telegram_client import TelegramClient
+from telegram.telegram_client import TelegramClient  # noqa: E402
 
 
 async def test_official_api():

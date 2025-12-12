@@ -823,14 +823,14 @@ class IntroPage(QWizardPage):
         prereq_layout = QVBoxLayout(prereq_group)
         prereq_layout.setContentsMargins(16, 24, 16, 16)
 
+        c = ThemeManager.get_colors()
         prereq_label = QLabel(
-            "<ul style='line-height: 1.6; margin-top: 5px;'>"
-            "<li><b>Telegram API Credentials</b> (my.telegram.org)</li>"
-            "<li><b>Google Gemini API Key</b> (Google AI Studio)</li>"
-            "<li>Approx. 3-5 minutes for configuration</li>"
+            f"<ul style='line-height: 1.6; margin-top: 5px; color: {c['TEXT_SECONDARY']};'>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'><b style='color: {c['TEXT_BRIGHT']};'>Telegram API Credentials</b> (my.telegram.org)</li>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'><b style='color: {c['TEXT_BRIGHT']};'>Google Gemini API Key</b> (Google AI Studio)</li>"
+            f"<li style='color: {c['TEXT_SECONDARY']};'>Approx. 3-5 minutes for configuration</li>"
             "</ul>"
         )
-        c = ThemeManager.get_colors()
         prereq_label.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 13px;")
         prereq_layout.addWidget(prereq_label)
         layout.addWidget(prereq_group)
@@ -884,12 +884,12 @@ class TelegramSetupPage(QWizardPage):
         info_layout.setSpacing(12)
 
         steps = QLabel(
-            "<ol style='line-height: 2.0; margin-top: 8px; margin-bottom: 8px; padding-left: 20px;'>"
-            "<li style='margin-bottom: 8px;'>Visit <b style='color: #5865f2;'>my.telegram.org/apps</b></li>"
-            "<li style='margin-bottom: 8px;'>Log in with your phone number</li>"
-            "<li style='margin-bottom: 8px;'>Go to <b>API Development Tools</b></li>"
-            "<li style='margin-bottom: 8px;'>Create a new application</li>"
-            "<li style='margin-bottom: 8px;'>Copy the <b>API ID</b> and <b>API Hash</b></li>"
+            f"<ol style='line-height: 2.0; margin-top: 8px; margin-bottom: 8px; padding-left: 20px; color: {c['TEXT_SECONDARY']};'>"
+            f"<li style='margin-bottom: 8px; color: {c['TEXT_SECONDARY']};'>Visit <b style='color: #5865f2;'>my.telegram.org/apps</b></li>"
+            f"<li style='margin-bottom: 8px; color: {c['TEXT_SECONDARY']};'>Log in with your phone number</li>"
+            f"<li style='margin-bottom: 8px; color: {c['TEXT_SECONDARY']};'>Go to <b style='color: {c['TEXT_BRIGHT']};'>API Development Tools</b></li>"
+            f"<li style='margin-bottom: 8px; color: {c['TEXT_SECONDARY']};'>Create a new application</li>"
+            f"<li style='margin-bottom: 8px; color: {c['TEXT_SECONDARY']};'>Copy the <b style='color: {c['TEXT_BRIGHT']};'>API ID</b> and <b style='color: {c['TEXT_BRIGHT']};'>API Hash</b></li>"
             "</ol>"
         )
         steps.setStyleSheet(f"color: {c['TEXT_SECONDARY']}; font-size: 14px; line-height: 1.8;")
@@ -1440,7 +1440,8 @@ class PhoneSetupPage(QWizardPage):
         layout.addWidget(sms_group)
 
         # Register fields - phone is optional here since it's already validated on page 1
-        self.registerField("phone", self.phone_edit)  # Not required (*) since it's from page 1
+        # Use "sms_phone" to avoid duplicate field name warning (TelegramSetupPage uses "phone")
+        self.registerField("sms_phone", self.phone_edit)
         self.registerField("sms_provider", self.provider_combo)
         self.registerField("sms_api_key", self.api_key_edit)
 

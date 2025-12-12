@@ -60,7 +60,8 @@ def migrate_campaign_database(db_path: str = "campaigns.db"):
                 ),
                 (
                     "idx_campaigns_created_at",
-                    "CREATE INDEX IF NOT EXISTS idx_campaigns_created_at ON campaigns(created_at DESC)",
+                    "CREATE INDEX IF NOT EXISTS idx_campaigns_created_at "
+                    "ON campaigns(created_at DESC)",
                 ),
             ]
 

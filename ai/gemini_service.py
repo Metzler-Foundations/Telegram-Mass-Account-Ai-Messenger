@@ -306,8 +306,8 @@ class GeminiService:
         Args:
             message: Incoming message text
             chat_id: Chat ID for conversation context
-            max_retries: Maximum number of retry attempts (deprecated - """
-            """resilience manager handles this)
+            max_retries: Maximum number of retry attempts (deprecated -"""
+        """resilience manager handles this)
 
         Returns:
             Optional[str]: Generated reply text, or None if generation failed
@@ -433,9 +433,7 @@ class GeminiService:
                     ) from e
 
                 elif "safety" in error_str or "blocked" in error_str:
-                    logger.warning(
-                        f"Gemini content safety block for chat {chat_id}: {e}"
-                    )
+                    logger.warning(f"Gemini content safety block for chat {chat_id}: {e}")
                     raise Exception(
                         "Message could not be processed due to content policy. "
                         "Please rephrase your message."

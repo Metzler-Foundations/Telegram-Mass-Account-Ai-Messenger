@@ -152,7 +152,8 @@ class InputValidator:
         if not InputValidator.USERNAME_PATTERN.match(username):
             raise ValidationError(
                 f"Invalid username: {username}. "
-                "Must be 5-32 characters, start with letter, contain only letters, digits, and underscores"
+                "Must be 5-32 characters, start with letter, "
+                "contain only letters, digits, and underscores"
             )
 
         return username

@@ -201,7 +201,8 @@ class MemoryMonitor:
             stats["freed_mb"] = round(freed_mb, 2)
 
         logger.info(
-            f"Garbage collection: {collected} objects collected, {stats.get('freed_mb', 0):.2f}MB freed"
+            f"Garbage collection: {collected} objects collected, "
+            f"{stats.get('freed_mb', 0):.2f}MB freed"
         )
 
         return stats

@@ -209,8 +209,7 @@ class ErrorTranslator:
             "title": "Invalid Verification Code",
             "message": "The verification code you entered is incorrect.",
             "solution": (
-                "Check the code Telegram sent you and try again. "
-                "The code usually has 5 digits."
+                "Check the code Telegram sent you and try again. " "The code usually has 5 digits."
             ),
         },
         "PhoneCodeExpired": {
@@ -238,8 +237,7 @@ class ErrorTranslator:
             "title": "Account Deactivated",
             "message": "This Telegram account has been deactivated or banned.",
             "solution": (
-                "You cannot use this account. Create a new one or "
-                "contact Telegram support."
+                "You cannot use this account. Create a new one or " "contact Telegram support."
             ),
         },
         "ApiIdInvalid": {
@@ -294,8 +292,7 @@ class ErrorTranslator:
             "title": "Gemini API Quota Exceeded",
             "message": "You've exceeded your Gemini API quota.",
             "solution": (
-                "Wait for quota to reset or upgrade your plan at "
-                "https://makersuite.google.com/"
+                "Wait for quota to reset or upgrade your plan at " "https://makersuite.google.com/"
             ),
         },
         # Database errors
@@ -432,8 +429,7 @@ class TooltipHelper:
     TOOLTIPS = {
         # API Settings
         "telegram_api_id": (
-            "Your Telegram API ID from https://my.telegram.org/apps\n"
-            "Example: 12345678"
+            "Your Telegram API ID from https://my.telegram.org/apps\n" "Example: 12345678"
         ),
         "telegram_api_hash": (
             "Your Telegram API Hash from https://my.telegram.org/apps\n"
@@ -458,12 +454,10 @@ class TooltipHelper:
             "Safe rate: 30-50/hour\nAggressive: 80-100/hour"
         ),
         "burst_limit": (
-            "Max messages to send in quick succession\n"
-            "Recommended: 2-3 messages\nLower is safer"
+            "Max messages to send in quick succession\n" "Recommended: 2-3 messages\nLower is safer"
         ),
         "online_simulation": (
-            "Simulate realistic online/offline patterns\n"
-            "Makes your bot appear more human"
+            "Simulate realistic online/offline patterns\n" "Makes your bot appear more human"
         ),
         # Phone Provider
         "phone_provider": (
@@ -471,8 +465,7 @@ class TooltipHelper:
             "Popular: SMS-Activate, SMSPool\nCost: $0.08-0.15 per number"
         ),
         "provider_api_key": (
-            "API key from your phone number provider\n"
-            "Get it from your provider's dashboard"
+            "API key from your phone number provider\n" "Get it from your provider's dashboard"
         ),
         "country": (
             "Country for phone numbers\n"
@@ -492,27 +485,22 @@ class TooltipHelper:
             "Highly recommended for new accounts"
         ),
         "warmup_duration": (
-            "How many days to warm up account\n"
-            "Recommended: 3-7 days\nLonger = safer"
+            "How many days to warm up account\n" "Recommended: 3-7 days\nLonger = safer"
         ),
         # Campaign
         "campaign_schedule": (
-            "When to send messages\n"
-            "Now: Start immediately\nScheduled: Set a specific time"
+            "When to send messages\n" "Now: Start immediately\nScheduled: Set a specific time"
         ),
         "campaign_delay": (
-            "Delay between messages to same user\n"
-            "Recommended: 24-48 hours\nAvoid seeming spammy"
+            "Delay between messages to same user\n" "Recommended: 24-48 hours\nAvoid seeming spammy"
         ),
         # Advanced
         "realistic_typing": (
-            "Simulate human typing speed\n"
-            "Adds delays proportional to message length"
+            "Simulate human typing speed\n" "Adds delays proportional to message length"
         ),
         "random_skip": "Randomly skip some messages\nMakes pattern less predictable",
         "session_recovery": (
-            "Automatically reconnect on network errors\n"
-            "Keeps your bots running reliably"
+            "Automatically reconnect on network errors\n" "Keeps your bots running reliably"
         ),
     }
 

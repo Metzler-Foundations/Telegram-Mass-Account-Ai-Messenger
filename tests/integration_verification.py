@@ -325,7 +325,8 @@ class IntegrationVerifier:
 
         logger.info("\n" + "=" * 60)
         logger.info(
-            f"SUMMARY: {len(self.passed)} passed, {len(self.warnings)} warnings, {len(self.failed)} failed"
+            f"SUMMARY: {len(self.passed)} passed, {len(self.warnings)} warnings, "
+            f"{len(self.failed)} failed"
         )
         logger.info("=" * 60)
 

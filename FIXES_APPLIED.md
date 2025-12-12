@@ -75,4 +75,3 @@ The codebase now has:
 - Consistent file path handling (using `pathlib.Path`)
 - Explicit database paths in all production code
 - No path-related bugs or inconsistencies
-

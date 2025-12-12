@@ -1248,9 +1248,9 @@ class AccountCreator:
         self.account_proxies: Dict[str, Dict] = {}  # phone_number -> proxy info
 
         # Cancellation tracking for cleanup
-        self._active_resources: Dict[str, Dict[str, Any]] = (
-            {}
-        )  # session_id -> {proxy, phone, client}
+        self._active_resources: Dict[
+            str, Dict[str, Any]
+        ] = {}  # session_id -> {proxy, phone, client}
         self._cleanup_lock = asyncio.Lock()
 
         # Concurrency control
@@ -1885,7 +1885,7 @@ class AccountCreator:
                     return {
                         "success": False,
                         "error": (
-                            'No proxies available. Add proxies in Settings '
+                            "No proxies available. Add proxies in Settings "
                             'or disable "require_proxy".'
                         ),
                     }
@@ -1978,9 +1978,7 @@ class AccountCreator:
 
             # 5. Get SMS Code from Provider
             self._notify_progress(50, 100, get_progress_message("waiting_sms"))
-            sms_code = await self._handle_sms_with_anti_detection(
-                session_name, phone_data, config
-            )
+            sms_code = await self._handle_sms_with_anti_detection(session_name, phone_data, config)
             if not sms_code:
                 return {
                     "success": False,

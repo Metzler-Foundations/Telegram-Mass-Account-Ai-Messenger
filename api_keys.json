@@ -19,5 +19,25 @@
     "last_used": "2025-12-07T05:27:15.233582",
     "usage_count": 1,
     "metadata": {}
+  },
+  "telegram_api_id": {
+    "key": "gAAAAABpORhQMgHL6bTdLvMHu76IjtT18n-0oaulk45U6TTILsFPjkTS6M13sM8RKEMUXC2n7iXiM--QuArwHaJBQLqSpVlyBA==",
+    "added_at": "2025-12-09T23:50:56.417118",
+    "last_validated": null,
+    "is_valid": false,
+    "validation_attempts": 0,
+    "last_used": null,
+    "usage_count": 0,
+    "metadata": {}
+  },
+  "telegram_api_hash": {
+    "key": "gAAAAABpORhQa3UThakH0a9ksy68KGxzY_IJ4YcZhM0Tdt2VNW4N7Z2bTPutih-sId9Q5WGiocV0zJSOx-y0Z7bDXuoBBmzfKnl6RXQn6_BkyiasHWfagCj4TDjjYx5ightt6QsWiiQn",
+    "added_at": "2025-12-09T23:50:56.423263",
+    "last_validated": null,
+    "is_valid": false,
+    "validation_attempts": 0,
+    "last_used": null,
+    "usage_count": 0,
+    "metadata": {}
   }
 }

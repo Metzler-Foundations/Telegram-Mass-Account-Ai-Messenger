@@ -11,8 +11,8 @@ import pytest
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.services import BusinessLogicCoordinator
-from ui.ui_controller import UIController
+from core.services import BusinessLogicCoordinator  # noqa: E402
+from ui.ui_controller import UIController  # noqa: E402
 
 
 class TestUIControllerIntegration:
@@ -71,7 +71,7 @@ class TestUIControllerIntegration:
         assert result["estimated_members"] == 3
 
         # Verify service calls
-        ui_controller.business_logic.campaign_service.validate_campaign_data.assert_called_once_with(
+        ui_controller.business_logic.campaign_service.validate_campaign_data.assert_called_once_with(  # noqa: E501
             campaign_data
         )
         ui_controller.business_logic.campaign_service.create_campaign.assert_called_once_with(

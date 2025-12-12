@@ -252,7 +252,8 @@ class AccountAuditLog:
                 self._update_account_summary(conn, event)
 
                 logger.debug(
-                    f"Logged audit event {event_id}: {event.event_type.value} for {event.phone_number}"
+                    f"Logged audit event {event_id}: {event.event_type.value} "
+                    f"for {event.phone_number}"
                 )
                 return event_id
 

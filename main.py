@@ -79,12 +79,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from accounts.account_creator import AccountCreator
 from accounts.account_manager import AccountManager
-from accounts.account_warmup_service import AccountWarmupService
 from ai.gemini_service import GeminiService
 from campaigns.dm_campaign_manager import DMCampaignManager
-from integrations.api_key_manager import APIKeyManager
 from scraping.database import MemberDatabase
 from telegram.telegram_client import TelegramClient
 from ui.settings_window import SettingsWindow
@@ -798,7 +795,7 @@ class MainWindow(QMainWindow):
             self.member_db = MemberDatabase("members.db")
             # Database tables are automatically created in MemberDatabase.__init__
             logger.info("Member database initialized successfully")
-            
+
             self.account_manager = AccountManager(
                 self.member_db, performance_profile=self.performance_settings
             )
@@ -1263,9 +1260,7 @@ class MainWindow(QMainWindow):
                         )
                         # Response tracker needs a client - we'll start it when we have one
                         # For now, just initialize it
-                        logger.info(
-                            "✅ Response tracker initialized (will start with first client)"
-                        )
+                        logger.info("✅ Response tracker initialized (will start with first client)")
                     elif self.low_power_mode:
                         logger.info("Response tracker skipped in low-power mode")
                 except Exception as e:
@@ -1414,9 +1409,7 @@ class MainWindow(QMainWindow):
         """Handle message received event."""
         try:
             if hasattr(self, "add_log_message"):
-                self.add_log_message(
-                    f"📨 Message received in chat {data.get('chat_id', 'unknown')}"
-                )
+                self.add_log_message(f"📨 Message received in chat {data.get('chat_id', 'unknown')}")
 
             # Add to message history widget if available
             if hasattr(self, "message_history_widget"):
@@ -3029,7 +3022,7 @@ class MainWindow(QMainWindow):
 
     def _check_first_time_setup(self):
         """Check if first-time setup is needed and show wizard if necessary.
-        
+
         This is a secondary check that runs after app_launcher has already handled
         the welcome wizard. It only triggers if:
         1. The wizard was skipped but config is still incomplete
@@ -3042,14 +3035,14 @@ class MainWindow(QMainWindow):
                 # Verify that critical credentials actually exist
                 try:
                     from core.secrets_manager import get_secrets_manager
+
                     secrets = get_secrets_manager()
                     api_id = secrets.get_secret("telegram_api_id", required=False)
                     api_hash = secrets.get_secret("telegram_api_hash", required=False)
-                    
+
                     if not api_id or not api_hash:
                         logger.warning(
-                            "Setup marked complete but credentials missing - "
-                            "showing settings"
+                            "Setup marked complete but credentials missing - " "showing settings"
                         )
                         # Credentials missing, show settings dialog
                         self._open_settings_dialog()
@@ -3399,9 +3392,7 @@ class MainWindow(QMainWindow):
                 self.gemini_service = GeminiService(gemini_key)
                 logger.info("Fallback Gemini service initialized")
             else:
-                logger.warning(
-                    "Gemini API key not available for fallback initialization"
-                )
+                logger.warning("Gemini API key not available for fallback initialization")
                 self.gemini_service = None
 
             logger.info("Fallback service initialization completed")

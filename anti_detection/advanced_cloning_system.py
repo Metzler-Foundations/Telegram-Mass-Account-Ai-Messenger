@@ -753,8 +753,8 @@ class AdvancedCloningSystem:
             return bio
 
         try:
-            prompt = f"""Modify this Telegram bio to make it unique while """
-            f"""keeping the same general meaning and style.
+            prompt = """Modify this Telegram bio to make it unique while """
+            """keeping the same general meaning and style.
             Keep it under 70 characters. Return only the modified bio, nothing else.
 
             Original bio: {bio}

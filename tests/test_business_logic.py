@@ -12,8 +12,13 @@ import pytest
 # Add the parent directory to Python path for package imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.repositories import AccountRepository, CampaignRepository, MemberRepository
-from core.services import AccountService, BusinessLogicCoordinator, CampaignService, MemberService
+from core.repositories import AccountRepository, CampaignRepository, MemberRepository  # noqa: E402
+from core.services import (  # noqa: E402
+    AccountService,
+    BusinessLogicCoordinator,
+    CampaignService,
+    MemberService,
+)  # noqa: E402
 
 
 class TestMemberService:

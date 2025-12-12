@@ -245,7 +245,8 @@ class EngagementAutomation:
         # Indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_log_timestamp ON engagement_log(timestamp)")
         cursor.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_log_rule_message ON engagement_log(rule_id, message_id)"
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_log_rule_message "
+            "ON engagement_log(rule_id, message_id)"
         )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_log_group ON engagement_log(group_id, timestamp)"
@@ -488,7 +489,8 @@ class EngagementAutomation:
         try:
             if self._already_engaged(rule.rule_id, message.id):
                 logger.debug(
-                    f"Skipping duplicate engagement for message {message.id} and rule {rule.rule_id}"
+                    f"Skipping duplicate engagement for message {message.id} "
+                    f"and rule {rule.rule_id}"
                 )
                 return False
 
@@ -517,7 +519,8 @@ class EngagementAutomation:
             self._update_engagement_stats(message.from_user.id, message.chat.id, gave_reaction=True)
 
             logger.info(
-                f"Engaged with message {message.id} in group {message.chat.id} using reaction {reaction}"
+                f"Engaged with message {message.id} in group {message.chat.id} "
+                f"using reaction {reaction}"
             )
             return True
 
@@ -614,7 +617,8 @@ class EngagementAutomation:
         try:
             cutoff = datetime.now() - timedelta(days=self.stats_retention_days)
             stats_result = conn.execute(
-                "DELETE FROM engagement_stats WHERE last_engagement IS NOT NULL AND last_engagement < ?",
+                "DELETE FROM engagement_stats WHERE last_engagement IS NOT NULL "
+                "AND last_engagement < ?",
                 (cutoff,),
             )
             log_result = conn.execute(
@@ -627,7 +631,8 @@ class EngagementAutomation:
             removed_logs = log_result.rowcount if log_result is not None else 0
             if removed_stats == 0 and removed_logs == 0:
                 logger.warning(
-                    "Engagement pruning completed without removing records. Check retention window (%s days) or DB locks.",
+                    "Engagement pruning completed without removing records. "
+                    "Check retention window (%s days) or DB locks.",
                     self.stats_retention_days,
                 )
         except Exception as exc:
@@ -662,7 +667,8 @@ class EngagementAutomation:
             if gave_reaction:
                 cursor.execute(
                     """
-                    INSERT INTO engagement_stats (user_id, group_id, reactions_given, last_engagement)
+                    INSERT INTO engagement_stats
+                    (user_id, group_id, reactions_given, last_engagement)
                     VALUES (?, ?, 1, ?)
                     ON CONFLICT(user_id, group_id) DO UPDATE SET
                         reactions_given = reactions_given + 1,
@@ -674,7 +680,8 @@ class EngagementAutomation:
             if received_reaction:
                 cursor.execute(
                     """
-                    INSERT INTO engagement_stats (user_id, group_id, reactions_received, last_engagement)
+                    INSERT INTO engagement_stats
+                    (user_id, group_id, reactions_received, last_engagement)
                     VALUES (?, ?, 1, ?)
                     ON CONFLICT(user_id, group_id) DO UPDATE SET
                         reactions_received = reactions_received + 1,
