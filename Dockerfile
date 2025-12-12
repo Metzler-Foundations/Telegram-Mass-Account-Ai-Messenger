@@ -53,8 +53,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Expose ports (if needed)
 # EXPOSE 8080
 
-# Volume for persistent data
-VOLUME ["/app/data", "/app/logs", "/app/backups"]
+# Note: VOLUME directive removed for Railway compatibility
+# Data directories are created but not declared as volumes
 
 # Entry point
 ENTRYPOINT ["python3"]

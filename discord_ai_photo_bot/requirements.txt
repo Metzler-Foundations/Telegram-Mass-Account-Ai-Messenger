@@ -6,6 +6,7 @@ fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 python-dotenv>=1.0.0
 openai>=1.0.0
-opencv-python>=4.8.0
+# Use headless version for server deployment (no GUI dependencies)
+opencv-python-headless>=4.8.0
 sentry-sdk>=1.30.0
 

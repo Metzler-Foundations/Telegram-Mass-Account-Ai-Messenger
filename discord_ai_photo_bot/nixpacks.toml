@@ -1,0 +1,12 @@
+# Nixpacks configuration for Railway deployment
+[phases.setup]
+nixPkgs = ["python311", "gcc"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "cd src && python -m discord_ai_photo_bot.bot"
+
+[variables]
+PYTHONUNBUFFERED = "1"
