@@ -52,13 +52,13 @@ def check_imports():
         print(f"  ✅ replicate: {replicate.__version__}")
 
         import cv2
-        print("  ✅ opencv-python-headless: OK"
+        print("  ✅ opencv-python-headless: OK")
 
         import PIL
         print(f"  ✅ pillow: {PIL.__version__}")
 
         from discord_ai_photo_bot.config import load_settings
-        print("  ✅ Bot configuration: OK"
+        print("  ✅ Bot configuration: OK")
 
         return True
     except ImportError as e:
