@@ -1,0 +1,1 @@
+worker: cd discord_ai_photo_bot && PYTHONPATH=./src python -m discord_ai_photo_bot.bot

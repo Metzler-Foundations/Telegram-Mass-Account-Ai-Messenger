@@ -1,0 +1,21 @@
+# fly.toml - Fly.io configuration for Discord AI Photo Bot
+# Deploy with: flyctl deploy
+
+app = "discord-ai-photo-bot"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PYTHONPATH = "/app/src"
+  PYTHONUNBUFFERED = "1"
+
+# No HTTP service needed - this is a background worker
+[processes]
+  app = "python -m discord_ai_photo_bot.bot"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
