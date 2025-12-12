@@ -5,6 +5,7 @@ Legacy BTC/payment commands are intentionally disabled.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 import discord
@@ -69,8 +70,9 @@ class DiscordPhotoBot(commands.Bot):
         await self.tree.sync()
         logger.info("Slash commands synced globally.")
 
-        # Post/pin the studio guide in #photo-generation (best-effort)
-        await self._ensure_studio_guide()
+        # Post/pin the studio guide in #photo-generation (best-effort).
+        # IMPORTANT: setup_hook can run before caches are fully warm; run with retries after ready.
+        asyncio.create_task(self._ensure_studio_guide_with_retries())
 
 
     async def on_app_command_error(
@@ -91,18 +93,63 @@ class DiscordPhotoBot(commands.Bot):
             )
 
 
-    async def _ensure_studio_guide(self) -> None:
-        """Ensure a pinned /studio onboarding guide exists in #photo-generation (best-effort)."""
-        try:
-            guild = self.get_guild(int(self.settings.discord_guild_id))
-            if not guild:
-                logger.warning("Guild not found, cannot post studio guide")
-                return
+    async def _ensure_studio_guide_with_retries(self) -> None:
+        """Run studio-guide posting after the bot is ready, with a few retries.
 
-            channel = discord.utils.get(guild.text_channels, name="photo-generation")
+        This avoids a common failure mode where guild/channel caches are not ready during setup_hook.
+        """
+        try:
+            await self.wait_until_ready()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("wait_until_ready failed: %s", exc)
+            return
+
+        # Retry a few times to allow guild/channel caches to populate.
+        for attempt in range(1, 6):
+            try:
+                posted = await self._ensure_studio_guide()
+                if posted:
+                    return
+            except Exception as exc:  # noqa: BLE001
+                logger.exception("Studio guide attempt %s failed: %s", attempt, exc)
+            await asyncio.sleep(2.0 * attempt)
+
+        logger.warning("Studio guide was not posted after retries.")
+
+    async def _ensure_studio_guide(self) -> bool:
+        """Ensure a pinned /studio onboarding guide exists in #photo-generation (best-effort).
+
+        Returns True if the guide is confirmed pinned or posted+attempted pin, False otherwise.
+        """
+        try:
+            guild_id = int(self.settings.discord_guild_id)
+            guild = self.get_guild(guild_id)
+
+            # Cache miss fallback: fetch guild + channels via API.
+            if not guild:
+                try:
+                    guild = await self.fetch_guild(guild_id)
+                    logger.info("Fetched guild %s via API for studio guide.", guild_id)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Guild %s not found (cache miss + fetch failed): %s", guild_id, exc)
+                    return False
+
+            try:
+                channels = await guild.fetch_channels()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to fetch channels for guild %s: %s", guild_id, exc)
+                channels = []
+
+            channel = discord.utils.get(channels, name="photo-generation")
             if not channel:
-                logger.warning("Channel #photo-generation not found; skipping studio guide")
-                return
+                # Best-effort fallback: try cached text_channels if available.
+                cached_guild = self.get_guild(guild_id)
+                if cached_guild:
+                    channel = discord.utils.get(cached_guild.text_channels, name="photo-generation")
+
+            if not channel:
+                logger.warning("Channel #photo-generation not found in guild %s; skipping studio guide", guild_id)
+                return False
 
             guide_title = "AI Photo Studio • How it works"
 
@@ -117,18 +164,19 @@ class DiscordPhotoBot(commands.Bot):
             pins = await channel.pins()
             for msg in pins:
                 if _is_guide_message(msg):
-                    logger.info("Studio guide already pinned")
-                    return
+                    logger.info("Studio guide already pinned in #%s (guild %s)", channel.name, guild_id)
+                    return True
 
             # 2) If guide exists but got unpinned, re-pin it.
             async for msg in channel.history(limit=50):
                 if _is_guide_message(msg):
                     try:
                         await msg.pin(reason="Re-pin studio onboarding guide")
-                        logger.info("Re-pinned existing studio guide")
+                        logger.info("Re-pinned existing studio guide in #%s (guild %s)", channel.name, guild_id)
+                        return True
                     except discord.Forbidden:
-                        logger.warning("Missing permissions to pin messages in #photo-generation")
-                    return
+                        logger.warning("Missing permissions to pin messages in #%s (guild %s)", channel.name, guild_id)
+                        return False
 
             # 3) Otherwise, post a new guide and pin it.
             embed = discord.Embed(
@@ -157,11 +205,14 @@ class DiscordPhotoBot(commands.Bot):
             try:
                 await guide_msg.pin(reason="Studio onboarding guide")
             except discord.Forbidden:
-                logger.warning("Missing permissions to pin messages in #photo-generation")
-            logger.info("Posted studio guide in #photo-generation")
+                logger.warning("Missing permissions to pin messages in #%s (guild %s)", channel.name, guild_id)
+                return True  # posted even if pin failed
+            logger.info("Posted and pinned studio guide in #%s (guild %s)", channel.name, guild_id)
+            return True
 
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed ensuring studio guide: %s", exc)
+            return False
 
 
 def run_bot() -> None:
