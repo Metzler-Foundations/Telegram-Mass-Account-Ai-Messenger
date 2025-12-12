@@ -277,28 +277,54 @@ class DiscordPhotoBot(commands.Bot):
                         logger.warning("Missing permissions to pin messages in #%s (guild %s)", channel.name, guild_id)
                         return False
 
+            # Get usage statistics for social proof
+            try:
+                conn = self.db._connect()
+                total_sessions = conn.execute("SELECT COUNT(*) FROM studio_sessions").fetchone()[0]
+                completed_sessions = conn.execute("SELECT COUNT(*) FROM studio_sessions WHERE trained_model IS NOT NULL").fetchone()[0]
+                conn.close()
+            except Exception:
+                total_sessions = completed_sessions = 0
+
             # 3) Otherwise, post a new guide and pin it.
             embed = discord.Embed(
                 title=guide_title,
                 description=(
-                    "**Start here:** run `/studio` to begin.\n\n"
-                    "**Flow**\n"
-                    "1) Bot creates a private thread for you\n"
+                    "**🎨 Create your own AI photo model in minutes!**\n\n"
+                    "**Start here:** run `/studio` to begin your session.\n\n"
+                    "**✨ What you'll get:**\n"
+                    "• 40 unique AI-generated photos\n"
+                    "• Custom model trained on your photos\n"
+                    "• High-quality, photorealistic results\n"
+                    "• Full ownership of all generated images\n\n"
+                    "**🚀 Quick Flow**\n"
+                    "1) Bot creates your private studio thread\n"
                     f"2) Upload **{MIN_REFS}–{MAX_REFS}** photos of the same person\n"
-                    "3) Click **Finish uploads & start training**\n"
-                    f"4) When training completes, click **Generate pack ({DEFAULT_PACK_COUNT})**\n"
-                    "5) You receive a ZIP via DM\n\n"
-                    "**Best reference photos**\n"
-                    "- No filters, no group photos\n"
-                    "- Face visible, good lighting, multiple angles\n"
-                    "- Mix: close-up + mid-shot + different expressions\n\n"
-                    "**Important**\n"
-                    "- Use only photos you have permission to use\n"
-                    "- Training can take several minutes"
+                    "3) Click **\"Finish uploads & start training\"**\n"
+                    "4) Training takes ~8 minutes (you can browse other channels)\n"
+                    f"5) Click **\"Generate pack ({DEFAULT_PACK_COUNT})\"** when training completes\n"
+                    "6) Receive your ZIP file via DM!\n\n"
+                    "**📸 Best reference photos**\n"
+                    "• Clear, well-lit photos\n"
+                    "• Face clearly visible\n"
+                    "• Different angles & expressions\n"
+                    "• No heavy filters or group photos\n\n"
+                    "**⚡ Pro Tips**\n"
+                    "• Sessions are saved - you can leave and come back\n"
+                    "• Use only photos you have permission to use\n"
+                    "• More varied reference photos = better results"
                 ),
                 color=discord.Color.from_rgb(138, 43, 226),
             )
-            embed.set_footer(text="Payments are currently disabled during testing.")
+
+            if total_sessions > 0:
+                embed.add_field(
+                    name="📊 Community Stats",
+                    value=f"• {total_sessions} studio sessions started\n• {completed_sessions} successful generations\n• Join the AI creators!",
+                    inline=False
+                )
+
+            embed.set_footer(text="🎯 Free during testing • Click \"Help & Tips\" anytime in your session")
 
             guide_msg = await channel.send(embed=embed)
             try:

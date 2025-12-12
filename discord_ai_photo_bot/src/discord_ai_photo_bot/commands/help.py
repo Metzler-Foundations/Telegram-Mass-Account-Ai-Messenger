@@ -35,26 +35,34 @@ class StudioHelp(commands.Cog):
                 channel_hint = "#photo-generation (this command works anywhere, but /studio must be started there)"
 
         embed = discord.Embed(
-            title="AI Photo Studio • Quickstart",
+            title="🎨 AI Photo Studio • Quickstart Guide",
             description=(
+                f"**🚀 Ready to create AI photos?**\n\n"
                 f"**Start:** run `/studio` in {channel_hint}.\n\n"
-                "**What happens**\n"
-                "1) The bot creates a private thread for your session\n"
-                "2) You upload **8–20** photos of the same person into the thread\n"
-                "3) Click **Finish uploads & start training**\n"
-                "4) After training succeeds, click **Generate pack (40)**\n"
-                "5) Your ZIP is delivered via **DM**\n\n"
-                "**Best results (photorealistic)**\n"
-                "- No filters, no group photos\n"
-                "- Face visible, good lighting, multiple angles\n"
-                "- Mix: close-up + mid-shot + different expressions\n\n"
-                "**Privacy**\n"
-                "- Use only photos you have permission to use\n"
-                "- Generated packs are delivered via DM"
+                "**✨ What you'll get:**\n"
+                "• 40 unique AI-generated photos\n"
+                "• Custom model trained on your photos\n"
+                "• High-quality, photorealistic results\n\n"
+                "**📋 Step-by-step**\n"
+                "1) Bot creates your private studio thread\n"
+                "2) Upload **5–15** photos of the same person\n"
+                "3) Click **\"Finish uploads & start training\"**\n"
+                "4) Training takes ~8 minutes (feel free to browse)\n"
+                "5) Click **\"Generate pack (40)\"** when ready\n"
+                "6) Receive your ZIP via **DM**\n\n"
+                "**📸 Best photo tips**\n"
+                "• Clear, well-lit photos work best\n"
+                "• Face clearly visible in each photo\n"
+                "• Different angles & expressions\n"
+                "• No heavy filters or group photos\n\n"
+                "**💡 Pro tips**\n"
+                "• Sessions save automatically - come back anytime\n"
+                "• Use only photos you have permission to use\n"
+                "• More variety = better AI results"
             ),
             color=discord.Color.from_rgb(138, 43, 226),
         )
-        embed.set_footer(text="Studio-only mode • Payments are currently disabled")
+        embed.set_footer(text="🎯 Free during testing • Full ownership of generated images")
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 

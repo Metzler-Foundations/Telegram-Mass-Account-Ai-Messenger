@@ -65,6 +65,22 @@ class Database:
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS studio_sessions (
+                    thread_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    guild_id TEXT NOT NULL,
+                    channel_id TEXT NOT NULL,
+                    temp_dir TEXT NOT NULL,
+                    ref_paths TEXT,  -- JSON array of paths
+                    training_id TEXT,
+                    trained_model TEXT,
+                    training_start_time REAL,
+                    progress_percentage INTEGER DEFAULT 0,
+                    dashboard_message_id TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
                 """
             )
 
@@ -251,6 +267,67 @@ class Database:
                 (training_id,),
             )
             return cur.fetchone()
+
+    # ===========================
+    # Studio sessions
+    # ===========================
+
+    def save_studio_session(
+        self,
+        thread_id: str,
+        user_id: str,
+        guild_id: str,
+        channel_id: str,
+        temp_dir: str,
+        ref_paths: List[str],
+        training_id: Optional[str] = None,
+        trained_model: Optional[str] = None,
+        training_start_time: Optional[float] = None,
+        progress_percentage: int = 0,
+        dashboard_message_id: Optional[int] = None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO studio_sessions
+                (thread_id, user_id, guild_id, channel_id, temp_dir, ref_paths,
+                 training_id, trained_model, training_start_time, progress_percentage,
+                 dashboard_message_id, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """,
+                (
+                    thread_id,
+                    user_id,
+                    guild_id,
+                    channel_id,
+                    temp_dir,
+                    json.dumps(ref_paths),
+                    training_id,
+                    trained_model,
+                    training_start_time,
+                    progress_percentage,
+                    str(dashboard_message_id) if dashboard_message_id else None,
+                ),
+            )
+
+    def get_studio_session(self, thread_id: str) -> Optional[sqlite3.Row]:
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                SELECT * FROM studio_sessions WHERE thread_id=?
+                """,
+                (thread_id,),
+            )
+            return cur.fetchone()
+
+    def delete_studio_session(self, thread_id: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                DELETE FROM studio_sessions WHERE thread_id=?
+                """,
+                (thread_id,),
+            )
 
 
 
