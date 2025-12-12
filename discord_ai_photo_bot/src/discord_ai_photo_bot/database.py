@@ -53,6 +53,18 @@ class Database:
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
+
+                CREATE TABLE IF NOT EXISTS training_jobs (
+                    training_id TEXT PRIMARY KEY,
+                    user_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    destination TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    error TEXT,
+                    logs TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
                 """
             )
 
@@ -167,12 +179,76 @@ class Database:
         with self._connect() as conn:
             cur = conn.execute(
                 """
-                SELECT * FROM jobs 
+                SELECT * FROM jobs
                 WHERE invoice_id=?
                 ORDER BY created_at DESC
                 LIMIT 1
                 """,
                 (invoice_id,),
+            )
+            return cur.fetchone()
+
+    # ===========================
+    # Training jobs (Replicate LoRA)
+    # ===========================
+
+    def upsert_training_job(
+        self,
+        training_id: str,
+        user_id: str,
+        thread_id: str,
+        destination: str,
+        status: str,
+        error: Optional[str] = None,
+        logs: Optional[str] = None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO training_jobs
+                (training_id, user_id, thread_id, destination, status, error, logs, created_at, updated_at)
+                VALUES (
+                    ?, ?, ?, ?, ?, ?, ?,
+                    COALESCE((SELECT created_at FROM training_jobs WHERE training_id=?), CURRENT_TIMESTAMP),
+                    CURRENT_TIMESTAMP
+                )
+                """,
+                (
+                    training_id,
+                    user_id,
+                    thread_id,
+                    destination,
+                    status,
+                    error,
+                    logs,
+                    training_id,
+                ),
+            )
+
+    def update_training_status(
+        self,
+        training_id: str,
+        status: str,
+        error: Optional[str] = None,
+        logs: Optional[str] = None,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE training_jobs
+                SET status=?, error=?, logs=?, updated_at=?
+                WHERE training_id=?
+                """,
+                (status, error, logs, datetime.utcnow().isoformat(), training_id),
+            )
+
+    def get_training_job(self, training_id: str) -> Optional[sqlite3.Row]:
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                SELECT * FROM training_jobs WHERE training_id=?
+                """,
+                (training_id,),
             )
             return cur.fetchone()
 

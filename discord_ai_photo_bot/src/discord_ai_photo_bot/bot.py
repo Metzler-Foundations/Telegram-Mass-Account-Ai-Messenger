@@ -13,9 +13,10 @@ from discord.ext import commands
 import sentry_sdk
 import uvicorn
 
-from discord_ai_photo_bot.ai.generator import ReplicateGenerator
+from discord_ai_photo_bot.ai.generator import ReplicateGenerator, ReplicateLoraWorkflow
 from discord_ai_photo_bot.commands.generate_pack import GeneratePack
 from discord_ai_photo_bot.commands.photo_verification import PhotoVerification
+from discord_ai_photo_bot.commands.studio import Studio
 from discord_ai_photo_bot.config import Settings, load_settings
 from discord_ai_photo_bot.database import Database
 from discord_ai_photo_bot.jobs.queue import GenerationJob, JobQueue
@@ -40,16 +41,31 @@ class DiscordPhotoBot(commands.Bot):
         self.settings = settings
         self.db = Database(settings.data_dir / "bot.db")
         self.payments = BitcoinPaymentGateway(settings)
+
+        # Legacy generator (kept for compatibility)
         self.generator = ReplicateGenerator(api_token=settings.replicate_token)
+
+        # Premium LoRA workflow
+        self.workflow = ReplicateLoraWorkflow(
+            api_token=settings.replicate_token,
+            training_model=settings.replicate_training_model,
+            training_version=settings.replicate_training_version,
+            training_params_json=settings.replicate_training_params_json,
+            trigger_word=settings.replicate_trigger_word or "TOK",
+            generation_params_json=settings.replicate_generation_params_json,
+        )
+
         self.storage = DiscordStorage()
         self.queue = JobQueue()
+
+        # Payments/webhooks are disabled for now (free testing mode), but keep app available.
         self.webhook_app = create_webhook_app(settings, self.payments)
         self._webhook_server: Optional[uvicorn.Server] = None
 
         # Initialize server manager for role management
         server_config = ServerConfig(
             token=settings.discord_token,
-            guild_id=int(settings.discord_guild_id)
+            guild_id=int(settings.discord_guild_id),
         )
         self.server_manager = DiscordServerManager(server_config)
 
@@ -72,7 +88,18 @@ class DiscordPhotoBot(commands.Bot):
         )
         await self.add_cog(cog)
 
-        # Add photo verification cog
+        # Premium studio cog (payments bypassed)
+        await self.add_cog(
+            Studio(
+                bot=self,
+                settings=self.settings,
+                db=self.db,
+                workflow=self.workflow,
+                storage=self.storage,
+            )
+        )
+
+        # Add photo verification cog (legacy)
         verification_cog = PhotoVerification(self, self.settings)
         await self.add_cog(verification_cog)
 
@@ -81,30 +108,33 @@ class DiscordPhotoBot(commands.Bot):
 
         await self.tree.sync()
         logger.info("Slash commands synced.")
-        
-        # Start webhook server in background
-        webhook_port = int(os.environ.get("WEBHOOK_PORT", "8000"))
-        config = uvicorn.Config(
-            app=self.webhook_app,
-            host="0.0.0.0",
-            port=webhook_port,
-            log_level="info",
-        )
-        self._webhook_server = uvicorn.Server(config)
-        
-        async def start_webhook():
-            try:
-                await self._webhook_server.serve()
-            except OSError as e:
-                if "address already in use" in str(e):
-                    logger.warning(f"Webhook port {webhook_port} already in use, skipping webhook server")
-                else:
-                    logger.error(f"Failed to start webhook server: {e}")
-            except Exception as e:
-                logger.error(f"Webhook server error: {e}")
-        
-        asyncio.create_task(start_webhook())
-        logger.info(f"Webhook server starting on port {webhook_port}")
+
+        # Payments are off for now: do NOT start webhook server.
+        if os.environ.get("ENABLE_WEBHOOK_SERVER", "").strip().lower() in ("1", "true", "yes"):
+            webhook_port = int(os.environ.get("WEBHOOK_PORT", "8000"))
+            config = uvicorn.Config(
+                app=self.webhook_app,
+                host="0.0.0.0",
+                port=webhook_port,
+                log_level="info",
+            )
+            self._webhook_server = uvicorn.Server(config)
+
+            async def start_webhook():
+                try:
+                    await self._webhook_server.serve()
+                except OSError as e:
+                    if "address already in use" in str(e):
+                        logger.warning(
+                            f"Webhook port {webhook_port} already in use, skipping webhook server"
+                        )
+                    else:
+                        logger.error(f"Failed to start webhook server: {e}")
+                except Exception as e:
+                    logger.error(f"Webhook server error: {e}")
+
+            asyncio.create_task(start_webhook())
+            logger.info(f"Webhook server starting on port {webhook_port}")
 
     async def process_generation_job(self, job: GenerationJob) -> None:
         """Handle a queued generation job."""
