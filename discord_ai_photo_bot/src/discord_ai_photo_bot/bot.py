@@ -1,29 +1,22 @@
-"""Discord bot entrypoint wiring commands, payments, and generation."""
+"""Discord bot entrypoint wiring the premium /studio flow.
+
+Legacy BTC/payment commands are intentionally disabled.
+"""
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import os
-from pathlib import Path
-from typing import Optional
 
 import discord
 from discord.ext import commands
 import sentry_sdk
-import uvicorn
 
-from discord_ai_photo_bot.ai.generator import ReplicateGenerator, ReplicateLoraWorkflow
-from discord_ai_photo_bot.commands.generate_pack import GeneratePack
-from discord_ai_photo_bot.commands.photo_verification import PhotoVerification
-from discord_ai_photo_bot.commands.studio import Studio
+from discord_ai_photo_bot.ai.generator import ReplicateLoraWorkflow
+from discord_ai_photo_bot.commands.help import StudioHelp
+from discord_ai_photo_bot.commands.studio import DEFAULT_PACK_COUNT, MAX_REFS, MIN_REFS, Studio
 from discord_ai_photo_bot.config import Settings, load_settings
 from discord_ai_photo_bot.database import Database
-from discord_ai_photo_bot.jobs.queue import GenerationJob, JobQueue
-from discord_ai_photo_bot.payments.bitcoin import BitcoinPaymentGateway
-from discord_ai_photo_bot.server_manager import DiscordServerManager, ServerConfig
 from discord_ai_photo_bot.storage.discord_storage import DiscordStorage
-from discord_ai_photo_bot.webhook import create_webhook_app
 
 
 logger = logging.getLogger(__name__)
@@ -34,16 +27,12 @@ class DiscordPhotoBot(commands.Bot):
 
     def __init__(self, settings: Settings) -> None:
         intents = discord.Intents.default()
-        intents.message_content = True
+        intents.message_content = True  # required to read attachment messages in studio threads
         intents.dm_messages = True
 
         super().__init__(command_prefix="!", intents=intents)
         self.settings = settings
         self.db = Database(settings.data_dir / "bot.db")
-        self.payments = BitcoinPaymentGateway(settings)
-
-        # Legacy generator (kept for compatibility)
-        self.generator = ReplicateGenerator(api_token=settings.replicate_token)
 
         # Premium LoRA workflow
         self.workflow = ReplicateLoraWorkflow(
@@ -56,39 +45,9 @@ class DiscordPhotoBot(commands.Bot):
         )
 
         self.storage = DiscordStorage()
-        self.queue = JobQueue()
-
-        # Payments/webhooks are disabled for now (free testing mode), but keep app available.
-        self.webhook_app = create_webhook_app(settings, self.payments)
-        self._webhook_server: Optional[uvicorn.Server] = None
-
-        # Initialize server manager for role management
-        server_config = ServerConfig(
-            token=settings.discord_token,
-            guild_id=int(settings.discord_guild_id),
-        )
-        self.server_manager = DiscordServerManager(server_config)
 
     async def setup_hook(self) -> None:
-        # Connect server manager
-        await self.server_manager.connect()
-        logger.info("Server manager connected")
-
-        # Create verification channel if it doesn't exist
-        await self._ensure_verification_channel()
-
-        cog = GeneratePack(
-            bot=self,
-            settings=self.settings,
-            db=self.db,
-            payments=self.payments,
-            queue=self.queue,
-            generation_handler=self.process_generation_job,
-            server_manager=self.server_manager,
-        )
-        await self.add_cog(cog)
-
-        # Premium studio cog (payments bypassed)
+        # Premium studio cog (only user-facing surface)
         await self.add_cog(
             Studio(
                 bot=self,
@@ -98,72 +57,21 @@ class DiscordPhotoBot(commands.Bot):
                 storage=self.storage,
             )
         )
+        await self.add_cog(StudioHelp(self, settings=self.settings))
 
-        # Add photo verification cog (legacy)
-        verification_cog = PhotoVerification(self, self.settings)
-        await self.add_cog(verification_cog)
+        # Sync commands to the configured guild for immediate updates (no 1-hour global delay)
+        guild_obj = discord.Object(id=int(self.settings.discord_guild_id))
+        await self.tree.sync(guild=guild_obj)
+        logger.info("Slash commands synced to guild %s.", self.settings.discord_guild_id)
 
-        # Register persistent views
-        self.add_view(verification_cog.guide_view)
-
+        # Also sync globally so removed legacy commands eventually disappear everywhere.
+        # This can take up to ~1 hour to propagate, but ensures clean command surface long-term.
         await self.tree.sync()
-        logger.info("Slash commands synced.")
+        logger.info("Slash commands synced globally.")
 
-        # Payments are off for now: do NOT start webhook server.
-        if os.environ.get("ENABLE_WEBHOOK_SERVER", "").strip().lower() in ("1", "true", "yes"):
-            webhook_port = int(os.environ.get("WEBHOOK_PORT", "8000"))
-            config = uvicorn.Config(
-                app=self.webhook_app,
-                host="0.0.0.0",
-                port=webhook_port,
-                log_level="info",
-            )
-            self._webhook_server = uvicorn.Server(config)
+        # Post/pin the studio guide in #photo-generation (best-effort)
+        await self._ensure_studio_guide()
 
-            async def start_webhook():
-                try:
-                    await self._webhook_server.serve()
-                except OSError as e:
-                    if "address already in use" in str(e):
-                        logger.warning(
-                            f"Webhook port {webhook_port} already in use, skipping webhook server"
-                        )
-                    else:
-                        logger.error(f"Failed to start webhook server: {e}")
-                except Exception as e:
-                    logger.error(f"Webhook server error: {e}")
-
-            asyncio.create_task(start_webhook())
-            logger.info(f"Webhook server starting on port {webhook_port}")
-
-    async def process_generation_job(self, job: GenerationJob) -> None:
-        """Handle a queued generation job."""
-
-        output_dir = Path(self.settings.data_dir) / "generated" / job.invoice_id
-        try:
-            self.db.update_job_status(job.job_id, "running")
-            generated = await self.generator.generate_batch(
-                prompts=job.prompts,
-                reference_images=job.reference_images,
-                output_dir=output_dir,
-            )
-            self.db.update_job_status(
-                job.job_id, "complete", output_paths=[str(path) for path in generated]
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Generation failed for job %s: %s", job.job_id, exc)
-            self.db.update_job_status(job.job_id, "failed", output_paths=[])
-            return
-
-        try:
-            user = await self.fetch_user(int(job.user_id))
-            await self.storage.send_pack(
-                channel=user,
-                file_paths=generated,
-                note="Your gesture photo pack is ready.",
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Failed to deliver pack for job %s: %s", job.job_id, exc)
 
     async def on_app_command_error(
         self, interaction: discord.Interaction, error: Exception
@@ -182,48 +90,78 @@ class DiscordPhotoBot(commands.Bot):
                 ephemeral=True,
             )
 
-    async def close(self) -> None:
-        """Clean up resources on bot shutdown."""
-        # Stop webhook server
-        if self._webhook_server:
-            self._webhook_server.should_exit = True
-            logger.info("Webhook server shutdown initiated")
-        
-        # Stop job queue
-        await self.queue.stop()
-        
-        await super().close()
 
-    async def _ensure_verification_channel(self) -> None:
-        """Ensure the photo-verification channel exists under LLAMA LLAMA CLUB category."""
+    async def _ensure_studio_guide(self) -> None:
+        """Ensure a pinned /studio onboarding guide exists in #photo-generation (best-effort)."""
         try:
             guild = self.get_guild(int(self.settings.discord_guild_id))
             if not guild:
-                logger.warning("Guild not found, cannot create verification channel")
+                logger.warning("Guild not found, cannot post studio guide")
                 return
 
-            # Check if channel already exists
-            existing_channel = discord.utils.get(guild.channels, name="photo-verification")
-            if existing_channel:
-                logger.info("Photo-verification channel already exists")
+            channel = discord.utils.get(guild.text_channels, name="photo-generation")
+            if not channel:
+                logger.warning("Channel #photo-generation not found; skipping studio guide")
                 return
 
-            # Find the LLAMA LLAMA CLUB category
-            category = discord.utils.get(guild.categories, id=1448815942435078355)
-            if not category:
-                logger.warning("LLAMA LLAMA CLUB category not found")
-                return
+            guide_title = "AI Photo Studio • How it works"
 
-            # Create the channel
-            channel = await guild.create_text_channel(
-                name="photo-verification",
-                category=category,
-                topic="AI-powered photo verification - upload photos and generate verification images"
+            def _is_guide_message(msg: discord.Message) -> bool:
+                if not self.user or msg.author.id != self.user.id:
+                    return False
+                if not msg.embeds:
+                    return False
+                return (msg.embeds[0].title or "").strip() == guide_title
+
+            # 1) If already pinned, we're done.
+            pins = await channel.pins()
+            for msg in pins:
+                if _is_guide_message(msg):
+                    logger.info("Studio guide already pinned")
+                    return
+
+            # 2) If guide exists but got unpinned, re-pin it.
+            async for msg in channel.history(limit=50):
+                if _is_guide_message(msg):
+                    try:
+                        await msg.pin(reason="Re-pin studio onboarding guide")
+                        logger.info("Re-pinned existing studio guide")
+                    except discord.Forbidden:
+                        logger.warning("Missing permissions to pin messages in #photo-generation")
+                    return
+
+            # 3) Otherwise, post a new guide and pin it.
+            embed = discord.Embed(
+                title=guide_title,
+                description=(
+                    "**Start here:** run `/studio` to begin.\n\n"
+                    "**Flow**\n"
+                    "1) Bot creates a private thread for you\n"
+                    f"2) Upload **{MIN_REFS}–{MAX_REFS}** photos of the same person\n"
+                    "3) Click **Finish uploads & start training**\n"
+                    f"4) When training completes, click **Generate pack ({DEFAULT_PACK_COUNT})**\n"
+                    "5) You receive a ZIP via DM\n\n"
+                    "**Best reference photos**\n"
+                    "- No filters, no group photos\n"
+                    "- Face visible, good lighting, multiple angles\n"
+                    "- Mix: close-up + mid-shot + different expressions\n\n"
+                    "**Important**\n"
+                    "- Use only photos you have permission to use\n"
+                    "- Training can take several minutes"
+                ),
+                color=discord.Color.from_rgb(138, 43, 226),
             )
-            logger.info(f"Created photo-verification channel: {channel.id}")
+            embed.set_footer(text="Payments are currently disabled during testing.")
 
-        except Exception as e:
-            logger.error(f"Failed to create verification channel: {e}")
+            guide_msg = await channel.send(embed=embed)
+            try:
+                await guide_msg.pin(reason="Studio onboarding guide")
+            except discord.Forbidden:
+                logger.warning("Missing permissions to pin messages in #photo-generation")
+            logger.info("Posted studio guide in #photo-generation")
+
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed ensuring studio guide: %s", exc)
 
 
 def run_bot() -> None:

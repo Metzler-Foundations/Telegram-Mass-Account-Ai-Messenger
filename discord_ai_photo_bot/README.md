@@ -1,6 +1,12 @@
 # Discord AI Photo Bot
 
-A Discord bot for generating AI photo packs with Bitcoin payments.
+A Discord bot for photorealistic identity training + photo generation in Discord.
+
+Primary user flow: [`/studio`](discord_ai_photo_bot/src/discord_ai_photo_bot/commands/studio.py:184) (upload reference photos → train LoRA → generate pack → receive ZIP via DM).
+
+This repo is currently **studio-only**:
+- Legacy BTC/payment commands are not exposed
+- Payments/webhooks are not started
 
 ## Quick Setup
 
@@ -57,76 +63,22 @@ This will guide you through:
 
 ## Running the Bot
 
+From the repo root (recommended `src/` layout invocation):
+
 ```bash
 cd discord_ai_photo_bot
-source venv/bin/activate
-python -m discord_ai_photo_bot.bot
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Run with src/ on PYTHONPATH
+PYTHONPATH=./src python -m discord_ai_photo_bot.bot
 ```
 
-## Server Management
+## Server Management (optional)
 
-Use the CLI tool to manage your Discord server:
-
-```bash
-# Show server info
-python manage_server.py info
-
-# List channels
-python manage_server.py channels
-
-# List roles
-python manage_server.py roles
-
-# Create a text channel
-python manage_server.py create-channel announcements --category "📢 Information" --topic "Important updates"
-
-# Create a voice channel
-python manage_server.py create-voice "General Voice" --category "🔊 Voice"
-
-# Create a category
-python manage_server.py create-category "💬 Chat"
-
-# Create a role
-python manage_server.py create-role "VIP" --color "#FFD700" --hoist
-
-# Send a message
-python manage_server.py send general "Hello, world!"
-
-# Set up standard server structure
-python manage_server.py setup-standard
-
-# Export server structure
-python manage_server.py export --output my_server.json
-```
-
-### Available Commands
-
-| Command | Description |
-|---------|-------------|
-| `info` | Show server information |
-| `channels` | List all channels |
-| `roles` | List all roles |
-| `members [--limit N]` | List server members |
-| `create-channel <name>` | Create text channel |
-| `create-voice <name>` | Create voice channel |
-| `create-category <name>` | Create category |
-| `create-role <name>` | Create role |
-| `delete-channel <name>` | Delete a channel |
-| `delete-role <name>` | Delete a role |
-| `send <channel> <msg>` | Send a message |
-| `purge <channel>` | Delete messages |
-| `export` | Export server structure |
-| `setup-standard` | Create standard structure |
-
-### Options for create-channel
-- `--category, -c`: Category to place channel in
-- `--topic, -t`: Channel topic/description
-- `--slowmode, -s`: Slowmode delay in seconds
-
-### Options for create-role
-- `--color`: Hex color (e.g., `#ff0000`)
-- `--hoist`: Display role separately in member list
-- `--mentionable`: Allow @mentions of this role
+A separate CLI exists in [`discord_ai_photo_bot/manage_server.py`](discord_ai_photo_bot/manage_server.py) for server administration.
+It’s optional and not required for the `/studio` workflow.
 
 ## Bot Commands (for users)
 
@@ -134,58 +86,84 @@ Once running, users can interact with the bot via slash commands:
 
 | Command | Description |
 |---------|-------------|
-| `/generate_pack` | Start a photo pack order (requires BTC payment) |
-| `/upload_refs` | Upload reference photos after payment |
+| `/studio` | Premium guided studio session: upload refs → train → generate → DM ZIP |
+| `/help` | Show the `/studio` quickstart |
+
+### `/studio` workflow (premium)
+1. Run `/studio` inside `#photo-generation`
+2. The bot creates a private thread for your session
+3. Upload **8–20** photos of the same person (best: 10–20)
+4. Click **Finish uploads & start training**
+5. When training completes, click **Generate pack (40)**
+6. Receive a ZIP via DM
+
+The bot will also auto-post and pin a “How it works” guide in `#photo-generation` on startup (best-effort).
 
 ## File Structure
 
 ```
 discord_ai_photo_bot/
-├── .env                    # Your configuration (create from env.sample)
-├── env.sample              # Example configuration
-├── discord_config.json     # Server config (created by setup)
-├── requirements.txt        # Python dependencies
-├── setup_discord.py        # Interactive setup wizard
-├── manage_server.py        # CLI server management
-├── venv/                   # Python virtual environment
+├── .env                      # Your configuration (create from env.sample)
+├── env.sample                # Example configuration
+├── requirements.txt          # Python dependencies
 └── src/
     └── discord_ai_photo_bot/
-        ├── bot.py              # Main bot entry point
-        ├── config.py           # Configuration loader
-        ├── database.py         # SQLite database
-        ├── server_manager.py   # Server management utilities
+        ├── bot.py                # Main bot entry point (studio-only)
+        ├── config.py             # Configuration loader
+        ├── database.py           # SQLite database (training_jobs table)
         ├── ai/
-        │   └── generator.py    # Replicate AI integration
+        │   └── generator.py      # Replicate LoRA training + generation
         ├── commands/
-        │   └── generate_pack.py # Slash commands
-        ├── jobs/
-        │   └── queue.py        # Job queue for generation
-        ├── payments/
-        │   └── bitcoin.py      # BTC payment handling
+        │   ├── studio.py         # Premium /studio flow
+        │   └── help.py           # /help quickstart
         └── storage/
-            └── discord_storage.py # File delivery
+            └── discord_storage.py # File delivery (DM ZIP)
 ```
+
+> Legacy code (payments, server manager, legacy commands) remains in the repo but is not used by the studio-only bot entrypoint.
 
 ## Environment Variables
 
+### Required (Studio)
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DISCORD_BOT_TOKEN` | ✅ | Your bot token |
 | `DISCORD_APPLICATION_ID` | ✅ | Your application ID |
 | `DISCORD_GUILD_ID` | ✅ | Your server ID |
-| `REPLICATE_API_TOKEN` | ✅ | Replicate API key for AI |
-| `BTC_RECEIVER_ADDRESS` | ✅ | Bitcoin address for payments |
-| `PAYMENT_WEBHOOK_SECRET` | ❌ | Webhook secret for payments |
-| `PACK_USD_PRICE` | ❌ | Price per pack (default: 25.0) |
-| `PAYMENT_TIMEOUT_SECONDS` | ❌ | Payment timeout (default: 900) |
+| `REPLICATE_API_TOKEN` | ✅ | Replicate API key |
+| `REPLICATE_DESTINATION_OWNER` | ✅ | Your Replicate username/org to store trained LoRAs under |
+
+### Optional (Studio)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `REPLICATE_TRIGGER_WORD` | ❌ | Trigger token used in prompts (default: `TOK`) |
+| `REPLICATE_TRAINING_MODEL` | ❌ | Trainer model (default: `ostris/flux-dev-lora-trainer`) |
+| `REPLICATE_TRAINING_VERSION` | ❌ | Pin trainer version to avoid upstream breaking changes |
+| `REPLICATE_TRAINING_PARAMS_JSON` | ❌ | JSON overrides for training payload |
+| `REPLICATE_GENERATION_PARAMS_JSON` | ❌ | JSON overrides for generation payload |
 | `DISCORD_AI_BOT_DATA_DIR` | ❌ | Data directory (default: ./data) |
+
+### Deprecated (legacy payments/webhook)
+Present in [`discord_ai_photo_bot/env.sample`](discord_ai_photo_bot/env.sample:1) but not used by the studio-only bot:
+- `BTC_RECEIVER_ADDRESS`
+- `PAYMENT_WEBHOOK_SECRET`
+- `PACK_USD_PRICE`
+- `PAYMENT_TIMEOUT_SECONDS`
+- `ENABLE_WEBHOOK_SERVER`
+- `WEBHOOK_PORT`
 
 ## Troubleshooting
 
 ### Bot not responding to commands
 - Make sure the bot is online (green dot)
-- Run `python manage_server.py info` to test connection
-- Check that slash commands are synced (may take up to an hour)
+- Ensure you start it with `PYTHONPATH=./src` (see “Running the Bot”)
+- Commands are synced to your guild at startup; Discord clients can cache — try restarting Discord
+
+### `/studio` says to use `#photo-generation`
+- Create a text channel named `photo-generation` (exact name) or rename your intended channel.
+
+### OpenCV error: `libGL.so.1`
+- On Linux, install: `sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0`
 
 ### "Missing Access" errors
 - Re-invite the bot with Administrator permissions
@@ -201,7 +179,7 @@ discord_ai_photo_bot/
 pip install -r requirements.txt
 
 # Run bot with debug logging
-DISCORD_LOG_LEVEL=DEBUG python -m discord_ai_photo_bot.bot
+DISCORD_LOG_LEVEL=DEBUG PYTHONPATH=./src python -m discord_ai_photo_bot.bot
 ```
 
 ## License
