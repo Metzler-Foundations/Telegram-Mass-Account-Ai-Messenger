@@ -43,11 +43,55 @@ Your Railway trial has expired. The API cannot perform mutations (set variables,
 ## Prerequisites
 
 Before deploying, you need:
-1. A Railway account with an active plan (Hobby or Pro)
-2. Your Discord Bot Token
-3. Your Discord Guild ID (server ID)
-4. Your Replicate API Token
-5. Your Replicate username/org
+1. **Railway account with active plan** (Hobby $5/month or Pro)
+2. **Discord Bot Token** from https://discord.com/developers/applications
+3. **Discord Guild ID** (right-click server → Copy Server ID)
+4. **Replicate API Token** from https://replicate.com/account/api-tokens
+5. **Replicate username/org** for LoRA storage
+6. **Audit Key Passphrase** (generate a secure random string)
+
+## Complete Setup Checklist
+
+### ✅ Step 1: Railway Account Setup
+- [ ] Upgrade to Hobby ($5/month) or Pro plan
+- [ ] Verify billing information is complete
+- [ ] Confirm project access: https://railway.app/project/18b65cb0-f64c-47cc-b5ac-72b63da59c3a
+
+### ✅ Step 2: Discord Bot Configuration
+- [ ] Create application at https://discord.com/developers/applications
+- [ ] Enable Privileged Gateway Intents:
+  - [ ] PRESENCE INTENT
+  - [ ] SERVER MEMBERS INTENT
+  - [ ] MESSAGE CONTENT INTENT
+- [ ] Copy Bot Token
+- [ ] Copy Application ID
+- [ ] Generate invite URL with admin permissions
+
+### ✅ Step 3: Replicate API Setup
+- [ ] Sign up at https://replicate.com
+- [ ] Generate API token at https://replicate.com/account/api-tokens
+- [ ] Note your username/org for LoRA storage
+- [ ] Ensure you have credits for training
+
+### ✅ Step 4: Environment Variables
+Set these in Railway service Variables tab:
+
+```bash
+DISCORD_BOT_TOKEN=your_bot_token_here
+DISCORD_GUILD_ID=your_server_id_here
+REPLICATE_API_TOKEN=your_replicate_token_here
+REPLICATE_DESTINATION_OWNER=your_replicate_username
+PYTHONPATH=/app/src
+AUDIT_KEY_PASSPHRASE=your_secure_random_passphrase_here
+```
+
+### ✅ Step 5: Deploy and Verify
+- [ ] Push latest code to GitHub main branch
+- [ ] Wait for Railway auto-deployment
+- [ ] Check Railway logs for successful startup
+- [ ] Verify bot appears online in Discord
+- [ ] Test `/studio` command in #photo-generation
+- [ ] Confirm enhanced onboarding guide is posted
 
 ## Required Environment Variables
 
@@ -56,10 +100,11 @@ Set these in Railway's service settings:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DISCORD_BOT_TOKEN` | ✅ | Your Discord bot token from Discord Developer Portal |
-| `DISCORD_GUILD_ID` | ✅ | Your Discord server ID |
-| `REPLICATE_API_TOKEN` | ✅ | Your Replicate API token |
+| `DISCORD_GUILD_ID` | ✅ | Your Discord server ID (right-click server → Copy Server ID) |
+| `REPLICATE_API_TOKEN` | ✅ | Your Replicate API token from https://replicate.com/account/api-tokens |
 | `REPLICATE_DESTINATION_OWNER` | ✅ | Your Replicate username/org for LoRA storage |
 | `PYTHONPATH` | ✅ | Set to `/app/src` for module resolution |
+| `AUDIT_KEY_PASSPHRASE` | ✅ | Random passphrase for audit log encryption (generate a secure one) |
 | `REPLICATE_TRIGGER_WORD` | ❌ | Trigger word for prompts (default: TOK) |
 | `REPLICATE_TRAINING_MODEL` | ❌ | Training model (default: ostris/flux-dev-lora-trainer) |
 | `DISCORD_AI_BOT_DATA_DIR` | ❌ | Data directory (default: ./data) |
@@ -177,6 +222,62 @@ discord_ai_photo_bot/
         ├── config.py     # Configuration loader
         └── ...
 ```
+
+## Automated Setup Script
+
+Run this script to set up Railway deployment automatically:
+
+```bash
+#!/bin/bash
+# Railway Deployment Setup Script
+
+echo "🚀 Setting up Discord AI Photo Bot on Railway..."
+
+# Check if Railway CLI is installed
+if ! command -v railway &> /dev/null; then
+    echo "Installing Railway CLI..."
+    npm install -g @railway/cli
+fi
+
+# Login to Railway
+echo "Logging into Railway..."
+railway login
+
+# Link to project
+echo "Linking to project..."
+railway link --project 18b65cb0-f64c-47cc-b5ac-72b63da59c3a
+
+# Set environment variables
+echo "Setting environment variables..."
+railway variables set DISCORD_BOT_TOKEN=$DISCORD_BOT_TOKEN
+railway variables set DISCORD_GUILD_ID=$DISCORD_GUILD_ID
+railway variables set REPLICATE_API_TOKEN=$REPLICATE_API_TOKEN
+railway variables set REPLICATE_DESTINATION_OWNER=$REPLICATE_DESTINATION_OWNER
+railway variables set PYTHONPATH=/app/src
+railway variables set AUDIT_KEY_PASSPHRASE=$(openssl rand -hex 32)
+
+echo "✅ Setup complete! Run 'railway up' to deploy."
+```
+
+## Environment Variables Reference
+
+### Required Variables
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `DISCORD_BOT_TOKEN` | `MTE4...` | Bot token from Discord Developer Portal |
+| `DISCORD_GUILD_ID` | `1448262639707754536` | Server ID (right-click server → Copy ID) |
+| `REPLICATE_API_TOKEN` | `r8_...` | API token from Replicate |
+| `REPLICATE_DESTINATION_OWNER` | `yourusername` | Your Replicate username |
+| `PYTHONPATH` | `/app/src` | Module resolution path |
+| `AUDIT_KEY_PASSPHRASE` | `a1b2c3...` | Secure random string for encryption |
+
+### Optional Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REPLICATE_TRIGGER_WORD` | `TOK` | Word to trigger AI generation |
+| `REPLICATE_TRAINING_MODEL` | `ostris/flux-dev-lora-trainer` | Training model |
+| `DISCORD_AI_BOT_DATA_DIR` | `./data` | SQLite database location |
+| `SENTRY_DSN` | `null` | Error tracking DSN |
 
 ## Railway Project Details
 
