@@ -35,6 +35,8 @@ This guide covers free hosting options for the Discord AI Photo Bot.
 
 6. **Deploy** - Railway will auto-detect Python and start the bot
 
+**Note:** Railway handles persistent storage through their volumes system, not Docker VOLUME instructions. The bot stores data in the container filesystem.
+
 ---
 
 ## Alternative: Render.com (Free Tier)
