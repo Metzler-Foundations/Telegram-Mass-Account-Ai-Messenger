@@ -121,10 +121,12 @@ class MemberQueries:
             ORDER BY scraped_at DESC
         """
 
+        params = ()
         if limit:
-            query += f" LIMIT {limit}"
+            query += " LIMIT ?"
+            params = (limit,)
 
-        members = self.db.execute_query(query)
+        members = self.db.execute_query(query, params)
         logger.info(f"Retrieved {len(members)} REAL members from database")
         return members
 
@@ -232,7 +234,8 @@ class MemberQueries:
         """
 
         if filter_criteria.get("limit"):
-            query += f" LIMIT {filter_criteria['limit']}"
+            query += " LIMIT ?"
+            params.append(filter_criteria["limit"])
 
         members = self.db.execute_query(query, tuple(params))
         logger.info(f"Filtered query returned {len(members)} REAL members")
@@ -315,10 +318,11 @@ class MemberQueries:
             FROM members
             WHERE {where_clause}
             ORDER BY scraped_at DESC
-            LIMIT {page_size} OFFSET {offset}
+            LIMIT ? OFFSET ?
         """
 
-        members = self.db.execute_query(data_query, tuple(params))
+        paginated_params = params + [page_size, offset]
+        members = self.db.execute_query(data_query, tuple(paginated_params))
         logger.info(f"Retrieved page {page} of members ({len(members)} items, {total_count} total)")
 
         return members, total_count

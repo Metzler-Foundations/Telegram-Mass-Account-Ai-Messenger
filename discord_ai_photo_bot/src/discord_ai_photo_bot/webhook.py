@@ -30,22 +30,27 @@ def create_webhook_app(settings: Settings, payments: BitcoinPaymentGateway) -> F
     async def verify_and_parse_webhook(request: Request) -> PaymentWebhookPayload:
         """Verify webhook signature and parse payload."""
         body_bytes = await request.body()
-        
-        # Verify signature if configured
-        if settings.payment_webhook_secret:
-            signature = request.headers.get("X-Signature")
-            if not signature:
-                raise HTTPException(status_code=401, detail="Missing webhook signature")
 
-            expected_signature = hmac.new(
-                settings.payment_webhook_secret.encode(),
-                body_bytes,
-                hashlib.sha256
-            ).hexdigest()
+        # Always verify signature - security requirement
+        if not settings.payment_webhook_secret:
+            raise HTTPException(
+                status_code=500,
+                detail="Webhook signature verification required but secret not configured"
+            )
 
-            if not hmac.compare_digest(signature, expected_signature):
-                raise HTTPException(status_code=401, detail="Invalid webhook signature")
-        
+        signature = request.headers.get("X-Signature")
+        if not signature:
+            raise HTTPException(status_code=401, detail="Missing webhook signature")
+
+        expected_signature = hmac.new(
+            settings.payment_webhook_secret.encode(),
+            body_bytes,
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(signature, expected_signature):
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+
         # Parse JSON payload
         try:
             body_json = json.loads(body_bytes.decode("utf-8"))

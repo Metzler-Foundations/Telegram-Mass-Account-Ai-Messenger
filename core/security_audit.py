@@ -89,24 +89,53 @@ class SecurityAuditLogger:
     def _generate_integrity_key(self) -> bytes:
         """Generate a key for log integrity verification."""
         key_file = self.audit_dir / ".integrity_key"
+        passphrase = os.environ.get("AUDIT_KEY_PASSPHRASE")
+
+        if not passphrase:
+            logger.warning("AUDIT_KEY_PASSPHRASE environment variable not set!")
+            logger.warning("Generating new key with random passphrase for development")
+            passphrase = os.urandom(32).hex()
+            logger.warning(f"Generated passphrase: {passphrase}")
+            logger.warning("Set AUDIT_KEY_PASSPHRASE environment variable in production!")
+
+        passphrase_bytes = passphrase.encode()
+
         if key_file.exists():
-            with open(key_file, "rb") as f:
-                return f.read()
+            try:
+                with open(key_file, "rb") as f:
+                    encrypted_pem = f.read()
+                # Try to load with passphrase
+                private_key = serialization.load_pem_private_key(
+                    encrypted_pem, password=passphrase_bytes
+                )
+                return private_key.private_bytes(
+                    encoding=serialization.Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption(),
+                )
+            except Exception as e:
+                logger.error(f"Failed to load encrypted integrity key: {e}")
+                logger.warning("Generating new encrypted key")
 
         # Generate new RSA key pair for integrity
         private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-        # Save private key securely
-        pem = private_key.private_bytes(
+        # Save private key securely with encryption
+        encrypted_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.BestAvailableEncryption(passphrase_bytes),
+        )
+
+        with open(key_file, "wb") as f:
+            f.write(encrypted_pem)
+
+        # Return unencrypted PEM for use
+        return private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption(),
         )
-
-        with open(key_file, "wb") as f:
-            f.write(pem)
-
-        return pem
 
     def _get_system_context(self) -> Dict[str, Any]:
         """Get system context information."""
