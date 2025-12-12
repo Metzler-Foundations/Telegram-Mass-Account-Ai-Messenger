@@ -96,6 +96,10 @@ class DiscordPhotoBot(commands.Bot):
     async def _ensure_studio_guide_with_retries(self) -> None:
         """Run studio-guide posting after the bot is ready, with a few retries.
 
+        Also enforces server structure:
+        - ensure category "LLAMA LLAMA CLUB" (by ID) exists (create by name if missing)
+        - ensure/move #photo-generation under that category
+
         This avoids a common failure mode where guild/channel caches are not ready during setup_hook.
         """
         try:
@@ -107,6 +111,7 @@ class DiscordPhotoBot(commands.Bot):
         # Retry a few times to allow guild/channel caches to populate.
         for attempt in range(1, 6):
             try:
+                await self._ensure_llama_category_and_channel()
                 posted = await self._ensure_studio_guide()
                 if posted:
                     return
@@ -115,6 +120,100 @@ class DiscordPhotoBot(commands.Bot):
             await asyncio.sleep(2.0 * attempt)
 
         logger.warning("Studio guide was not posted after retries.")
+
+    async def _ensure_llama_category_and_channel(self) -> None:
+        """Ensure #photo-generation is under the 'LLAMA LLAMA CLUB' category.
+
+        Target category ID: 1448815942435078355 (preferred).
+        If missing, create a category named 'LLAMA LLAMA CLUB' and log the new ID.
+        """
+        guild_id = int(self.settings.discord_guild_id)
+
+        # Prefer cached guild, fall back to API fetch.
+        guild = self.get_guild(guild_id)
+        if not guild:
+            try:
+                guild = await self.fetch_guild(guild_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Unable to fetch guild %s for structure enforcement: %s", guild_id, exc)
+                return
+
+        # Fetch all channels for reliable lookup.
+        try:
+            channels = await guild.fetch_channels()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to fetch channels for guild %s: %s", guild_id, exc)
+            return
+
+        target_category_id = 1448815942435078355
+        category = discord.utils.get(channels, id=target_category_id)
+
+        if not category:
+            # Fall back to category name, then create if missing.
+            category = discord.utils.get(channels, name="LLAMA LLAMA CLUB")
+            if not category:
+                try:
+                    # Need a cached Guild to create channels/categories
+                    cached_guild = self.get_guild(guild_id)
+                    if not cached_guild:
+                        logger.warning("Guild cache not ready; cannot create category yet.")
+                        return
+                    category = await cached_guild.create_category(
+                        name="LLAMA LLAMA CLUB",
+                        reason="Ensure premium studio category exists",
+                    )
+                    logger.warning(
+                        "Created category 'LLAMA LLAMA CLUB' with id=%s (update target id if you want it fixed).",
+                        category.id,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Failed to create category 'LLAMA LLAMA CLUB': %s", exc)
+                    return
+            else:
+                logger.warning(
+                    "Category id=%s not found; using category by name 'LLAMA LLAMA CLUB' (id=%s).",
+                    target_category_id,
+                    getattr(category, "id", None),
+                )
+
+        # Find existing #photo-generation (by name) across fetched channels.
+        photo_channel = discord.utils.get(channels, name="photo-generation")
+
+        # If it doesn't exist, create it under the category.
+        if not photo_channel:
+            try:
+                cached_guild = self.get_guild(guild_id)
+                if not cached_guild:
+                    logger.warning("Guild cache not ready; cannot create #photo-generation yet.")
+                    return
+                photo_channel = await cached_guild.create_text_channel(
+                    name="photo-generation",
+                    category=category if isinstance(category, discord.CategoryChannel) else None,
+                    topic="Premium AI photo studio: use /studio here.",
+                    reason="Ensure photo-generation channel exists for studio",
+                )
+                logger.info("Created #photo-generation under category id=%s", getattr(category, "id", None))
+                return
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to create #photo-generation: %s", exc)
+                return
+
+        # If it exists but is not under the category, move it.
+        try:
+            current_cat_id = getattr(getattr(photo_channel, "category", None), "id", None)
+            desired_cat_id = getattr(category, "id", None)
+            if desired_cat_id and current_cat_id != desired_cat_id:
+                await photo_channel.edit(
+                    category=category,
+                    reason="Move photo-generation under LLAMA LLAMA CLUB",
+                )
+                logger.info(
+                    "Moved #photo-generation into category id=%s (was %s)",
+                    desired_cat_id,
+                    current_cat_id,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to move #photo-generation into category: %s", exc)
 
     async def _ensure_studio_guide(self) -> bool:
         """Ensure a pinned /studio onboarding guide exists in #photo-generation (best-effort).
